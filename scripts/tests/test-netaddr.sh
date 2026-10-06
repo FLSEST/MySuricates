@@ -8,13 +8,13 @@ TMP="$(mktemp -d)"; trap 'rm -rf "$TMP"' EXIT
 PASS=0; FAIL=0
 check() { if eval "$2"; then echo "  ok   $1"; PASS=$((PASS + 1)); else echo "  FAIL $1"; FAIL=$((FAIL + 1)); fi; }
 mkdir -p "$TMP/linux" "$TMP/mac" "$TMP/none" "$TMP/tools"
-# Eigener PATH: nur die Werkzeuge, die netaddr.sh braucht — sonst kaeme das echte hostname zum Zug
+# Own PATH: only the tools netaddr.sh needs — otherwise the real hostname would come into play
 for t in awk sed cat dirname basename; do ln -s "$(command -v "$t")" "$TMP/tools/$t"; done
 cat > "$TMP/linux/hostname" <<'STUB'
 #!/bin/sh
 [ "$1" = -I ] && echo "192.168.1.20 127.0.0.1 10.8.0.3 fe80::1 192.168.1.20 "
 STUB
-# macOS: hostname kennt -I nicht, ipconfig getifaddr liefert je Schnittstelle eine Adresse
+# macOS: hostname does not know -I, ipconfig getifaddr returns one address per interface
 cat > "$TMP/mac/hostname" <<'STUB'
 #!/bin/sh
 echo "hostname: illegal option -- I" >&2; exit 1
@@ -24,7 +24,7 @@ cat > "$TMP/mac/ipconfig" <<'STUB'
 case "$2" in en0) echo 10.0.0.7 ;; en1) echo 10.0.0.8 ;; *) exit 1 ;; esac
 STUB
 chmod +x "$TMP"/linux/* "$TMP"/mac/*
-run() {  # OS-VERZEICHNIS SPRACHE BEFEHL
+run() {  # OS-DIRECTORY LANGUAGE COMMAND
   ( PATH="$TMP/$1:$TMP/tools"; export PATH; . "$HERE/../lib/i18n.sh"; i18n_load "$2"; . "$HERE/../lib/netaddr.sh"; eval "$3" )
 }
 

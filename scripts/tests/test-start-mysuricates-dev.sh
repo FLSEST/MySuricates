@@ -166,8 +166,8 @@ check "invalid mode refuses the start"      '[ "$RC" = 2 ]'
 check "compose file no longer hard-wires the socket" '! grep -q "docker.sock:/var/run/docker.sock" "$HERE/../../ai-automation-backend/docker-compose.dev-container.yml"'
 
 echo "9) --container builds the JAR the image copies (3bfa4e10)"
-# Dockerfile.stable kopiert target/ai-automation-backend-*.jar und kompiliert nichts. Ohne Maven-Lauf
-# lief nach einer Code-Aenderung still das zuletzt auf dem Host gebaute JAR.
+# Dockerfile.stable copies target/ai-automation-backend-*.jar and compiles nothing. Without a Maven run
+# after a code change the JAR last built on the host silently ran.
 mkdir -p "$TMP/cbin" "$TMP/cnm"
 cat > "$TMP/cbin/docker" <<'STUB'
 #!/usr/bin/env bash
@@ -183,7 +183,7 @@ cat > "$TMP/cbin/curl" <<'STUB'
 [[ "$*" == *":3000"* && -e "$FE_MARKER" ]] && exit 0
 exit 7
 STUB
-# restart startet einen fehlenden Vite mit — nie den echten aus dem Repo (3c75d433)
+# restart also starts a missing Vite — never the real one from the repo (3c75d433)
 cat > "$TMP/cbin/npm" <<'STUB'
 #!/usr/bin/env bash
 echo "npm $*" >> "$CALLS"; touch "$FE_MARKER"
@@ -239,14 +239,14 @@ URL="$(MYSURICATES_DEV_RUNTIME=container MYSURICATES_DEV_CONTAINER_PORT=9190 MYS
 check "MYSURICATES_API_BASE still wins"                  '[ "$URL" = "http://x:1/api/v1/system/info" ]'
 
 echo "11) a proxy from the environment never gets a request meant for the dev backend (bb4f60a5)"
-# curl 8.5 schickt auch localhost ueber http_proxy/https_proxy: die Bereitschaftspruefung lief ueber den
-# Proxy, und der Run-Waechter vor restart schickte ihm den API-Key — der zudem in den curl-Argumenten
-# stand, sichtbar in der Prozessliste. Echte HTTP-Antworten fuer das echte curl: tests/fake_instance.py;
-# der Fake-Proxy schreibt alles auf, was bei ihm ankommt, und antwortet 502 — er darf nichts bekommen.
+# curl 8.5 also sends localhost via http_proxy/https_proxy: the readiness check ran via the
+# proxy, and the run guard before restart sent it the API key — which also stood in the curl arguments,
+# visible in the process list. Real HTTP answers for the real curl: tests/fake_instance.py;
+# the fake proxy writes down everything that reaches it and answers 502 — it must receive nothing.
 if command -v python3 >/dev/null 2>&1 && command -v curl >/dev/null 2>&1; then
   FAKE="$HERE/fake_instance.py"; PXLOG="$TMP/proxy.log"; RKEY="key-bb4f60a5-$$"
   freeport() { local p="$1"; while (exec 3<>"/dev/tcp/127.0.0.1/$p") 2>/dev/null; do p=$((p + 1)); done; echo "$p"; }
-  serve() {  # MODUS PORT … — fake_instance.py losgeloest starten; gibt die PID aus, sobald der Port antwortet
+  serve() {  # MODE PORT … — start fake_instance.py detached; prints the PID as soon as the port answers
     local pid
     pid="$( (python3 "$FAKE" "$@" > /dev/null 2>&1 & echo $!) )"
     for _ in $(seq 1 100); do (exec 3<>"/dev/tcp/127.0.0.1/$2") 2>/dev/null && break; sleep 0.05; done
@@ -256,7 +256,7 @@ if command -v python3 >/dev/null 2>&1 && command -v curl >/dev/null 2>&1; then
   PXPORT="$(freeport $((APORT + 1)))"; PX_PID="$(serve proxy "$PXPORT" "$PXLOG")"
   trap 'kill "$API_PID" "$PX_PID" 2>/dev/null; rm -rf "$TMP"' EXIT
   PX="http://127.0.0.1:$PXPORT"
-  # proxied CODE — CODE im Starter (run_in_script) mit dem Fake-Proxy in jeder Variablen, die curl liest
+  # proxied CODE — CODE in the starter (run_in_script) with the fake proxy in every variable curl reads
   proxied() {
     : > "$PXLOG"
     run_in_script "export http_proxy=$PX https_proxy=$PX all_proxy=$PX HTTP_PROXY=$PX HTTPS_PROXY=$PX ALL_PROXY=$PX; unset no_proxy NO_PROXY; $1"

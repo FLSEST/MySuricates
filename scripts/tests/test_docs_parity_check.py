@@ -1,12 +1,12 @@
-"""Tests fuer scripts/public-readiness/docs_parity_check.py (TODO c58d7402).
+"""Tests for scripts/public-readiness/docs_parity_check.py (TODO c58d7402).
 
-Zwei der Faelle halten Fehler fest, die die Erstfassung des Skripts wirklich hatte und die
-beide zu **Falschbefunden** gefuehrt haetten — der teuersten Sorte Fehler in einem Gate:
+Two of the cases pin errors that the first version of the script really had and that
+would both have led to **false findings** — the most expensive kind of error in a gate:
 
-* `test_slug_keeps_each_space`   — Slug zog Leerzeichenfolgen zusammen, korrekte Anker
-                                   galten als tot.
-* `test_headings_skip_code_block` — `# Kommentar` in einem Shell-Beispiel zaehlte als
-                                   Ueberschrift und erzeugte Phantom-Unterschiede.
+* `test_slug_keeps_each_space`   — slug collapsed runs of spaces, correct anchors
+                                                                      counted as dead.
+* `test_headings_skip_code_block` — `# Kommentar` in a shell example counted as
+                                                                      a heading and produced phantom differences.
 
 Run: python3 -m unittest discover -s scripts/tests -p 'test_docs_parity_check.py'
 """
@@ -39,8 +39,8 @@ def run_script(root: Path):
 
 class SlugTest(unittest.TestCase):
     def test_slug_keeps_each_space(self):
-        # `a` / `b` — c  ->  zwischen a und b stehen nach dem Entfernen von Backtick und
-        # Schraegstrich zwei Leerzeichen, GitHub macht daraus zwei Bindestriche.
+        # `a` / `b` — c  ->  after removing the backtick and
+        # slash there are two spaces between a and b, GitHub turns them into two hyphens.
         self.assertEqual(dpc.slug("### `a` / `b` — c"), "a--b--c")
 
     def test_slug_real_heading(self):
@@ -126,9 +126,9 @@ class GateTest(unittest.TestCase):
             self.assertIn("BEFUND: abschnitt-fehlt-en", out)
 
     def test_known_gap_stays_green(self):
-        # Eine Luecke, die in KNOWN_GAPS steht, meldet das Gate als bekannt und bleibt gruen.
-        # KNOWN_GAPS ist seit TODO 47bd4d27 leer; geprueft wird der Mechanismus mit einem
-        # Testeintrag — im selben Prozess, weil ein Unterprozess die Ersetzung nicht saehe.
+        # A gap listed in KNOWN_GAPS is reported by the gate as known and stays green.
+        # KNOWN_GAPS has been empty since TODO 47bd4d27; the mechanism is tested with a
+        # test entry — in the same process, because a subprocess would not see the replacement.
         with tempfile.TemporaryDirectory() as tmp:
             root = self.build(tmp, extra_de_file="diagramme.md")
             argv = ["docs_parity_check.py", "--root", str(root)]
@@ -142,10 +142,10 @@ class GateTest(unittest.TestCase):
             self.assertIn("gate_status: GREEN", out)
 
     def test_english_link_to_german_page_is_reported_not_failed(self):
-        # README.md und docs/en/ sind der englische Pfad. Ein Verweis von dort auf eine
-        # rein deutsche Seite ist ein Hinweis fuers Audit, das Gate bleibt gruen (TODO 1b84ecab).
+        # README.md and docs/en/ are the English path. A link from there to a
+        # purely German page is a hint for the audit, the gate stays green (TODO 1b84ecab).
         with tempfile.TemporaryDirectory() as tmp:
-            # `plans/` ist kein gespiegelter Ordner (anders als konzepte/, siehe MIRRORED_SUBDIRS).
+            # `plans/` is not a mirrored folder (unlike konzepte/, see MIRRORED_SUBDIRS).
             root = self.build(tmp, en_extra="[Plan](../plans/README.md)\n[A](a.md)")
             (root / "docs" / "plans").mkdir()
             (root / "docs" / "plans" / "README.md").write_text("# Plan\n")
@@ -166,7 +166,7 @@ class GateTest(unittest.TestCase):
 
 
 class MirroredSubdirTest(unittest.TestCase):
-    """Unterordner wie docs/konzepte/ werden gespiegelt geprueft wie docs/ selbst (TODO b94beaed)."""
+    """Subfolders like docs/konzepte/ are checked as mirrored like docs/ itself (TODO b94beaed)."""
 
     def build(self, tmp, *, de_body="# K\n\n## Eins\n", en_body="# K\n\n## One\n", en_file=True):
         root = Path(tmp)
@@ -197,7 +197,7 @@ class MirroredSubdirTest(unittest.TestCase):
             self.assertIn("BEFUND: abschnitt-fehlt-en konzepte/k.md '## Zwei'", out)
 
     def test_english_link_to_data_file_is_not_reported(self):
-        # Messdaten (JSON) sind sprachneutral – nur Seiten (.md) zaehlen als "deutsch".
+        # Measurement data (JSON) is language-neutral – only pages (.md) count as "German".
         with tempfile.TemporaryDirectory() as tmp:
             root = self.build(tmp, en_body="# K\n\n## One\n[Daten](../../konzepte/daten.json)\n")
             (root / "docs" / "konzepte" / "daten.json").write_text("{}\n")
@@ -206,12 +206,12 @@ class MirroredSubdirTest(unittest.TestCase):
 
 
 class SectionPairingTest(unittest.TestCase):
-    """Ein fehlender Abschnitt wird dem richtigen zugeschrieben, nicht dem letzten gleichrangigen.
+    """A missing section is attributed to the right one, not to the last one of equal rank.
 
-    Die Erstfassung verglich nur die Ebenenfolge und meldete bei einem fehlenden mittleren
-    "##"-Abschnitt immer den letzten -- so standen "## Bekannte Einschränkungen" (statt
-    "## Diagramm-Seiten") und "## Completion Triggers (V39)" (statt des Audit Centers) als
-    bekannte Luecken in KNOWN_SECTION_GAPS (TODO 2d553479).
+    The first version compared only the level sequence and, for a missing middle
+    "##" section, always reported the last one -- so "## Bekannte Einschränkungen" (instead of
+    "## Diagramm-Seiten") and "## Completion Triggers (V39)" (instead of the Audit Center) stood
+    as known gaps in KNOWN_SECTION_GAPS (TODO 2d553479).
     """
 
     def build(self, tmp, de_body, en_body, name="a.md"):
@@ -222,7 +222,7 @@ class SectionPairingTest(unittest.TestCase):
         return root
 
     def test_missing_middle_section_is_named_by_its_heading(self):
-        # Nachbau von docs/architektur.md: Das Audit Center fehlte in der englischen Fassung.
+        # Replica of docs/architektur.md: the Audit Center was missing in the English version.
         de = ("# Architektur\n\n## Workflow Chains\n\n## Completion Triggers (V39)\n\n"
               "## Audit Center — Findings, Akzeptanz und Verfall (V68/V69)\n\n"
               "## Todo Triggers — Self-Improvement Loop (V51/V52)\n\n## Notification System (V40)\n")
@@ -237,9 +237,9 @@ class SectionPairingTest(unittest.TestCase):
             self.assertNotIn("Notification System", out)
 
     def test_translated_headings_are_paired_through_the_section_text(self):
-        # Nachbau von docs/entwicklung.md: "## Diagramm-Seiten" fehlte, gemeldet wurde
-        # "## Bekannte Einschränkungen". Die Ueberschriften teilen kein Wort -- der Abschnittstext
-        # schon: Code, Pfade und Bezeichner stehen in beiden Sprachen gleich da.
+        # Replica of docs/entwicklung.md: "## Diagramm-Seiten" was missing, what was reported was
+        # "## Bekannte Einschränkungen". The headings share no word -- the section text
+        # does: code, paths and identifiers stand the same in both languages.
         de = ("# Entwicklung\n\n## Hygiene-Gate\n`scripts/ci/public-hygiene.sh`, `--tracked`\n\n"
               "## Diagramm-Seiten\nErzeugt von `scripts/docs-diagrams.py` mit `--add-missing` und `--check`.\n\n"
               "## Abhängigkeits-Meldungen (Frontend)\n`npm audit`, `dep_vuln_check.py`, `package-lock.json`\n\n"
@@ -255,8 +255,8 @@ class SectionPairingTest(unittest.TestCase):
             self.assertNotIn("Abhängigkeits-Meldungen", out)
 
     def test_moved_section_is_reported_on_both_sides(self):
-        # Nachbau von docs/en/datenmodell.md: gleiche Zahl an Ueberschriften, aber `goals` stand
-        # hinter den Enums statt bei den Tabellen. Frueher blieb das unsichtbar (gleiche Anzahl).
+        # Replica of docs/en/datenmodell.md: same number of headings, but `goals` stood
+        # behind the enums instead of at the tables. Before, this stayed invisible (same count).
         de = "# D\n\n## Tabellen\n\n### `todos`\n\n### `goals`\n\n## Enums\n\n### RunStatus\n"
         en = "# D\n\n## Tables\n\n### `todos`\n\n## Enums\n\n### RunStatus\n\n### `goals`\n"
         with tempfile.TemporaryDirectory() as tmp:
@@ -266,8 +266,8 @@ class SectionPairingTest(unittest.TestCase):
             self.assertIn("BEFUND: abschnitt-nur-en a.md '### `goals`' (Ueberschrift 6 von 6", out)
 
     def test_same_level_sequence_is_not_paired(self):
-        # Gleiche Ebenenfolge: ob eine Ueberschrift uebersetzt oder ersetzt ist, sagt der Text
-        # allein nicht sicher -- die Pruefung bleibt dort stumm, wie bisher.
+        # Same level sequence: whether a heading is translated or replaced, the text
+        # alone does not say for sure -- the check stays silent there, as before.
         de = "# D\n\n## Eins\n\n## Zwei\n"
         en = "# D\n\n## One\n\n## Something else\n"
         with tempfile.TemporaryDirectory() as tmp:
@@ -285,14 +285,14 @@ class SectionPairingTest(unittest.TestCase):
             return [de[i][0] for i in only_de], [en[j][0] for j in only_en]
 
     def test_without_any_signal_the_later_section_counts_as_missing(self):
-        # Reine Prosa, ganz uebersetzte Ueberschriften, gleiche Gestalt: keine Aehnlichkeit, nur die
-        # Ebenen. Dann bleibt es eine Vermutung, und sie faellt wie frueher auf den spaeteren Abschnitt.
+        # Pure prose, fully translated headings, same shape: no similarity, only the
+        # levels. Then it stays a guess, and it falls on the later section as before.
         got = self.align("# D\n\n## Eins\nText.\n\n## Zwei\nTexte\n", "# D\n\n## One\nText.\n")
         self.assertEqual(got, (["## Zwei"], []))
 
     def test_shape_decides_between_prose_sections(self):
-        # Gegenstueck: Nur die Gestalt (Laenge, Zeilen) unterscheidet die Abschnitte -- sie genuegt.
-        # Ohne sie fiele die Vermutung auf "## Zwei" (TODO 3fbff015).
+        # Counterpart: only the shape (length, lines) distinguishes the sections -- it suffices.
+        # Without it the guess would fall on "## Zwei" (TODO 3fbff015).
         de = ("# D\n\n## Eins\nEin langer Absatz, der den Mechanismus ausfuehrlich erklaert und dabei"
               " mehrere Saetze braucht, um alles zu sagen.\n\n## Zwei\nKurz.\n")
         en = "# D\n\n## One\nShort.\n"
@@ -317,8 +317,8 @@ class SectionPairingTest(unittest.TestCase):
         self.assertEqual(self.align(de, en), (["## Vorteile"], []))
 
     def test_near_identical_neighbours_are_told_apart_by_heading(self):
-        # Nachbau von docs/api-referenz.md: zwei Endpunkte derselben Ressource mit gleichem Text.
-        # Der Text passt voll auf beide; erst die Ueberschrift entscheidet (TODO 3fbff015).
+        # Replica of docs/api-referenz.md: two endpoints of the same resource with the same text.
+        # The text fits fully on both; only the heading decides (TODO 3fbff015).
         body = "Webhook schalten.\n\n**Response:** `WebhookTriggerResponse` (`tokenVisible: false`)\n\n"
         body_en = "Toggle the webhook.\n\n**Response:** `WebhookTriggerResponse` (`tokenVisible: false`)\n\n"
         de = ("# API\n\n### `POST /api/v1/webhooks/{id}/enable`\n" + body
@@ -328,13 +328,13 @@ class SectionPairingTest(unittest.TestCase):
 
 
 class StockPairingTest(unittest.TestCase):
-    """Die Luecken, die die Zuordnung am Bestand falsch benannte (TODO 3fbff015).
+    """The gaps that the pairing named wrongly on the real inventory (TODO 3fbff015).
 
-    Probe 2026-10-01: in jeder Datei mit gleicher Ebenenfolge jeden englischen Abschnitt einzeln
-    entfernt -- die Fassung von TODO 2d553479 benannte 29 von 1213 Luecken falsch (dazu ein Fall,
-    der waehrend der Arbeit kippte). Jeder Fall wird hier am echten Dateipaar nachgestellt. Faellt
-    eine Ueberschrift spaeter weg oder weicht die Ebenenfolge ab, wird der Fall uebersprungen, nicht
-    gruen gezaehlt.
+    Probe 2026-10-01: in every file with the same level sequence each English section removed
+    individually -- the version of TODO 2d553479 named 29 of 1213 gaps wrongly (plus one case
+    that flipped during the work). Each case is replayed here on the real file pair. If
+    a heading drops out later or the level sequence deviates, the case is skipped, not
+    counted as green.
     """
 
     CASES = (

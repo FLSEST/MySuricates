@@ -1,9 +1,9 @@
-"""Tests fuer scripts/readme-sync/readme_sync.py (TODO c13a942b).
+"""Tests for scripts/readme-sync/readme_sync.py (TODO c13a942b).
 
-Der Anlass: Fuer vier geaenderte Absaetze uebersetzte der Sync am 2026-09-30 die ganze
-README.md neu und aenderte festgelegten Wortlaut. Die Tests halten fest, dass nur noch die
-geaenderten Bloecke zur Uebersetzung gehen und dass das Gate jedes Byte ausserhalb davon
-bewacht.
+The occasion: for four changed paragraphs the sync retranslated the whole
+README.md on 2026-09-30 and changed fixed wording. The tests pin that only the
+changed blocks go to translation and that the gate guards every byte outside
+of them.
 
 Run: python3 -m unittest discover -s scripts/tests -p 'test_readme_sync.py'
 """
@@ -20,7 +20,7 @@ SCRIPT = REPO / "scripts" / "readme-sync" / "readme_sync.py"
 
 _spec = importlib.util.spec_from_file_location("readme_sync", SCRIPT)
 rs = importlib.util.module_from_spec(_spec)
-sys.modules["readme_sync"] = rs  # dataclasses brauchen das Modul in sys.modules
+sys.modules["readme_sync"] = rs  # dataclasses need the module in sys.modules
 _spec.loader.exec_module(rs)
 
 DE = """**Deutsch** | [English](README.md)
@@ -96,7 +96,7 @@ def run(root: Path, *args: str, stdin: str = "") -> tuple[int, str]:
 
 
 class Repo:
-    """Temporaeres Git-Repo mit synchronem README-Paar am ersten Commit."""
+    """Temporary git repo with a synchronous README pair at the first commit."""
 
     def __init__(self, tmp: str):
         self.root = Path(tmp)
@@ -152,8 +152,8 @@ class ParseTest(unittest.TestCase):
         self.assertIn("echo welt", code[0].body)
 
     def test_current_readmes_run_in_parallel(self):
-        # Gleichlauf und Sync-Stand der echten READMEs: haelt eine Hand-Aenderung fest, die
-        # einen Block teilt oder verschmilzt und damit jeden spaeteren Sync blockieren wuerde.
+        # Parity and sync state of the real READMEs: pins a manual change that
+        # splits or merges a block and would thereby block every later sync.
         rc, out = run(REPO, "check")
         self.assertEqual(rc, 0, out)
 
@@ -173,7 +173,7 @@ class PlanApplyTest(unittest.TestCase):
         self.assertEqual(rc, 0, out)
         self.assertIn("=== EN 4 ===", out)
         self.assertNotIn("=== EN 5 ===", out)
-        self.assertIn("First paragraph in the author's", out)  # bisherige Fassung als Vorlage
+        self.assertIn("First paragraph in the author's", out)  # previous version as template
         self.assertEqual(run(self.repo.root, "has-work")[0], 0)
 
         before = self.repo.en()
@@ -197,7 +197,7 @@ class PlanApplyTest(unittest.TestCase):
         self.assertEqual(rc, 0, out)
         self.assertIn("gate_status: GREEN", out)
         self.assertEqual(self.repo.body(), before)
-        self.assertIn(f"sha256:{sha(self.repo.de())}", self.repo.en())  # Sync-Stand rueckt vor
+        self.assertIn(f"sha256:{sha(self.repo.de())}", self.repo.en())  # sync state advances
 
     def test_inserted_and_deleted_blocks(self):
         text = (self.repo.root / "README.de.md").read_text(encoding="utf-8")
@@ -227,8 +227,8 @@ class PlanApplyTest(unittest.TestCase):
         en = self.repo.en()
         self.assertIn("[architecture](docs/en/arch.md#flow)", en)
         self.assertIn("[docs/en/arch.md](docs/en/arch.md)", en)
-        self.assertIn("[German only](docs/nur-de.md)", en)  # keine englische Fassung: bleibt
-        self.assertIn("[vision](VISION.md)", en)  # docs/en/vision.md fehlt hier: bleibt
+        self.assertIn("[German only](docs/nur-de.md)", en)  # no English version: stays
+        self.assertIn("[vision](VISION.md)", en)  # docs/en/vision.md is missing here: stays
 
     def test_unmappable_anchor_is_dropped_with_warning(self):
         self.repo.change_de("docs/arch.md#datenmodell", "docs/arch.md#gibt-es-nicht")
@@ -284,7 +284,7 @@ class PlanApplyTest(unittest.TestCase):
     def test_direct_edit_of_readme_during_run_is_discarded(self):
         self.repo.change_de("Erster Absatz im", "Erster geaenderter Absatz im")
         run(self.repo.root, "plan")
-        # die KI schreibt trotz Verbot die ganze Datei neu ("meerkats")
+        # the AI rewrites the whole file despite the prohibition ("meerkats")
         self.repo.write_en(self.repo.en().replace("suricates", "meerkats"))
         rc, out = run(self.repo.root, "apply", "--translations", "-",
                       stdin="=== EN 4 ===\nFirst changed paragraph in the author's\nwording.\n=== END ===")
@@ -320,7 +320,7 @@ class PreconditionTest(unittest.TestCase):
         self.assertIn("Sync-Stand unbekannt", out)
 
     def test_unknown_marker_commit(self):
-        self.repo.write_en(self.repo.en().replace(self.repo.marker, "deadbeefdead"))  # ohne Hash
+        self.repo.write_en(self.repo.en().replace(self.repo.marker, "deadbeefdead"))  # without hash
         self.repo.commit("bad marker")
         rc, out = run(self.repo.root, "plan")
         self.assertEqual(rc, 2)
@@ -350,7 +350,7 @@ class PreconditionTest(unittest.TestCase):
 
 
 class GateTest(unittest.TestCase):
-    """verify() unabhaengig von apply: jede Abweichung ausserhalb der uebersetzten Bloecke faellt auf."""
+    """verify() independent of apply: every deviation outside the translated blocks stands out."""
 
     OLD = rs.Marker("abc1234", None)
     NEW = rs.Marker("abc9999", "f" * 64)
@@ -384,7 +384,7 @@ class GateTest(unittest.TestCase):
 
 
 class ReviewFixTest(unittest.TestCase):
-    """Nachbesserungen aus dem Review (Codebloecke exakt, Verschiebungen, Inhalts-Hash, Nur-Loeschen)."""
+    """Follow-ups from the review (code blocks exact, moves, content hash, delete-only)."""
 
     def setUp(self):
         self._tmp = tempfile.TemporaryDirectory()
@@ -449,7 +449,7 @@ class ReviewFixTest(unittest.TestCase):
         self.assertTrue(self.repo.en().endswith(f"<!-- synced-from: {self.repo.base[:12]} sha256:{sha(DE)} -->\n"))
 
     def test_unknown_commit_with_matching_hash_continues(self):
-        # Release-Uebergabe/History-Rewrite: den Commit gibt es nicht mehr, den Inhalt schon
+        # Release handover/history rewrite: the commit no longer exists, the content still does
         en = self.repo.en().rsplit("<!-- synced-from", 1)[0] + f"<!-- synced-from: deadbeefdead sha256:{sha(DE)} -->\n"
         self.repo.write_en(en)
         self.repo.commit("rewritten")
@@ -479,7 +479,7 @@ class ReviewFixTest(unittest.TestCase):
         self.repo.change_de("Erster Absatz", "Erster neuer Absatz")
         rc, out = run(self.repo.root, "check", "--current")
         self.assertEqual(rc, 1, out)
-        self.assertEqual(run(self.repo.root, "check")[0], 0)  # Gleichlauf zum Sync-Stand bleibt
+        self.assertEqual(run(self.repo.root, "check")[0], 0)  # parity with the sync state stays
 
 
 if __name__ == "__main__":

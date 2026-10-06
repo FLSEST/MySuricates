@@ -1,9 +1,9 @@
-"""Tests fuer scripts/docs-diagrams.py (TODO f54bb95d, englische Fassung: TODO 47bd4d27).
+"""Tests for scripts/docs-diagrams.py (TODO f54bb95d, English version: TODO 47bd4d27).
 
-Geprueft wird auf einem Miniatur-docs/ mit bekannten Inhalten, damit die Tests
-nicht mitwandern, wenn die echten Diagramm-Seiten wachsen. Der Schwerpunkt liegt
-auf den Fehlerwegen: Ein Gate, das Drift nicht meldet, ist wertlos — und eines,
-das eine deutsche Aenderung ohne englische Nachfuehrung durchlaesst, ebenso.
+Checked on a miniature docs/ with known contents so that the tests
+do not move along when the real diagram pages grow. The focus is
+on the error paths: a gate that does not report drift is worthless — and so is one
+that lets a German change through without the English follow-up.
 
 Run: python3 -m unittest discover -s scripts/tests -p 'test_docs_diagrams.py'
 """
@@ -81,7 +81,7 @@ graph LR
 ```
 """
 
-# Uebersetzungstabellen der Miniatur-Seiten: Schluessel = deutsches Textstueck.
+# Translation tables of the miniature pages: key = German text piece.
 TABLE = {
     "Produkt — Beispielseite": "Product — Sample page",
     "Untertitel der Seite": "Page subtitle",
@@ -116,7 +116,7 @@ TABLE_SECOND = {
 
 
 def strip_note(text):
-    """Die erzeugte Kopfzeile <!-- ... --> ist kein Teil der Seitenstruktur."""
+    """The generated header line <!-- ... --> is no part of the page structure."""
     lines = text.split("\n")
     if lines and lines[0].startswith("<!--"):
         lines = lines[1:]
@@ -159,7 +159,7 @@ class DocsDiagramsTest(unittest.TestCase):
         self.assertEqual(code, 0, output)
         return self.target.read_text(encoding="utf-8")
 
-    # -- Erzeugen ----------------------------------------------------------
+    # -- Generating ----------------------------------------------------------
     def test_build_writes_html_and_index(self):
         html = self.build()
         self.assertIn('<html lang="de">', html)
@@ -174,7 +174,7 @@ class DocsDiagramsTest(unittest.TestCase):
         self.assertIn("docs/beispiel-diagrams.md", self.build())
 
     def test_mermaid_angle_brackets_are_escaped_but_br_survives(self):
-        """Der Fehler, der den Umbau ausgeloest hat: <Ding> verschwand im Browser."""
+        """The error that triggered the rebuild: <Ding> vanished in the browser."""
         html = self.build()
         self.assertIn("List&lt;Ding&gt;", html)
         self.assertNotIn("List<Ding>", html)
@@ -184,7 +184,7 @@ class DocsDiagramsTest(unittest.TestCase):
         html = self.build()
         self.assertIn('<div class="grid">', html)
         self.assertIn("<h3>Linke Karte</h3>", html)
-        # Ein einzelner Unterabschnitt mit Tabelle passt in keine Karte.
+        # A single subsection with a table fits into no card.
         self.assertNotIn('<div class="card">\n      <h3>Einzelner', html)
         self.assertIn("<h3>Einzelner Unterabschnitt</h3>", html)
 
@@ -200,14 +200,14 @@ class DocsDiagramsTest(unittest.TestCase):
     def test_index_counts_every_diagram(self):
         self.build()
         index = (self.docs / "diagramme.md").read_text(encoding="utf-8")
-        self.assertIn("[Beispielseite](beispiel-diagrams.md)", index)   # Praefix gekuerzt
+        self.assertIn("[Beispielseite](beispiel-diagrams.md)", index)   # prefix shortened
         self.assertIn("Zusammen 2 Diagramme in 2 Seiten.", index)
 
     def test_markdown_renderer_reproduces_the_german_source(self):
-        """Die englische Markdown-Seite entsteht mit demselben Renderer aus derselben Struktur."""
+        """The English Markdown page arises with the same renderer from the same structure."""
         self.assertEqual(tool.render_markdown(tool.parse(SOURCE)), SOURCE)
 
-    # -- Englische Fassung -------------------------------------------------
+    # -- English version -------------------------------------------------
     def test_build_writes_english_pages_and_index(self):
         self.build()
         for name in ("beispiel-diagrams.md", "beispiel-diagrams.html", "zweite-diagrams.md",
@@ -231,7 +231,7 @@ class DocsDiagramsTest(unittest.TestCase):
         self.assertIn('    A["Start<br/>two lines"] --> B["List<Ding>"]', page)
 
     def test_english_tree_translates_comments_and_markers_only(self):
-        """Pfade bleiben, Kommentare hinter ← kommen aus der Tabelle, Marken je Sprache (08e6fa4d)."""
+        """Paths stay, comments after ← come from the table, marks per language (08e6fa4d)."""
         self.build()
         page = (self.en / "beispiel-diagrams.md").read_text(encoding="utf-8")
         self.assertIn("```text\nprojekt/\n├── alt.java     ← Gone [REMOVED]\n"
@@ -316,7 +316,7 @@ class DocsDiagramsTest(unittest.TestCase):
         self.assertIn('<a href="../de/beispiel-diagrams.html">Deutsch</a>', english)
 
     def test_site_is_built_from_the_source_and_leaves_docs_alone(self):
-        """Gebaut wird aus der Markdown-Quelle, nicht aus den HTML-Dateien im Repo."""
+        """The build is made from the Markdown source, not from the HTML files in the repo."""
         code, output, _ = self.site()
         self.assertEqual(code, 0, output)
         self.assertFalse((self.docs / "beispiel-diagrams.html").exists())
@@ -346,7 +346,7 @@ class DocsDiagramsTest(unittest.TestCase):
     def test_site_needs_a_directory(self):
         self.assertEqual(self.run_tool("--site")[0], 2)
 
-    # -- Pruefen -----------------------------------------------------------
+    # -- Checking -----------------------------------------------------------
     def test_check_is_green_right_after_build(self):
         self.build()
         code, output = self.run_tool("--check")
@@ -359,7 +359,7 @@ class DocsDiagramsTest(unittest.TestCase):
         code, output = self.run_tool("--check")
         self.assertEqual(code, 1)
         self.assertIn("DRIFT docs/beispiel-diagrams.html", output)
-        # Der Pruefmodus schreibt nichts zurueck.
+        # The check mode writes nothing back.
         self.assertEqual(self.target.read_text(encoding="utf-8"), "von Hand geaendert")
 
     def test_check_reports_changed_source(self):
@@ -392,15 +392,15 @@ class DocsDiagramsTest(unittest.TestCase):
         self.assertEqual(code, 1)
         self.assertIn("DRIFT docs/en/alt-diagrams.html", output)
         self.assertTrue(stale.exists())
-        # Der Schreiblauf raeumt das verwaiste Erzeugnis weg, danach ist --check gruen.
+        # The write run clears away the orphaned product, afterwards --check is green.
         code, _ = self.run_tool()
         self.assertEqual(code, 0)
         self.assertFalse(stale.exists())
         self.assertEqual(self.run_tool("--check")[0], 0)
 
-    # -- Uebersetzungstabellen ---------------------------------------------
+    # -- Translation tables ---------------------------------------------
     def test_changed_german_text_without_translation_is_red(self):
-        """Der Kern der Regel: Deutsch kann nicht still weiterlaufen, ohne dass Englisch nachzieht."""
+        """The core of the rule: German cannot silently continue without English following."""
         self.build()
         (self.docs / "beispiel-diagrams.md").write_text(
             SOURCE.replace("- Ein Punkt", "- Ein neuer Punkt"), encoding="utf-8")
@@ -418,7 +418,7 @@ class DocsDiagramsTest(unittest.TestCase):
         self.assertIn('FEHLT docs/i18n/beispiel-diagrams.en.json: "Ein Punkt"', output)
         self.assertFalse((self.en / "beispiel-diagrams.md").exists())
         self.assertFalse((self.en / "diagramme.md").exists())
-        # Die deutsche Seite haengt nicht an der Uebersetzung.
+        # The German page does not depend on the translation.
         self.assertTrue(self.target.exists())
         self.assertEqual(self.run_tool("--check")[0], 1)
 
@@ -474,7 +474,7 @@ class DocsDiagramsTest(unittest.TestCase):
         self.assertFalse((self.en / "beispiel-diagrams.md").exists())
 
     def test_translation_breaking_the_page_structure_is_red(self):
-        # Ein Wert mit "## " am Anfang wuerde in der englischen Seite einen neuen Abschnitt beginnen.
+        # A value with "## " at the start would begin a new section in the English page.
         self.write_table("beispiel", dict(TABLE, **{"Text links.": "## Text on the left."}))
         code, output = self.run_tool("--check")
         self.assertEqual(code, 1)
@@ -499,14 +499,14 @@ class DocsDiagramsTest(unittest.TestCase):
         table["Alt"] = "Old"
         self.write_table("beispiel", table)
         code, output = self.run_tool("--add-missing")
-        self.assertEqual(code, 1, output)          # noch offen: leerer Wert und verwaister Schluessel
+        self.assertEqual(code, 1, output)          # still open: empty value and orphaned key
         data = self.read_table("beispiel")
         keys = list(data)
         self.assertEqual(data["Ein Punkt"], "")
         self.assertEqual(keys.index("Ein Punkt"), keys.index("Rechte Karte") + 1)
-        self.assertEqual(keys[-1], "Alt")           # verwaiste bleiben stehen, am Ende
+        self.assertEqual(keys[-1], "Alt")           # orphaned ones stay, at the end
         self.assertEqual(data["Linke Karte"], "Left card")
-        # --add-missing erzeugt keine Seiten.
+        # --add-missing creates no pages.
         self.assertFalse(self.target.exists())
 
     def test_add_missing_creates_a_missing_table(self):
@@ -520,7 +520,7 @@ class DocsDiagramsTest(unittest.TestCase):
         self.assertEqual(code, 0, output)
         self.assertEqual(self.read_table("beispiel"), TABLE)
 
-    # -- Kaputte Quellen ---------------------------------------------------
+    # -- Broken sources ---------------------------------------------------
     def test_source_without_title_fails_without_writing(self):
         (self.docs / "beispiel-diagrams.md").write_text("Kein Titel\n", encoding="utf-8")
         code, output = self.run_tool()
@@ -558,7 +558,7 @@ class DocsDiagramsTest(unittest.TestCase):
 
 
 class SegmentTest(unittest.TestCase):
-    """Welche Textstuecke eine Seite hat — genau diese Schluessel braucht ihre Tabelle."""
+    """Which text pieces a page has — exactly these keys its table needs."""
 
     def setUp(self):
         self.segments = tool.segments(tool.parse(SOURCE))
@@ -569,12 +569,12 @@ class SegmentTest(unittest.TestCase):
         self.assertLess(self.segments.index("Start<br/>zweizeilig"), self.segments.index("Linke Karte"))
 
     def test_code_ids_and_code_blocks_are_not_segments(self):
-        self.assertNotIn("`a`", self.segments)                   # nur Inline-Code
-        self.assertNotIn("A", self.segments)                     # Knoten-ID
+        self.assertNotIn("`a`", self.segments)                   # only inline code
+        self.assertNotIn("A", self.segments)                     # node ID
         self.assertFalse(any("datei.java" in s for s in self.segments))
 
     def test_tree_comments_are_segments_without_markers(self):
-        """Der Kommentar hinter ← ist ein Textstueck, ohne Marke; ohne Buchstaben keins (08e6fa4d)."""
+        """The comment after ← is a text piece, without mark; without letters none (08e6fa4d)."""
         self.assertIn("Kommentar", self.segments)
         self.assertIn("Weg damit", self.segments)
         self.assertNotIn("400/422", self.segments)
@@ -588,7 +588,7 @@ class SegmentTest(unittest.TestCase):
 
 
 class MermaidLabelsTest(unittest.TestCase):
-    """Beschriftungen je Diagrammtyp: nur sie werden uebersetzt, der Rest bleibt Zeichen fuer Zeichen."""
+    """Labels per diagram type: only they are translated, the rest stays character by character."""
 
     labels = staticmethod(lambda code: tool.mermaid_labels.labels(code))
 
@@ -677,7 +677,7 @@ class MermaidLabelsTest(unittest.TestCase):
 
 
 class RepositoryTest(unittest.TestCase):
-    """Das eigentliche Gate: docs/ im Repo muss deckungsgleich sein, in beiden Sprachen."""
+    """The actual gate: docs/ in the repo must be congruent, in both languages."""
 
     repo = SCRIPTS.parent
 

@@ -1,16 +1,16 @@
 #!/usr/bin/env bash
-# Tests fuer scripts/release-handover.sh. Das Skript laeuft wirklich: ein Wegwerf-Arbeits-Repo mit
-# Tags und den echten Gate-Skripten (public-hygiene, pool-neutrality, pre-push-checks) und ein
-# Wegwerf-"oeffentliches" Repo (lokal: bare + Klon). Nur die vier Doku-Gates, die
-# pre-push-checks.sh --tree aufruft, sind Attrappen — sie brauchen das ganze Projekt (der
-# API-Endpunkt-Abgleich z. B. echte Controller-Klassen und docs/api-referenz.md).
+# Tests for scripts/release-handover.sh. The script really runs: a throwaway working repo with
+# tags and the real gate scripts (public-hygiene, pool-neutrality, pre-push-checks) and a
+# throwaway "public" repo (local: bare + clone). Only the four docs gates that
+# pre-push-checks.sh --tree calls are dummies — they need the whole project (the
+# API endpoint comparison e.g. real controller classes and docs/api-referenz.md).
 #
-# Geprueft: Ausschlussliste, Inhalt ersetzt (ignorierte Build-Caches bleiben), Commit mit
-# noreply-Autor, annotiertes Tag, Notizdatei, Abbruch bei Gate-Befund (Standard-Regel, private
-# Begriffsliste, Doku-Gate) mit vollstaendigem Zuruecksetzen, Abbruch ohne Aenderung, Vorbedingungen,
-# und dass nie gepusht wird.
+# Checked: exclusion list, content replaced (ignored build caches stay), commit with
+# noreply author, annotated tag, notes file, abort on gate finding (default rule, private
+# term list, docs gate) with full reset, abort without change, preconditions,
+# and that nothing is ever pushed.
 #
-# Run: bash scripts/tests/test-release-handover.sh   (exit 0 = alle Checks ok)
+# Run: bash scripts/tests/test-release-handover.sh   (exit 0 = all checks ok)
 set -uo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO="$(cd "$HERE/../.." && pwd)"
@@ -23,7 +23,7 @@ TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT
 unset GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE
 NOREPLY="12345+tester@users.noreply.github.com"
-# Treffer der Standard-Regeln zusammengesetzt, damit diese Datei selbst sauber bleibt.
+# Hits of the default rules assembled so that this file itself stays clean.
 DEFAULT_CREDENTIAL="change""me"
 PRIVATE_TERM="Geheim""projekt"
 
@@ -31,7 +31,7 @@ SRC="$TMP/work"
 PUBLIC_BARE="$TMP/public.git"
 PUB="$TMP/pub"
 
-# --- Arbeits-Repo --------------------------------------------------------------------------------
+# --- Working repo --------------------------------------------------------------------------------
 mkdir -p "$SRC/scripts/ci" "$SRC/scripts/lib" "$SRC/scripts/public-readiness" "$SRC/docs" \
          "$SRC/internal" "$SRC/assets"
 cp "$REPO/scripts/release-handover.sh" "$REPO/scripts/release-notes.sh" "$SRC/scripts/"
@@ -40,7 +40,7 @@ cp "$REPO/scripts/lib/strip-todo-brackets.py" "$REPO/scripts/lib/hygiene-rules.s
    "$SRC/scripts/lib/"
 cp "$REPO/scripts/ci/public-hygiene.sh" "$REPO/scripts/ci/pool-neutrality.sh" \
    "$REPO/scripts/ci/pre-push-checks.sh" "$SRC/scripts/ci/"
-# Doku-Gate-Attrappen: gruen, ausser eine Datei DOCS_BROKEN liegt im gepruften Stand.
+# Docs gate dummies: green, unless a file DOCS_BROKEN lies in the checked state.
 cat > "$SRC/scripts/public-readiness/doc-facts-check.sh" <<'SH'
 #!/usr/bin/env bash
 [ ! -f DOCS_BROKEN ] || { echo "Doku-Zahlen passen nicht"; exit 1; }
@@ -59,11 +59,11 @@ printf '# Security\n\nPlease use Private vulnerability reporting.\n' > "$SRC/SEC
 echo "Projekt" > "$SRC/README.md"
 echo "bleibt bis v0.2.0" > "$SRC/docs/old.md"
 echo "private Notiz" > "$SRC/docs/notes-intern.md"
-# Das Ausgeschlossene enthaelt absichtlich einen Treffer der Standard-Regeln: griffe der Ausschluss
-# nicht, schluege das Hygiene-Gate schon beim ersten Lauf an.
+# The excluded one deliberately contains a hit of the default rules: if the exclusion did
+# not take effect, the hygiene gate would trigger on the very first run.
 echo "password=${DEFAULT_CREDENTIAL}" > "$SRC/internal/plan.md"
 printf 'PNG-Attrappe' > "$SRC/assets/logo.png"
-# CRLF-Datei (wie mvnw.cmd): muss byte-gleich ankommen, auch wenn der Ziel-Klon core.autocrlf=input hat.
+# CRLF file (like mvnw.cmd): must arrive byte-identical, even if the target clone has core.autocrlf=input.
 printf '@echo off\r\necho ok\r\n' > "$SRC/win.cmd"
 
 git -C "$SRC" init -q -b main
@@ -77,13 +77,13 @@ git -C "$SRC" add -f assets/logo.png
 git -C "$SRC" commit -qm "Start"
 git -C "$SRC" tag -a v0.1.0 -m "Release v0.1.0"
 
-# Private Listen ausserhalb des Repos, wie im Betrieb (~/.config bzw. Variablen).
+# Private lists outside the repo, as in operation (~/.config or variables).
 printf 'workflow-pool/privat-*.json\n' > "$TMP/private-list.txt"
 printf '# Begriffe\n%s\n' "$PRIVATE_TERM" > "$TMP/private-terms.txt"
 export HYGIENE_PRIVATE_LIST="$TMP/private-list.txt"
 export HYGIENE_PRIVATE_TERMS="$TMP/private-terms.txt"
 
-# --- "Oeffentliches" Repo: leer, lokal ------------------------------------------------------------
+# --- "Public" repo: empty, local ------------------------------------------------------------------
 git init -q --bare -b main "$PUBLIC_BARE"
 git clone -q "$PUBLIC_BARE" "$PUB" 2>/dev/null
 git -C "$PUB" config user.email "$NOREPLY"
@@ -233,8 +233,8 @@ OUT14="$(env -u HYGIENE_PRIVATE_LIST -u HYGIENE_PRIVATE_TERMS XDG_CONFIG_HOME="$
 [ "$RC14" -eq 0 ] || printf '%s\n' "$OUT14" | sed 's/^/     | /'
 check "laeuft mit Warnung durch"                          '[ "$RC14" -eq 0 ] && grep -q "WARNUNG: private Liste" <<< "$OUT14"'
 check "Tag v0.6.0 gesetzt"                                '[ "$(git -C "$PUB" cat-file -t v0.6.0)" = "tag" ]'
-# Vorgaenger ist das zuletzt uebergebene Release (v0.2.0), nicht v0.5.0: v0.3.0 bis v0.5.0 kamen
-# nie an, ihre Aenderungen gehoeren in diese Notizen.
+# Predecessor is the most recently handed-over release (v0.2.0), not v0.5.0: v0.3.0 to v0.5.0
+# never arrived, their changes belong in these notes.
 check "Notizen seit dem zuletzt uebergebenen Release"     'grep -qF "Vorgänger:     v0.2.0" <<< "$OUT14" && git -C "$PUB" show HEAD:release-notes/v0.6.0.md | grep -F "Kapitel sechs" >/dev/null && git -C "$PUB" show HEAD:release-notes/v0.6.0.md | grep -F "Herkunft raus" >/dev/null'
 check "Stand v0.6.0 im Ziel (Reparaturen enthalten)"      'in_head docs/sechs.md && ! in_head DOCS_BROKEN && ! in_head docs/leak.md'
 check "drei Release-Commits, nichts gepusht"              '[ "$(git -C "$PUB" rev-list --count HEAD)" = "3" ] && no_push'

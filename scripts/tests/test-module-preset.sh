@@ -13,15 +13,15 @@ check() {  # $1 = label, $2 = shell condition
   if eval "$2"; then echo "  ok   $1"; PASS=$((PASS + 1)); else echo "  FAIL $1"; FAIL=$((FAIL + 1)); fi
 }
 
-# Liest automation.modules.preset so, wie ein YAML-Parser es sieht — die Probe darauf, dass eine
-# geschriebene Datei noch das bedeutet, was sie soll. Ohne PyYAML (nicht vorausgesetzt) liefert
-# die Funktion "skipped", der zugehoerige check laeuft dann ins Leere statt falsch rot zu werden.
+# Reads automation.modules.preset the way a YAML parser sees it — the check that a written file still means
+# what it should. Without PyYAML (not required) the function returns "skipped", the corresponding
+# check then runs into nothing instead of going falsely red.
 HAVE_YAML=0; python3 -c 'import yaml' 2>/dev/null && HAVE_YAML=1
 yaml_preset() {
   [ "$HAVE_YAML" = 1 ] || { echo skipped; return 0; }
   python3 -c 'import sys,yaml; d=yaml.safe_load(open(sys.argv[1])) or {}; print(((d.get("automation") or {}).get("modules") or {}).get("preset"))' "$1" 2>/dev/null
 }
-yaml_expect() {  # $1 = Datei, $2 = erwartetes Preset
+yaml_expect() {  # $1 = file, $2 = expected preset
   local got; got="$(yaml_preset "$1")"
   [ "$got" = "$2" ] || [ "$got" = skipped ]
 }

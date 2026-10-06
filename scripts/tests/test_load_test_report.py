@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Tests fuer scripts/load-test/report.py — Kennzahlen, Verdict, Baseline-Wahl und Faktenblatt.
+"""Tests for scripts/load-test/report.py — figures, verdict, baseline choice and fact sheet.
 
 Run: python3 -m unittest discover -s scripts/tests -p 'test_load_test_report.py'
 """
@@ -55,8 +55,8 @@ class StatsTest(unittest.TestCase):
         self.assertEqual(result["routes"]["GET /workflows"]["p95_ms"], 10)
 
     def test_wait_share_is_summed_server_time_not_mean_of_shares(self):
-        # 1 langsamer Request, der fast nur wartet, gegen 39 schnelle ohne Warten: der Anteil ist
-        # Summe Warten / Summe Gesamtzeit, damit zaehlt die langsame Anfrage mit ihrem Gewicht.
+        # 1 slow request that almost only waits, against 39 fast ones without waiting: the share is
+        # sum of waiting / sum of total time, so the slow request counts with its weight.
         reqs = many("GET /todos", 10, n=39) + [req("GET /todos", 1000, wait=900)]
         stats = report.route_stats(reqs)
         self.assertAlmostEqual(stats["GET /todos"]["wait_share"], round(900 / 1390, 4))
@@ -89,7 +89,7 @@ class VerdictTest(unittest.TestCase):
         self.assertEqual(report.build_result(raw(many("GET /export/bpmn", 9000, n=3)))["verdict"], "GREEN")
 
     def test_waiting_alone_is_the_architecture_not_a_finding(self):
-        # pool-size 1 unter Last: hoher Wartezeit-Anteil bei kurzen Zeiten ist die Bauart
+        # pool-size 1 under load: a high wait share with short times is the design
         result = report.build_result(raw(many("GET /executions", 400, wait=300)))
         self.assertEqual(result["verdict"], "GREEN")
         self.assertEqual(result["wait_share"], 0.75)
