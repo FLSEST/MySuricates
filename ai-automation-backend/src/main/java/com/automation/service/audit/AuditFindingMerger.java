@@ -120,6 +120,8 @@ public class AuditFindingMerger {
             AuditFindingTodo existing = targetLinks.get(link.getTodoId());
             if (existing != null) {
                 if (link.isManaged()) {
+                    // A TODO created by hand stays manual, whichever side carried it (f2ce6c50)
+                    existing.setManual(existing.isManual() || link.isManual());
                     existing.setManaged(true);
                 }
                 dropped.add(link);

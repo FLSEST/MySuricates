@@ -57,7 +57,7 @@ class AuditIngestionServiceTest {
                 new AuditResultParser(new ObjectMapper()), ruleKeyCatalog, activityLog,
                 new AuditSnapshotApplier(findingRepository, occurrenceRepository, new AuditAcceptancePolicy(),
                         ruleKeyCatalog, activityLog,
-                        new ManagedTodoWriter(findingRepository, findingTodoRepository, todoRepository, eventPublisher),
+                        new ManagedTodoWriter(findingRepository, findingTodoRepository, todoRepository, eventPublisher, activityLog),
                         new AuditDispositionLifecycle(ruleKeyCatalog, reportRepository)));
         when(reportRepository.save(any())).thenAnswer(inv -> {
             AuditReport report = inv.getArgument(0);

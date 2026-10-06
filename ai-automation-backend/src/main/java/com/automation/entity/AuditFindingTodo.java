@@ -25,6 +25,13 @@ public class AuditFindingTodo {
     private String todoId;
     @Column(nullable = false)
     private boolean managed;
+
+    /**
+     * A managed TODO created by hand (Audit Center button) rather than by the ingest threshold. Only automatic
+     * TODOs are released when their open findings fall below HIGH (f2ce6c50).
+     */
+    @Column(nullable = false)
+    private boolean manual;
     @CreatedDate
     @Column(name = "created_at", updatable = false)
     private Instant createdAt;

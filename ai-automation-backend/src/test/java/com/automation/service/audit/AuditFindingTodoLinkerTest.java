@@ -50,7 +50,8 @@ class AuditFindingTodoLinkerTest {
         linker().createManagedTodo(finding);
 
         ArgumentCaptor<String> description = ArgumentCaptor.forClass(String.class);
-        verify(managedTodoWriter).create(any(), description.capture(), org.mockito.ArgumentMatchers.eq("run-9"));
+        verify(managedTodoWriter).create(any(), description.capture(), org.mockito.ArgumentMatchers.eq("run-9"),
+                org.mockito.ArgumentMatchers.eq(true));
         assertThat(description.getValue()).startsWith("Beschreibung")
                 .contains("Evidence: Beleg")
                 .contains("[Audit finding](/reports?finding=f-1)")
@@ -67,7 +68,7 @@ class AuditFindingTodoLinkerTest {
         linker().createManagedTodo(finding);
 
         ArgumentCaptor<String> description = ArgumentCaptor.forClass(String.class);
-        verify(managedTodoWriter).create(any(), description.capture(), any());
+        verify(managedTodoWriter).create(any(), description.capture(), any(), org.mockito.ArgumentMatchers.anyBoolean());
         assertThat(description.getValue()).startsWith("Audit finding requires remediation.")
                 .contains("Evidence: not provided");
     }
