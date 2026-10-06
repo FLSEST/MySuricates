@@ -496,8 +496,9 @@ class Classifier:
         self.known_state = "ok"
         known = set()
         for line in text.splitlines():
-            fields = [field.strip() for field in line.split("|")]   # a field never holds "|" (masked as ¦)
-            if (len(fields) >= 6 and fields[2] in JUDGMENT_RULE_KEYS
+            # A field never holds "|" (masked as ¦). Platforms before 5fc15f50 end an OPEN row after the title.
+            fields = [field.strip() for field in line.split("|")]
+            if (len(fields) >= 5 and fields[2] in JUDGMENT_RULE_KEYS
                     and KNOWN_STATUS.match(fields[0]) and KNOWN_SUBJECT.match(fields[3])):
                 known.add((fields[2], fields[3], fields[0]))
         self.known = sorted(known, key=lambda k: (k[1], k[0]))

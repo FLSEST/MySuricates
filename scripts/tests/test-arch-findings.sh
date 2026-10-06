@@ -716,6 +716,11 @@ check "module off or no --known: the gap is named, never an empty list that look
   '[ "$(summary "$TMP/known-off.out" known_judgments_state)" = unavailable ] && grep -q "^# audit_findings nicht verfuegbar" "$TMP/known-off.out" \
      && [ "$(summary "$TMP/cand.txt" known_judgments_state)" = not_given ] && grep -q "^# audit_findings nicht gegeben" "$TMP/cand.txt"'
 
+printf '<audit_findings>\nSTATUS | SEVERITY | ruleKey | subject | title\nOPEN | LOW | arch.misplaced-logic | %s/Plain.java | alt\n</audit_findings>\n' "$C" > "$TMP/known-old.txt"
+python3 "$FINDINGS" "$TMP/cand-backend.txt" --known "$TMP/known-old.txt" > "$TMP/known-old.out"
+check "older platform format (OPEN row without Beleg) is still read" \
+  'grep -q "^arch.misplaced-logic${TAB}$C/Plain.java${TAB}OPEN${TAB}ja${TAB}0${TAB}" <<< "$(section "$TMP/known-old.out" known_judgments)"'
+
 echo
 echo "passed=$PASS failed=$FAIL"
 [ "$FAIL" -eq 0 ]
