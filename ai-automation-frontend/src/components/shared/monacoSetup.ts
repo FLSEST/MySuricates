@@ -47,14 +47,17 @@ export function registerJsonSchema(modelPath: string, schema: object): () => voi
 }
 
 export function ensureLocalMonaco(): Promise<void> {
+  // Since Monaco 0.56 the package only exports these entry points: `editor` is the bare core,
+  // `features/register.all` adds the editor features (find, hover, folding, …), languages register one by one
   ready ??= Promise.all([
-    import('monaco-editor/esm/vs/editor/edcore.main.js'),
-    import('monaco-editor/esm/vs/language/json/monaco.contribution.js'),
-    import('monaco-editor/esm/vs/basic-languages/markdown/markdown.contribution.js'),
-    import('monaco-editor/esm/vs/editor/editor.worker.js?worker'),
-    import('monaco-editor/esm/vs/language/json/json.worker.js?worker'),
-  ]).then(([monaco, json, , { default: EditorWorker }, { default: JsonWorker }]) => {
-    // Monaco 0.55 no longer hangs the JSON defaults off `monaco.languages.json` — take them from the contribution
+    import('monaco-editor/editor'),
+    import('monaco-editor/features/register.all'),
+    import('monaco-editor/languages/features/json/register'),
+    import('monaco-editor/languages/definitions/markdown/register'),
+    import('monaco-editor/editor/editor.worker.js?worker'),
+    import('monaco-editor/languages/features/json/json.worker.js?worker'),
+  ]).then(([monaco, , json, , { default: EditorWorker }, { default: JsonWorker }]) => {
+    // Monaco no longer hangs the JSON defaults off `monaco.languages.json` — take them from the registration
     jsonDefaults = (json as { jsonDefaults?: JsonDefaults }).jsonDefaults ?? null;
     applyJsonSchemas();
     // Once defined, Monaco asks this for every worker — the JSON language service included

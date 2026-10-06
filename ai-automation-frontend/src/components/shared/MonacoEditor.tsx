@@ -189,7 +189,7 @@ export function MonacoEditor({
       // Suggestions also inside strings — that is where JSON values like "stop"/"continue" live
       quickSuggestions: { other: true, comments: false, strings: true },
       suggest: { showInlineDetails: true, preview: true },
-      hover: { enabled: true, delay: 250 },
+      hover: { enabled: 'on', delay: 250 },
       formatOnPaste: !!jsonSchema,
       fixedOverflowWidgets: true,
       // Prose keeps its switches: the suggestions above would bring back Enter accepting a word

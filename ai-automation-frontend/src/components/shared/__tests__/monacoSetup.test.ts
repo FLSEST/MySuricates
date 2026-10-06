@@ -2,30 +2,36 @@ import { describe, it, expect, vi } from 'vitest';
 
 const config = vi.fn();
 vi.mock('@monaco-editor/react', () => ({ loader: { config } }));
-vi.mock('monaco-editor/esm/vs/editor/edcore.main.js', () => ({ editor: {}, marker: 'local-monaco' }));
+vi.mock('monaco-editor/editor', () => ({ editor: {}, marker: 'local-monaco' }));
+const features: string[] = [];
+vi.mock('monaco-editor/features/register.all', () => {
+  features.push('all');
+  return {};
+});
 const contributions: string[] = [];
 const setDiagnosticsOptions = vi.fn();
-vi.mock('monaco-editor/esm/vs/language/json/monaco.contribution.js', () => {
+vi.mock('monaco-editor/languages/features/json/register', () => {
   contributions.push('json');
   return { jsonDefaults: { setDiagnosticsOptions } };
 });
-vi.mock('monaco-editor/esm/vs/basic-languages/markdown/markdown.contribution.js', () => {
+vi.mock('monaco-editor/languages/definitions/markdown/register', () => {
   contributions.push('markdown');
   return {};
 });
 class EditorWorker { kind = 'editor'; }
 class JsonWorker { kind = 'json'; }
-vi.mock('monaco-editor/esm/vs/editor/editor.worker.js?worker', () => ({ default: EditorWorker }));
-vi.mock('monaco-editor/esm/vs/language/json/json.worker.js?worker', () => ({ default: JsonWorker }));
+vi.mock('monaco-editor/editor/editor.worker.js?worker', () => ({ default: EditorWorker }));
+vi.mock('monaco-editor/languages/features/json/json.worker.js?worker', () => ({ default: JsonWorker }));
 
 describe('ensureLocalMonaco', () => {
-  it('points the loader at the bundled Monaco once, with the JSON and Markdown languages and bundled workers', async () => {
+  it('points the loader at the bundled Monaco once, with the editor features, JSON and Markdown and bundled workers', async () => {
     const { ensureLocalMonaco } = await import('../monacoSetup');
 
     await Promise.all([ensureLocalMonaco(), ensureLocalMonaco()]);
 
     expect(config).toHaveBeenCalledTimes(1);
     expect(config.mock.calls[0]![0].monaco).toMatchObject({ marker: 'local-monaco' });
+    expect(features).toEqual(['all']);
     expect(contributions.sort()).toEqual(['json', 'markdown']);
     const env = (self as unknown as { MonacoEnvironment: { getWorker: (id: string, label: string) => { kind: string } } })
       .MonacoEnvironment;
