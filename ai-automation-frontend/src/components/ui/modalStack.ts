@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useState } from 'react';
 
 /**
- * The open modal layers: every `Modal` and the sheet of the goal side panel (d86f27b2). The one
- * with the highest `order` is on top. A confirmation can open above another dialog (23635ef6): Escape
- * then closes only the top one, the focus trap applies only to the top one, and the page stays locked
- * until the last closes. The order is taken when a layer renders open (parents render before their
+ * The open modal layers: every `Modal`, the sheet of the goal side panel, the walkthrough and the approval
+ * dialog (d86f27b2). The one with the highest `order` is on top. A confirmation can open above another
+ * dialog (23635ef6): Escape then closes only the top one, the focus trap applies only to the top one, and
+ * the page stays locked until the last closes. The order is taken when a layer renders open (parents render before their
  * children, later siblings after earlier ones), not when its effect runs – effects run children first,
  * so an outer and an inner dialog opening in the same commit would otherwise put the outer one on top
  * (0d9072fa).

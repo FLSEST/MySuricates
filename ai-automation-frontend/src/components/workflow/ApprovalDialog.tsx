@@ -5,6 +5,7 @@ import type { PendingApproval } from '../../hooks/useWebSocket';
 import { isRejectOption } from '../../hooks/usePendingInputs';
 import { ApprovalQuestion } from '../shared/ApprovalQuestion';
 import { Hint } from '../hints/Hint';
+import { useModalLayer } from '../ui/modalStack';
 
 interface ApprovalDialogProps {
   approval: PendingApproval;
@@ -15,6 +16,8 @@ interface ApprovalDialogProps {
 
 export function ApprovalDialog({ approval, onSubmit, onDismiss, loading }: ApprovalDialogProps) {
   const t = useT();
+  // A modal layer like Modal (d86f27b2): locks the page scroll, and side panels leave Escape to it
+  useModalLayer();
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 animate-fade-in">

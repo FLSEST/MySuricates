@@ -8,6 +8,7 @@ import { useSettingsStore } from '../../stores/settingsStore';
 import { WALKTHROUGH_PANELS, type PanelModule } from '../../data/walkthroughPanels';
 import walkthroughImages from '../../data/walkthroughImages.json';
 import { PanelDiagram } from './PanelDiagram';
+import { useModalLayer } from '../ui/modalStack';
 
 /**
  * The welcome tour shown once after the first start. Skippable, re-openable from the settings.
@@ -50,18 +51,16 @@ export function Walkthrough({ onClose }: { onClose: () => void }) {
   }, [last, position, onClose]);
   const back = useCallback(() => setIndex(Math.max(0, position - 1)), [position]);
 
+  // Joins the stack of modal layers (d86f27b2): it locks the page scroll, and side panels leave Escape to it
+  useModalLayer();
   useEffect(() => {
-    document.body.style.overflow = 'hidden';
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose();
       else if (e.key === 'ArrowRight') next();
       else if (e.key === 'ArrowLeft') back();
     };
     window.addEventListener('keydown', onKey);
-    return () => {
-      document.body.style.overflow = '';
-      window.removeEventListener('keydown', onKey);
-    };
+    return () => window.removeEventListener('keydown', onKey);
   }, [next, back, onClose]);
 
   if (!panel) return null;

@@ -10,6 +10,8 @@ import { renderWithProviders } from '../../test/utils';
 import { useI18nStore } from '../../i18n';
 import { GoalDetail } from '../GoalDetail';
 import { ToastContainer } from '../../components/ui/ToastContainer';
+import { ApprovalDialog } from '../../components/workflow/ApprovalDialog';
+import { useState } from 'react';
 import { useToastStore } from '../../stores/toastStore';
 import type { GoalDetail as GoalDetailData, GoalTodoItem } from '../../types';
 
@@ -360,6 +362,36 @@ describe('GoalSidePanel – history, modal sheet, clean-up', () => {
     } finally {
       window.matchMedia = original;
     }
+  });
+
+  // d86f27b2, browser check: the walkthrough and the approval dialog are modal too, but were not in the stack
+  it('leaves Escape to an approval dialog lying above the docked panel', async () => {
+    function ApprovalOnTop() {
+      const [open, setOpen] = useState(true);
+      return open ? (
+        <ApprovalDialog
+          approval={{ blockId: 'approval-1', question: 'Adopt?', options: ['Ja', 'Nein'], rejectOptions: ['Nein'], stepIndex: 1 }}
+          onSubmit={() => {}} onDismiss={() => setOpen(false)} />
+      ) : null;
+    }
+    serveGoal();
+    renderWithProviders(
+      <>
+        <Routes><Route path="/goals/:goalId" element={<GoalDetail />} /></Routes>
+        <ApprovalOnTop />
+      </>,
+      { route: '/goals/g1?item=workpackage:w1' },
+    );
+    await screen.findByTestId('goal-side-panel');
+    expect(document.body.style.overflow).toBe('hidden');
+
+    fireEvent.keyDown(document.body, { key: 'Escape' });
+    expect(screen.getByTestId('goal-side-panel')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Close' }));
+    expect(document.body.style.overflow).toBe('');
+    fireEvent.keyDown(document.body, { key: 'Escape' });
+    expect(screen.queryByTestId('goal-side-panel')).not.toBeInTheDocument();
   });
 
   it('stays open when something inside already used Escape – an inline field, a keyboard drag', async () => {
