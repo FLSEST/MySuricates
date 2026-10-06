@@ -1,10 +1,10 @@
 import { createContext, useContext } from 'react';
 
 /**
- * Was die Seitenleiste der Zielseite zeigt (c60bf914, Flo: „Beim Anklicken eines Milestones sollten
- * die TODOs und Workflows in der Ansicht rechts sein“): ein Meilenstein oder ein Arbeitspaket. Die
- * Auswahl steht in der URL (`?item=milestone:<id>` bzw. `workpackage:<id>`), damit Zurück und
- * Neuladen sie behalten.
+ * What the side bar of the goal page shows (c60bf914, Flo: „Beim Anklicken eines Milestones sollten
+ * die TODOs und Workflows in der Ansicht rechts sein“): a milestone or a work package. The
+ * selection is in the URL (`?item=milestone:<id>` or `workpackage:<id>`) so that Back and
+ * reload keep it.
  */
 export type GoalSelection = { kind: 'milestone' | 'workpackage'; id: string };
 
@@ -27,7 +27,7 @@ export const sameSelection = (a: GoalSelection | null, b: GoalSelection | null) 
 
 export interface GoalSelectionValue {
   selected: GoalSelection | null;
-  /** Öffnet die Seitenleiste; `trigger` bekommt beim Schließen den Fokus zurück. */
+  /** Opens the side bar; `trigger` gets the focus back on closing. */
   select: (selection: GoalSelection, trigger?: HTMLElement | null) => void;
   close: () => void;
 }
@@ -36,7 +36,7 @@ export const GoalSelectionContext = createContext<GoalSelectionValue | null>(nul
 
 export const useGoalSelection = () => useContext(GoalSelectionContext);
 
-/** Ist dieser Eintrag gerade in der Seitenleiste offen? */
+/** Is this entry currently open in the side bar? */
 export function useIsSelected(kind: GoalSelection['kind'], id: string): boolean {
   const selection = useGoalSelection();
   return sameSelection(selection?.selected ?? null, { kind, id });

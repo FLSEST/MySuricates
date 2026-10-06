@@ -1,16 +1,16 @@
 import type { GoalDetail, GoalProject, GoalTodoItem, GoalWorkPackage } from '../../types';
 
 /**
- * Gliederung eines Ziels (c60bf914), rein und testbar: Projekt → Arbeitspaket → TODOs, je Projekt
- * dazu „Ohne Arbeitspaket“, am Ende „Ohne Projekt“. Jeder Knoten zählt seine TODOs. Die Meilensteine
- * stehen darüber für sich (sie gehören dem ganzen Ziel, keinem Projekt).
+ * Outline of a goal (c60bf914), pure and testable: project → work package → TODOs, per project
+ * plus „Ohne Arbeitspaket“, at the end „Ohne Projekt“. Each node counts its TODOs. The milestones
+ * stand above it on their own (they belong to the whole goal, not to a project).
  *
- * Gezählt werden nicht archivierte TODOs; offene Fragen nur an TODOs, die noch nicht erledigt sind,
- * Entscheidungen an allen (68a5e24e, wie der Server).
- * Archivierte TODOs stehen auch nicht in der Gliederung.
+ * Counted are non-archived TODOs; open questions only on TODOs that are not yet done,
+ * decisions on all (68a5e24e, like the server).
+ * Archived TODOs are not in the outline either.
  */
 
-/** Schlüssel der Gruppe „Ohne Projekt“ – Projekt-IDs sind UUIDs, das kollidiert nicht. */
+/** Key of the group „Ohne Projekt“ - project IDs are UUIDs, so this does not collide. */
 export const NO_PROJECT = 'none';
 
 export interface OutlineCounts {
@@ -23,7 +23,7 @@ export interface OutlineCounts {
 
 export interface OutlineTodo {
   todo: GoalTodoItem;
-  /** Altfall (⚠): Das TODO hat ein anderes Projekt als sein Arbeitspaket. Wird gelesen, nicht abgewiesen. */
+  /** Legacy case (⚠): the TODO has a different project than its work package. It is read, not rejected. */
   mismatch: boolean;
 }
 
@@ -36,21 +36,21 @@ export interface OutlinePackage {
 export interface OutlineProject {
   /** Projekt-ID oder {@link NO_PROJECT}. */
   key: string;
-  /** null für „Ohne Projekt“. */
+  /** null for „Ohne Projekt“. */
   project: GoalProject | null;
-  /** Das Projekt eines TODOs gehört (noch) nicht zum Ziel – nur Altdaten, sonst hängt der Server es an. */
+  /** The project of a TODO does not (yet) belong to the goal - legacy data only, otherwise the server attaches it. */
   linked: boolean;
   /** In Reihenfolge ihrer Position. */
   packages: OutlinePackage[];
-  /** TODOs des Projekts ohne Arbeitspaket. */
+  /** TODOs of the project without a work package. */
   loose: OutlineTodo[];
   counts: OutlineCounts;
 }
 
 export interface GoalOutline {
-  /** Die Projekte des Ziels nach Position, danach Projekte, die nur über ein TODO hereinkommen. */
+  /** The projects of the goal by position, then projects that come in only via a TODO. */
   projects: OutlineProject[];
-  /** „Ohne Projekt“ – nur, wenn es dort TODOs oder Arbeitspakete gibt. */
+  /** „Ohne Projekt“ - only if there are TODOs or work packages there. */
   noProject: OutlineProject | null;
 }
 
@@ -81,7 +81,7 @@ export function percentDone(counts: OutlineCounts): number {
   return counts.total === 0 ? 0 : Math.round((counts.done / counts.total) * 100);
 }
 
-/** Pakete nach `position`; bei gleicher Position bleibt die Reihenfolge des Servers. */
+/** Packages by `position`; with equal position the server's order stays. */
 function byPosition(workPackages: GoalWorkPackage[]): GoalWorkPackage[] {
   return workPackages.map((item, index) => ({ item, index }))
     .sort((a, b) => a.item.position - b.item.position || a.index - b.index)
@@ -91,7 +91,7 @@ function byPosition(workPackages: GoalWorkPackage[]): GoalWorkPackage[] {
 export function buildOutline(detail: Pick<GoalDetail, 'projects' | 'workPackages' | 'todos'>): GoalOutline {
   const projectKeys = new Set(detail.projects.map((project) => project.projectId));
   const packageById = new Map(detail.workPackages.map((item) => [item.id, item]));
-  /** Gruppe eines Pakets: sein Projekt, sonst (Projekt gelöscht, Altdaten) „Ohne Projekt“. */
+  /** Group of a package: its project, otherwise (project deleted, legacy data) „Ohne Projekt“. */
   const groupOfPackage = (item: GoalWorkPackage) => item.projectId ?? NO_PROJECT;
 
   const todosBy = new Map<string, OutlineTodo[]>();
@@ -120,7 +120,7 @@ export function buildOutline(detail: Pick<GoalDetail, 'projects' | 'workPackages
     return { key, project, linked, packages, loose, counts };
   };
 
-  // Pakete, deren Projekt nicht (mehr) zum Ziel gehört, bekommen ihr Projekt als eigene Gruppe
+  // Packages whose project no longer belongs to the goal get their project as a group of its own
   for (const item of detail.workPackages) {
     if (item.projectId && !projectKeys.has(item.projectId) && !strays.has(item.projectId)) {
       const named = detail.todos.find((todo) => todo.projectId === item.projectId)?.projectName;
@@ -141,8 +141,8 @@ export function buildOutline(detail: Pick<GoalDetail, 'projects' | 'workPackages
 }
 
 /**
- * Neue Reihenfolge nach ↑/↓: das Element an `index` tauscht mit seinem Nachbarn. null, wenn es am
- * Rand steht.
+ * New order after ↑/↓: the element at `index` swaps with its neighbour. null if it is at the
+ * edge.
  */
 export function moved<T>(items: T[], index: number, delta: -1 | 1): T[] | null {
   const target = index + delta;

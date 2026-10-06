@@ -2,7 +2,7 @@ import { CalendarOff, ChevronDown } from 'lucide-react';
 import { useT } from '../../i18n';
 import type { UndatedMode } from './timelineUndated';
 
-/** Schalter oben am Zeitstrahl: alle TODOs ohne Datum zeigen bzw. einklappen. */
+/** Switch at the top of the timeline: show all undated TODOs or fold them. */
 export function UndatedSwitch({ total, allOpen, onChange }: { total: number; allOpen: boolean; onChange: (mode: UndatedMode) => void }) {
   const tt = useT().goals.timeline;
   return (
@@ -18,7 +18,7 @@ export function UndatedSwitch({ total, allOpen, onChange }: { total: number; all
   );
 }
 
-/** Zähler der TODOs ohne Datum an einer Zeile oder einem Paket der Leiste – ein Knopf, der auf- und zuklappt. */
+/** Counter of the undated TODOs at a row or a package of the bar - a button that folds open and closed. */
 export function UndatedToggle({ count, open, controls, onToggle }: {
   count: number;
   open: boolean;

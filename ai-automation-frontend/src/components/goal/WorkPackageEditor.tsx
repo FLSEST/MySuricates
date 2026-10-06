@@ -10,14 +10,14 @@ import {
 import type { GoalProject, GoalWorkPackage } from '../../types';
 
 /**
- * Arbeitspaket anlegen oder bearbeiten (c60bf914) – als Dialog der Gliederung: Titel, Projekt des
- * Ziels, Zeitraum optional. Löschen fragt der Aufrufer in seinem eigenen Dialog nach.
+ * Create or edit a work package (c60bf914) - as a dialog of the outline: title, project of the
+ * goal, period optional. The caller asks about deleting in its own dialog.
  */
 export function WorkPackageEditor({ goalId, projects, workPackage, projectId, onClose, onDelete }: {
   goalId: string;
   projects: GoalProject[];
   workPackage?: GoalWorkPackage;
-  /** Vorbelegtes Projekt beim Anlegen, etwa aus der Projektkarte. */
+  /** Prefilled project when creating, e.g. from the project card. */
   projectId?: string | null;
   onClose: () => void;
   onDelete?: (workPackage: GoalWorkPackage) => void;

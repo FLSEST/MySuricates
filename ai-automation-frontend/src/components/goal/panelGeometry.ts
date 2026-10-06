@@ -1,7 +1,7 @@
 /**
- * Lage und Größe der Seitenleiste der Zielseite (c60bf914, Flo: „ziehbar und verschiebbar und
- * größenänderbar … bei den tieferen nicht alles erkennbar“): angedockt mit änderbarer Breite oder als
- * schwebendes Fenster, immer im Sichtbereich. Rein und testbar; gemerkt im Browser.
+ * Position and size of the side bar of the goal page (c60bf914, Flo: „ziehbar und verschiebbar und
+ * größenänderbar … bei den tieferen nicht alles erkennbar“): docked with changeable width or as a
+ * floating window, always within the viewport. Pure and testable; remembered in the browser.
  */
 
 export type PanelMode = 'docked' | 'floating';
@@ -17,7 +17,7 @@ export interface PanelPrefs {
   mode: PanelMode;
   /** Breite angedockt. */
   width: number;
-  /** Lage und Größe als Fenster. */
+  /** Position and size as a window. */
   rect: PanelRect;
 }
 
@@ -27,13 +27,13 @@ export interface Viewport {
 }
 
 export const DOCK_MIN = 300;
-/** Höchstens so breit angedockt – und nie mehr als 60 % der Seite, damit der Inhalt daneben bedienbar bleibt. */
+/** At most this wide when docked - and never more than 60 % of the page, so the content next to it stays usable. */
 export const DOCK_MAX = 720;
 export const WINDOW_MIN = { width: 300, height: 240 };
-/** So viel Abstand hält ein Fenster zum Rand des Sichtbereichs. */
+/** This much distance a window keeps from the edge of the viewport. */
 export const EDGE = 8;
 export const DEFAULT_WIDTH = 384;
-/** Speicher der Seitenleiste; die Workflow-Leiste der Zuordnung (52bc1e8c) merkt sich ihre Lage getrennt. */
+/** Storage of the side bar; the workflow bar of the assignment (52bc1e8c) remembers its position separately. */
 export const PANEL_STORAGE_KEY = 'mysuricates-goal-panel';
 export const WORKFLOW_PANEL_KEY = 'mysuricates-goal-workflow-panel';
 
@@ -42,7 +42,7 @@ export function clampWidth(width: number, viewport: Viewport): number {
   return Math.round(Math.min(max, Math.max(DOCK_MIN, width)));
 }
 
-/** Ein Fenster, das ganz im Sichtbereich liegt: erst die Größe begrenzen, dann die Lage. */
+/** A window that lies fully within the viewport: first limit the size, then the position. */
 export function clampRect(rect: PanelRect, viewport: Viewport): PanelRect {
   const width = Math.min(Math.max(WINDOW_MIN.width, rect.width), Math.max(WINDOW_MIN.width, viewport.width - 2 * EDGE));
   const height = Math.min(Math.max(WINDOW_MIN.height, rect.height), Math.max(WINDOW_MIN.height, viewport.height - 2 * EDGE));
@@ -57,7 +57,7 @@ export function movedRect(rect: PanelRect, dx: number, dy: number, viewport: Vie
 
 export type ResizeEdge = 'right' | 'bottom' | 'corner' | 'left';
 
-/** Größe an einem Rand oder der Ecke rechts unten ändern; links wandert die Kante, rechts bleibt stehen. */
+/** Change size at an edge or the bottom right corner; on the left the edge moves, on the right it stays put. */
 export function resizedRect(rect: PanelRect, edge: ResizeEdge, dx: number, dy: number, viewport: Viewport): PanelRect {
   if (edge === 'left') {
     const width = Math.max(WINDOW_MIN.width, Math.min(rect.width - dx, rect.x + rect.width - EDGE));
@@ -68,7 +68,7 @@ export function resizedRect(rect: PanelRect, edge: ResizeEdge, dx: number, dy: n
   return clampRect({ ...rect, width, height }, viewport);
 }
 
-/** Das erste Fenster: rechts, so breit wie angedockt, fast so hoch wie der Sichtbereich. */
+/** The first window: on the right, as wide as docked, almost as tall as the viewport. */
 export function defaultRect(width: number, viewport: Viewport): PanelRect {
   const w = Math.min(width, viewport.width - 2 * EDGE);
   return clampRect({ x: viewport.width - w - 24, y: 72, width: w, height: viewport.height - 96 }, viewport);
@@ -92,6 +92,6 @@ export function storePanelPrefs(prefs: PanelPrefs, key: string = PANEL_STORAGE_K
   try {
     localStorage.setItem(key, JSON.stringify(prefs));
   } catch {
-    // privates Fenster oder gesperrter Speicher: gilt dann bis zum Neuladen
+    // private window or blocked storage: then valid until reload
   }
 }

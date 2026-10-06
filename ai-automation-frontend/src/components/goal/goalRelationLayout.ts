@@ -1,16 +1,16 @@
 import type { GoalOriginKind, GoalTodoRelation, RunStatus, TodoResolutionState } from '../../types';
 
 /**
- * Layout der Relationskarte eines Ziels (TODO c6ea8f5c), rein und testbar: vier Spalten
- * Herkunft · TODOs · Bearbeitung · Ergebnis.
+ * Layout of the relation card of a goal (TODO c6ea8f5c), pure and testable: four columns
+ * origin · TODOs · processing · result.
  *
- * - TODO-Zeilen in Arbeitsreihenfolge (so liefert sie der Server), nach Projekt gruppiert – mit
- *   `MapStructure` nach Projekt → Arbeitspaket (52bc1e8c); die Kandidaten stehen zuletzt in einer
- *   eigenen Gruppe.
- * - Herkunft und Bearbeitung sind zusammengefasst: derselbe Workflow (oder „Mensch“, „Health-Check“ …)
- *   ist ein Knoten, auf Höhe des Mittels seiner TODOs; die Linien laufen fächerförmig zusammen.
- * - Ein TODO ohne Bearbeitung bekommt einen gepunkteten Stummel („kein Workflow“) – so sieht man,
- *   wo noch nichts andockt.
+ * - TODO rows in working order (as the server delivers them), grouped by project - with
+ *   `MapStructure` by project → work package (52bc1e8c); the candidates come last in a
+ *   group of their own.
+ * - Origin and processing are merged: the same workflow (or „Mensch“, „Health-Check“ …)
+ *   is one node, at the height of the mean of its TODOs; the lines converge in a fan shape.
+ * - A TODO without processing gets a dotted stub („kein Workflow“) - this shows
+ *   where nothing docks yet.
  */
 
 export const COLUMNS = [
@@ -21,7 +21,7 @@ export const COLUMNS = [
 ] as const;
 
 export const MAP_WIDTH = COLUMNS[3].x + COLUMNS[3].w;
-/** Platz über der ersten Zeile für die Spaltenköpfe. */
+/** Space above the first row for the column heads. */
 export const HEADER_HEIGHT = 34;
 export const NODE_HEIGHT = 34;
 export const ROW_HEIGHT = 44;
@@ -50,21 +50,21 @@ export interface MapNode {
   y: number;
   w: number;
   h: number;
-  /** Text aus den Daten (Workflow-Name, TODO-Titel, Agent); fehlt er, beschriftet die Karte nach Art. */
+  /** Text from the data (workflow name, TODO title, agent); if absent, the card labels by kind. */
   label: string | null;
   tone: Tone;
-  /** Die TODOs, deren Pfad durch diesen Knoten läuft – Grundlage der Hervorhebung. */
+  /** The TODOs whose path runs through this node - basis of the highlighting. */
   todoIds: string[];
   candidate: boolean;
   target: NodeTarget | null;
   originKind?: GoalOriginKind;
-  /** Bearbeitung: Fix-Workflow und/oder Trigger. */
+  /** Processing: fix workflow and/or trigger. */
   workerKinds?: ('LINKED' | 'TRIGGER')[];
   triggerLabels?: string[];
   runStatus?: RunStatus | null;
   resolutionState?: TodoResolutionState | null;
   fixAttempts?: number;
-  /** TODO: Status und Priorität für die Symbole. */
+  /** TODO: status and priority for the symbols. */
   todo?: GoalTodoRelation;
 }
 
@@ -78,32 +78,32 @@ export interface MapEdge {
 }
 
 export interface MapGroup {
-  /** Projektname; `null` = ohne Projekt; bei `candidate` die Kandidaten-Gruppe. */
+  /** Project name; `null` = without project; for `candidate` the candidate group. */
   label: string | null;
   y: number;
-  /** Höhe der Gruppe samt ihrer Zeilen – Ablagefläche der Workflow-Zuordnung. */
+  /** Height of the group including its rows - drop surface of the workflow assignment. */
   h?: number;
   candidate: boolean;
   /**
-   * Gliederung nach Arbeitspaketen (52bc1e8c): das Paket der Gruppe; `null` = „Ohne Arbeitspaket“;
-   * fehlt, wenn nur nach Projekt gegliedert ist.
+   * Outline by work packages (52bc1e8c): the package of the group; `null` = „Ohne Arbeitspaket“;
+   * absent if outlined by project only.
    */
   workPackageId?: string | null;
-  /** Titel des Pakets (oder `null` für „Ohne Arbeitspaket“) – steht hinter dem Projektnamen. */
+  /** Title of the package (or `null` for „Ohne Arbeitspaket“) - stands after the project name. */
   packageTitle?: string | null;
 }
 
 /**
- * Wie die Zeilen gegliedert werden (52bc1e8c): Projekt → Arbeitspaket, in der Reihenfolge der
- * Projekte und Pakete des Ziels, je Projekt zuletzt „Ohne Arbeitspaket“. Die Relationen kennen
- * das Paket eines TODOs nicht – es kommt aus dem Ziel (`GoalDetail.todos[].workPackageId`).
+ * How the rows are outlined (52bc1e8c): project → work package, in the order of the
+ * projects and packages of the goal, per project „Ohne Arbeitspaket“ last. The relations do not know
+ * the package of a TODO - it comes from the goal (`GoalDetail.todos[].workPackageId`).
  */
 export interface MapStructure {
   /** Projekte des Ziels in ihrer Reihenfolge. */
   projectOrder: string[];
-  /** Pakete des Ziels in ihrer Reihenfolge (je Projekt nach Position). */
+  /** Packages of the goal in their order (per project by position). */
   packages: { id: string; title: string; projectId: string | null }[];
-  /** Paket je TODO; fehlt ein TODO, gilt es als ohne Paket. */
+  /** Package per TODO; a missing TODO counts as without a package. */
   packageOf: ReadonlyMap<string, string | null>;
 }
 
@@ -113,11 +113,11 @@ export interface RelationLayout {
   nodes: MapNode[];
   edges: MapEdge[];
   groups: MapGroup[];
-  /** Hat mindestens ein TODO des Ziels (ohne Kandidaten) einen Workflow, der es bearbeitet? */
+  /** Does at least one TODO of the goal (without candidates) have a workflow that processes it? */
   hasWorkers: boolean;
 }
 
-/** Schlüssel des zusammengefassten Herkunfts-Knotens. */
+/** Key of the merged origin node. */
 export function originKey(todo: GoalTodoRelation): string {
   const { kind, workflowId, agent } = todo.origin;
   switch (kind) {
@@ -156,7 +156,7 @@ function todoTone(todo: GoalTodoRelation): Tone {
   return 'neutral';
 }
 
-/** Kurve von der rechten Kante der Quelle zur linken Kante des Ziels. */
+/** Curve from the right edge of the source to the left edge of the target. */
 export function curve(x1: number, y1: number, x2: number, y2: number): string {
   const mid = (x1 + x2) / 2;
   return `M ${x1} ${y1} C ${mid} ${y1}, ${mid} ${y2}, ${x2} ${y2}`;
@@ -164,15 +164,15 @@ export function curve(x1: number, y1: number, x2: number, y2: number): string {
 
 const centerY = (node: MapNode) => node.y + node.h / 2;
 
-/** Zusammengefasster Knoten, noch ohne endgültige Höhe. */
+/** Merged node, still without final height. */
 interface Pending {
   node: MapNode;
   desired: number[];
 }
 
 /**
- * Verteilt die Knoten einer Spalte: jeder möglichst auf Höhe des Mittels seiner TODOs, bei
- * Überlappung nach unten geschoben. Gibt die unterste Kante zurück.
+ * Distributes the nodes of a column: each as close as possible to the mean of its TODOs, pushed
+ * down on overlap. Returns the bottom edge.
  */
 function place(items: Pending[]): number {
   const wanted = items.map((item) => ({
@@ -188,7 +188,7 @@ function place(items: Pending[]): number {
   return bottom;
 }
 
-/** Gruppen der Zeilen: nach Projekt (ohne Struktur) oder nach Projekt → Arbeitspaket. */
+/** Groups of the rows: by project (without structure) or by project → work package. */
 function rowGroupsOf(members: GoalTodoRelation[], structure?: MapStructure) {
   type RowGroup = { label: string | null; candidate: boolean; todos: GoalTodoRelation[]; workPackageId?: string | null; packageTitle?: string | null };
   const byProject = new Map<string, GoalTodoRelation[]>();
@@ -213,7 +213,7 @@ function rowGroupsOf(members: GoalTodoRelation[], structure?: MapStructure) {
       const id = structure.packageOf.get(todo.id) ?? null;
       return id && structure.packages.some((item) => item.id === id) ? id : null;
     };
-    // Pakete in der Reihenfolge des Ziels; auch ein Paket eines anderen Projekts (Altfall) steht unter dem TODO-Projekt
+    // Packages in the order of the goal; a package of another project (legacy case) also stands under the TODO project
     const packageIds = [...new Set(list.map(packageOf).filter((id): id is string => id !== null))]
       .sort((a, b) => structure.packages.findIndex((item) => item.id === a) - structure.packages.findIndex((item) => item.id === b));
     for (const id of packageIds) {
@@ -233,7 +233,7 @@ export function layoutRelations(todos: GoalTodoRelation[], structure?: MapStruct
   const edges: MapEdge[] = [];
   const groups: MapGroup[] = [];
 
-  // ── TODO-Zeilen: nach Projekt gruppiert, Gruppen in der Reihenfolge ihres ersten TODOs ──
+  // ── TODO rows: grouped by project, groups in the order of their first TODO ──
   const members = todos.filter((t) => !t.candidate);
   const candidates = todos.filter((t) => t.candidate);
   const rowGroups = rowGroupsOf(members, structure);
@@ -282,7 +282,7 @@ export function layoutRelations(todos: GoalTodoRelation[], structure?: MapStruct
     }
     entry.node.todoIds.push(todo.id);
     entry.desired.push(centerY(todoNode));
-    // Mehrere Läufe: der schlechteste Status zählt (ein gescheiterter Lauf soll auffallen).
+    // Several runs: the worst status counts (a failed run should stand out).
     if (todo.origin.runStatus === 'FAILED') entry.node.runStatus = 'FAILED';
   }
   for (const entry of origins.values()) {
@@ -291,13 +291,13 @@ export function layoutRelations(todos: GoalTodoRelation[], structure?: MapStruct
     entry.node.target = findings.length === 1 ? { type: 'finding', id: findings[0]! } : { type: 'audit' };
   }
 
-  // ── Bearbeitung: ein Knoten je Workflow, dazu ein Stummel je TODO ohne Workflow ──
+  // ── Processing: one node per workflow, plus a stub per TODO without a workflow ──
   const workers = new Map<string, Pending>();
   const gaps: Pending[] = [];
   for (const todo of todos) {
     const todoNode = todoNodes.get(todo.id)!;
     if (todo.workers.length === 0) {
-      if (todo.result) continue; // schon bearbeitet, nur dockt heute nichts mehr an: Linie direkt zum Ergebnis
+      if (todo.result) continue; // already processed, nothing docks there any more today: line directly to the result
       gaps.push({
         node: {
           id: `gap:${todo.id}`, kind: 'gap', column: 2, x: COLUMNS[2].x, y: 0, w: GAP_WIDTH, h: GAP_HEIGHT,
@@ -331,7 +331,7 @@ export function layoutRelations(todos: GoalTodoRelation[], structure?: MapStruct
     }
   }
 
-  // ── Ergebnis: je TODO mit Fix-Lauf ein Knoten auf seiner Zeile ──
+  // ── Result: one node per TODO with a fix run, on its row ──
   const results: MapNode[] = [];
   for (const todo of todos) {
     if (!todo.result) continue;
@@ -382,7 +382,7 @@ export function layoutRelations(todos: GoalTodoRelation[], structure?: MapStruct
   };
 }
 
-/** Die TODO-IDs, die bei Hover über einem Knoten hervorgehoben werden. */
+/** The TODO IDs that are highlighted when hovering over a node. */
 export function highlightFor(layout: RelationLayout, nodeId: string | null): Set<string> | null {
   if (!nodeId) return null;
   const node = layout.nodes.find((n) => n.id === nodeId);

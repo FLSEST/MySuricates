@@ -12,7 +12,7 @@ import {
 import type { FloatingAlign, FloatingAnchor } from './floating';
 import type { GoalMilestone, GoalProject, GoalWorkPackage } from '../../types';
 
-/** Wo die Karte schwebt (`floating.ts`) und wer sie geöffnet hat – er bekommt danach den Fokus zurück. */
+/** Where the card floats (`floating.ts`) and who opened it - it gets the focus back afterwards. */
 interface Placement {
   anchor?: FloatingAnchor;
   align?: FloatingAlign;
@@ -22,9 +22,9 @@ interface Placement {
 const DELETE_BUTTON = 'btn-base mr-auto px-3 py-1.5 text-xs text-danger hover:bg-danger-subtle';
 
 /**
- * Karte eines Meilensteins am Zeitstrahl (c60bf914): Titel, Datum, verknüpfte Arbeitspakete nach
- * Projekt, Stand „2/3 Pakete“ – ohne Verknüpfung stattdessen „erreicht“ von Hand – und Löschen. Ohne
- * `milestone` legt sie einen neuen an (vorbelegt mit `day`).
+ * Card of a milestone on the timeline (c60bf914): title, date, linked work packages by
+ * project, status „2/3 Pakete“ - without a link instead „erreicht“ by hand - and delete. Without
+ * `milestone` it creates a new one (prefilled with `day`).
  */
 export function MilestoneCard({ goalId, milestone, day, workPackages, projects, onClose, onDelete, ...placement }: {
   goalId: string;

@@ -3,25 +3,25 @@ import { createPortal } from 'react-dom';
 import { FLOATING_STYLE, returnFocus, useFloating, type FloatingAlign, type FloatingAnchor } from './floating';
 
 const FOCUSABLE = 'input, select, textarea, button';
-/** Ein Element mit diesem Attribut bekommt beim Öffnen den Fokus statt des ersten Felds. */
+/** An element with this attribute gets the focus on opening instead of the first field. */
 const AUTOFOCUS = '[data-autofocus]';
 
 /**
- * Kleine, nicht modale Karte am Zeitstrahl – das Menü eines Chips, die Karte eines Arbeitspakets
- * oder Meilensteins. Sie schwebt per Portal über der Seite (`floating.ts`), damit der in sich scrollende
- * Zeitstrahl sie nicht abschneidet. Beim Öffnen steht der Fokus auf ihrem ersten Feld (oder dem mit
- * `data-autofocus`); Escape und ein Klick daneben schließen sie. Danach geht der Fokus an den
- * Auslöser zurück – nach Speichern wie nach Abbrechen.
+ * Small, non-modal card on the timeline - the menu of a chip, the card of a work package
+ * or milestone. It floats via portal above the page (`floating.ts`) so that the internally scrolling
+ * timeline does not cut it off. On opening, the focus is on its first field (or the one with
+ * `data-autofocus`); Escape and a click outside close it. Afterwards the focus goes back to the
+ * trigger - after saving as after cancelling.
  */
 export function TimelinePopover({ label, onClose, anchor, align = 'start', triggerRef, wide = false, children }: {
   label: string;
   onClose: () => void;
-  /** Wo die Karte steht; ohne eigenen Anker am Auslöser. */
+  /** Where the card stands; without its own anchor, at the trigger. */
   anchor?: FloatingAnchor;
   align?: FloatingAlign;
-  /** Klicks auf den Auslöser schalten selbst um – sie zählen nicht als „daneben“. Er bekommt danach den Fokus zurück. */
+  /** Clicks on the trigger toggle by themselves - they do not count as „outside“. It gets the focus back afterwards. */
   triggerRef?: RefObject<HTMLElement | null>;
-  /** Breiter für Formulare mit zwei Datumsfeldern oder einer Auswahlliste. */
+  /** Wider for forms with two date fields or a selection list. */
   wide?: boolean;
   children: ReactNode;
 }) {
@@ -33,7 +33,7 @@ export function TimelinePopover({ label, onClose, anchor, align = 'start', trigg
     (ref.current?.querySelector<HTMLElement>(AUTOFOCUS) ?? ref.current?.querySelector<HTMLElement>(FOCUSABLE))?.focus();
   }, []);
 
-  // Beim Schließen – gleich wodurch – den Fokus an den Auslöser zurückgeben
+  // On closing - however it happens - give the focus back to the trigger
   useLayoutEffect(() => {
     const node = ref.current;
     const trigger = triggerRef?.current;

@@ -37,7 +37,7 @@ function item(id: string, workPackageId: string | null): GoalTodoItem {
   };
 }
 
-// sechs ohne Datum im Paket (mehr als fünf: eingeklappt), zwei ohne Paket (offen)
+// six undated in the package (more than five: folded), two without a package (open)
 const todos = [...['1', '2', '3', '4', '5', '6'].map((id) => item(`w${id}`, 'w1')), item('l1', null), item('l2', null)];
 
 function renderTimeline() {
@@ -81,7 +81,7 @@ describe('TODOs without a date in the timeline', () => {
     expect(looseToggle()).toHaveAttribute('aria-expanded', 'false');
     expect(JSON.parse(localStorage.getItem('mysuricates-goal-undated')!)).toEqual({ g1: 'none' });
 
-    // eine einzelne Zeile lässt sich danach für sich öffnen, der Schalter bietet wieder „alle zeigen“
+    // a single row can then be opened on its own, the switch offers „alle zeigen“ again
     fireEvent.click(looseToggle());
     expect(looseToggle()).toHaveAttribute('aria-expanded', 'true');
     expect(screen.getByRole('button', { name: 'Show all TODOs without a date' })).toBeInTheDocument();

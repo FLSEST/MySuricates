@@ -3,18 +3,18 @@ import type { WorkflowWidgetEntry } from '../dashboard/workflowWidgetContract';
 import type { GoalWorkflow } from '../../types';
 
 /**
- * Die Workflows des Ziels für alle Ansichten der Zielseite (52bc1e8c): einmal geladen, am Ziel im
- * Kopf und an jedem Arbeitspaket in Gliederung und Zeitstrahl gezeigt. Ohne Anbieter (etwa außerhalb
- * der Zielseite) zeigen die Pakete keine Workflows.
+ * The workflows of the goal for all views of the goal page (52bc1e8c): loaded once, shown at the goal in the
+ * header and at every work package in outline and timeline. Without a provider (e.g. outside
+ * the goal page) the packages show no workflows.
  */
 export interface GoalWorkflowsValue {
   goalId: string;
-  /** Das Backend kennt Workflows am Ziel; sonst nur der Wächter und kein Zuordnen. */
+  /** The backend knows workflows at the goal; otherwise only the guard and no assigning. */
   supported: boolean;
   attachments: GoalWorkflow[];
   /** Letzter Lauf und Ergebnis je Workflow-ID. */
   results: Map<string, WorkflowWidgetEntry>;
-  /** Öffnet „Workflow zuordnen“, vorbelegt mit dem Paket (null = ganzes Ziel). */
+  /** Opens „Workflow zuordnen“, prefilled with the package (null = whole goal). */
   openAssign: (workPackageId: string | null) => void;
 }
 
@@ -22,7 +22,7 @@ export const GoalWorkflowsContext = createContext<GoalWorkflowsValue | null>(nul
 
 export const useGoalWorkflowsScope = () => useContext(GoalWorkflowsContext);
 
-/** Die Zuordnungen am Ziel (`null`) bzw. an einem Paket – in der Reihenfolge des Servers. */
+/** The assignments at the goal (`null`) or at a package - in the order of the server. */
 export function attachmentsAt(attachments: GoalWorkflow[], workPackageId: string | null): GoalWorkflow[] {
   return attachments.filter((item) => (item.workPackageId ?? null) === workPackageId);
 }

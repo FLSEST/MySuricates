@@ -51,7 +51,7 @@ function detail(guard: GoalGuard): GoalDetail {
   };
 }
 
-/** Das Ziel liefert den jeweils aktuellen Wächter; POST /guard schaltet ihn wie das Backend. */
+/** The goal returns the current guard each time; POST /guard switches it like the backend. */
 function serveGoal(initial: GoalGuard) {
   const state = { guard: initial, sent: [] as unknown[], executed: [] as string[] };
   server.use(
@@ -103,7 +103,7 @@ describe('GoalGuardControl', { timeout: 20_000 }, () => {
     fireEvent.click(await screen.findByRole('switch', { name: 'Guard' }));
     const dialog = screen.getByRole('dialog');
     expect(within(dialog).getByText('Switch on the goal guard')).toBeInTheDocument();
-    // vorbelegt: das Projekt mit den meisten TODOs des Ziels
+    // prefilled: the project with the most TODOs of the goal
     await waitFor(() => expect(within(dialog).getByLabelText('Project')).toHaveValue('p2'));
     expect(within(dialog).getByLabelText('Time (daily)')).toHaveValue('08:00');
     fireEvent.change(within(dialog).getByLabelText('Time (daily)'), { target: { value: '07:30' } });
@@ -111,7 +111,7 @@ describe('GoalGuardControl', { timeout: 20_000 }, () => {
 
     await waitFor(() => expect(state.sent).toEqual([{ enabled: true, projectId: 'p2', cron: '0 30 7 * * *', locale: 'en' }]));
     await waitFor(() => expect(resultTiles()).toEqual(['wf-guard']));
-    // wie aus dem Katalog: hinten angehängt, hinter den Standard-Kacheln, und als lokale Änderung vermerkt
+    // as from the catalog: appended at the back, behind the standard tiles, and noted as a local change
     const widgets = selectActiveView(useDashboardLayoutStore.getState())!.widgets;
     expect(widgets.length).toBeGreaterThan(1);
     expect(widgets.at(-1)).toMatchObject({ type: 'workflow-result', config: { workflowId: 'wf-guard' } });

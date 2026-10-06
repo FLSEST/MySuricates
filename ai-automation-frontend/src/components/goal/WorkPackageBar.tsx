@@ -12,7 +12,7 @@ import { pointerOnly, useDragState } from './timelineDrag';
 import { useKeyboardNudge } from './useKeyboardNudge';
 import type { GoalWorkPackage, WorkPackageState } from '../../types';
 
-/** Rahmen nach Zustand; Grund und Füllung bleiben ruhig – der Zustand soll auffallen, nicht der Balken. */
+/** Frame by state; background and fill stay calm - the state should stand out, not the bar. */
 const FRAME: Record<WorkPackageState, string> = {
   OPEN: 'border border-info/45 bg-info-subtle',
   DUE_SOON: 'border-2 border-warning bg-info-subtle',
@@ -23,11 +23,11 @@ const FRAME: Record<WorkPackageState, string> = {
 const DRAG_DATA: ChipDragData = { anchor: 0, flipped: false, kind: 'package' };
 
 /**
- * Ein Arbeitspaket als Balken (c60bf914) von Beginn bis Ende, Fortschritt als Füllung, Zustand am
- * Rahmen, der Titel im Balken (passt er nicht, daneben). Den Balken ziehen verschiebt ihn (die Dauer
- * bleibt), die Griffe an den Enden ändern Beginn bzw. Ende. Tastatur: ← → verschieben um einen Tag,
- * Umschalt mit ← → ändert das Ende, Enter öffnet die Karte, Escape verwirft; gespeichert wird nach
- * einer kurzen Pause (`useKeyboardNudge`).
+ * A work package as a bar (c60bf914) from start to end, progress as fill, state at the
+ * frame, the title in the bar (if it does not fit, next to it). Dragging the bar moves it (the duration
+ * stays), the handles at the ends change start or end. Keyboard: ← → move by one day,
+ * Shift with ← → changes the end, Enter opens the card, Escape discards; it is saved after
+ * a short pause (`useKeyboardNudge`).
  */
 export function WorkPackageBar({ workPackage, range, axis, width, helpId, onOpen, onReschedule, announce }: {
   workPackage: GoalWorkPackage;
@@ -35,11 +35,11 @@ export function WorkPackageBar({ workPackage, range, axis, width, helpId, onOpen
   range: DayRange;
   axis: TimelineAxis;
   width: number;
-  /** ID des Hilfetexts zur Tastatur (einmal je Zeitstrahl). */
+  /** ID of the help text on the keyboard (once per timeline). */
   helpId: string;
   onOpen: (trigger: HTMLElement) => void;
   onReschedule: (range: DayRange) => void;
-  /** Ansage für Screenreader, wenn die Tastatur den Balken bewegt. */
+  /** Announcement for screen readers when the keyboard moves the bar. */
   announce: (text: string) => void;
 }) {
   const t = useT();
@@ -58,7 +58,7 @@ export function WorkPackageBar({ workPackage, range, axis, width, helpId, onOpen
   const percent = workPackage.state === 'REACHED' ? 100 : workPackage.total > 0 ? (workPackage.done / workPackage.total) * 100 : 0;
   const fit = barLabelFit(workPackage.title, box.width);
   const fits = fit !== 'none';
-  // Passt der Titel nicht hinein, steht er rechts daneben – am rechten Rand links davor
+  // If the title does not fit in, it stands to the right of it - at the right edge, to the left of it
   const titleBefore = !fits && box.left + box.width + workPackage.title.length * 6.2 + 12 > width;
   const label = tw.bar.replace('{title}', workPackage.title).replace('{range}', rangeText(shown, locale))
     .replace('{done}', String(workPackage.done)).replace('{total}', String(workPackage.total));
@@ -68,7 +68,7 @@ export function WorkPackageBar({ workPackage, range, axis, width, helpId, onOpen
   const onKeyDown = (event: KeyboardEvent<HTMLButtonElement>) => {
     if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') {
       const step = event.key === 'ArrowRight' ? 1 : -1;
-      // Umschalt ändert das Ende, Alt den Beginn (c60bf914) – ohne beides wandert der ganze Balken
+      // Shift changes the end, Alt the start (c60bf914) - without either the whole bar moves
       const next = event.shiftKey ? resizedRange(nudge.value, 'end', step)
         : event.altKey ? resizedRange(nudge.value, 'start', step) : movedRange(nudge.value, step);
       nudge.nudge(next);

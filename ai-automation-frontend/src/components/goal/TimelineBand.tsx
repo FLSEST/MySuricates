@@ -21,7 +21,7 @@ import { useIsSelected } from './goalSelection';
 import type { FloatingAnchor } from './floating';
 import type { GoalWorkPackage } from '../../types';
 
-/** Wo ein neues Paket gerade eingetippt wird: ab einem Tag (eine Woche) oder ohne Zeitraum in der Leiste. */
+/** Where a new package is being typed right now: from a day (one week) or without a period in the bar. */
 export interface InlineAt {
   day: number | null;
   x: number | null;
@@ -43,17 +43,17 @@ interface BandProps {
   onCreate: (title: string, day: number | null) => void;
   onPlan: (todoId: string, changes: PlanChanges) => void;
   onOpenTodo: (todoId: string) => void;
-  /** `trigger`: Balken, Zeilenname oder Eintrag der Leiste, der geklickt wurde – dort steht die Karte, er bekommt danach den Fokus. */
+  /** `trigger`: bar, row name or bar entry that was clicked - the card stands there, and it gets the focus afterwards. */
   onOpenPackage: (id: string, trigger: HTMLElement) => void;
   onReschedule: (workPackage: GoalWorkPackage, range: DayRange | null) => void;
   announce: (text: string) => void;
 }
 
 /**
- * Ein Projektband des Zeitstrahls (c60bf914): Kopfzeile mit dem Projekt – ein Klick hinein (oder Tag
- * per Tastatur wählen, Enter) legt ab diesem Tag ein Arbeitspaket für eine Woche an, nur der Titel
- * fehlt; „+ Arbeitspaket“ legt eins ohne Zeitraum an –, darunter je Paket eine Zeile mit seinem
- * Balken, „Ohne Arbeitspaket“ nur bei Bedarf, zuletzt die Leiste „Ohne Zeitraum“.
+ * A project band of the timeline (c60bf914): header row with the project - a click into it (or picking a day
+ * by keyboard, Enter) creates a work package from that day for one week, only the title
+ * is missing; „+ Arbeitspaket“ creates one without a period -, below it one row per package with its
+ * bar, „Ohne Arbeitspaket“ only when needed, last the bar „Ohne Zeitraum“.
  */
 export function TimelineBandView({
   band, axis, width, today, workPackages, inline, creating, barHelpId,
@@ -66,7 +66,7 @@ export function TimelineBandView({
   const { dragged } = useDragState();
   const name = band.name ?? to.noProject;
   const addLabel = to.addWorkPackageIn.replace('{project}', name);
-  // Auslöser der Eingabefelder – sie bekommen nach Anlegen oder Abbrechen den Fokus zurück
+  // Trigger of the input fields - they get the focus back after creating or cancelling
   const addRef = useRef<HTMLButtonElement>(null);
   const pickerRef = useRef<HTMLDivElement>(null);
   const inlineX = inline?.x ?? null;
@@ -74,7 +74,7 @@ export function TimelineBandView({
     const rect = pickerRef.current?.getBoundingClientRect();
     return rect && inlineX !== null ? new DOMRect(rect.left + inlineX - 12, rect.top, 0, rect.height) : null;
   };
-  // „Ohne Arbeitspaket“ und die Leiste nur, wenn dort etwas steht – oder gerade hinein soll
+  // „Ohne Arbeitspaket“ and the bar only if something is in there - or something is about to go in
   const draggingOwnTodo = dragged?.kind === 'todo' && bandOfTodo(dragged.todo) === band.key && dragged.todo.workPackageId !== null;
   const draggingOwnBar = dragged?.kind === 'package' && dragged.mode === 'move' && bandOfPackage(dragged.workPackage) === band.key;
   const addingUnscheduled = !!inline && inline.day === null;
@@ -124,7 +124,7 @@ export function TimelineBandView({
   );
 }
 
-/** Kopfzeile eines Bands als Fläche: Balken dieses Projekts lassen sich hierher auf einen Tag ziehen. */
+/** Header row of a band as a surface: bars of this project can be dragged here onto a day. */
 function BandStrip({ band, children }: { band: TimelineBand; children: ReactNode }) {
   const { dragged } = useDragState();
   const id = stripDropId(band.key);
@@ -139,14 +139,14 @@ function BandStrip({ band, children }: { band: TimelineBand; children: ReactNode
 }
 
 /**
- * Leiste „Ohne Zeitraum“: Pakete ohne Zeitraum, auf die Achse gezogen bekommen sie eine Woche; ein
- * Balken hierher verliert seinen. Die TODOs ohne Datum eines Pakets klappen unter der Leiste auf.
+ * Bar „Ohne Zeitraum“: packages without a period get one week when dragged onto the axis; a
+ * bar dragged here loses its period. The undated TODOs of a package unfold below the bar.
  */
 function UnscheduledTray({ band, adding, creating, addRef, today, workPackages, onPlan, onOpenTodo, onCreate, onCancel, onOpenPackage }: {
   band: TimelineBand;
   adding: boolean;
   creating: boolean;
-  /** Knopf „+ Arbeitspaket“ des Bands – er bekommt nach Anlegen oder Abbrechen den Fokus zurück. */
+  /** Button „+ Arbeitspaket“ of the band - it gets the focus back after creating or cancelling. */
   addRef: RefObject<HTMLButtonElement | null>;
   today: number;
   workPackages: GoalWorkPackage[];
@@ -161,7 +161,7 @@ function UnscheduledTray({ band, adding, creating, addRef, today, workPackages, 
   const tw = t.goals.workPackages;
   const name = band.name ?? t.goals.outline.noProject;
   const listId = useId();
-  // Welches Paket seine TODOs ohne Datum zeigt, hält der Zeitstrahl – „Zeigen“ öffnet es von dort (85889063)
+  // Which package shows its undated TODOs is held by the timeline - „Zeigen“ opens it from there (85889063)
   const shared = useContext(UndatedContext);
   const [local, setLocal] = useState<string | null>(null);
   const open = shared ? shared.pill(band.key) : local;
@@ -201,8 +201,8 @@ function UnscheduledTray({ band, adding, creating, addRef, today, workPackages, 
 }
 
 /**
- * Ein Paket ohne Zeitraum: ziehbar auf die Achse (bekommt eine Woche); TODO-Chips darauf abgelegt
- * kommen hinein. Der Zähler daneben klappt seine TODOs ohne Datum auf.
+ * A package without a period: draggable onto the axis (gets one week); TODO chips dropped on it
+ * go into it. The counter next to it unfolds its undated TODOs.
  */
 function UnscheduledPill({ band, entry, listId, open, onToggle, onOpen }: {
   band: string;

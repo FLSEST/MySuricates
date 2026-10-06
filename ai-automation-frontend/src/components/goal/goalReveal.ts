@@ -2,23 +2,23 @@ import { useEffect, useRef, type RefObject } from 'react';
 import { create } from 'zustand';
 
 /**
- * „Zeigen“ nach dem Hinzufügen eines TODOs zum Ziel (85889063, Flo: „Ich habe + gedrückt und sehe es
- * aber nicht in der Timeline oben“): Der Knopf im Toast merkt sich hier, welches TODO gezeigt werden
- * soll. Die Zielseite wechselt aus Liste und Workflow-Zuordnung in die Gliederung; Gliederung und
- * Zeitstrahl klappen auf, was das TODO verdeckt, scrollen hin und heben es kurz hervor. Ein Store
- * statt eines Callbacks, weil der Toast die Seite überlebt, von der er kam.
+ * „Zeigen“ after adding a TODO to the goal (85889063, Flo: „Ich habe + gedrückt und sehe es
+ * aber nicht in der Timeline oben“): the button in the toast remembers here which TODO is to be shown.
+ * The goal page switches from list and workflow assignment to the outline; outline and
+ * timeline unfold what hides the TODO, scroll to it and briefly highlight it. A store
+ * instead of a callback, because the toast outlives the page it came from.
  */
 interface RevealRequest {
   goalId: string;
   todoId: string;
-  /** Jeder Klick ein neuer Auftrag – auch zweimal dasselbe TODO. */
+  /** Every click a new order - even twice the same TODO. */
   seq: number;
 }
 
 interface RevealState {
   request: RevealRequest | null;
   reveal: (goalId: string, todoId: string) => void;
-  /** Erledigt, sofern `seq` noch der offene Auftrag ist. */
+  /** Done, provided `seq` is still the open order. */
   done: (seq: number) => void;
   clear: () => void;
 }
@@ -33,12 +33,12 @@ export const useGoalReveal = create<RevealState>()((set) => ({
 /** So lange leuchtet das gezeigte TODO. */
 export const REVEAL_MS = 2000;
 
-/** Attribut der Zeile bzw. des Chips eines TODOs – daran findet „Zeigen“ es. */
+/** Attribute of the row or chip of a TODO - this is how „Zeigen“ finds it. */
 export const TODO_ID_ATTRIBUTE = 'data-todo-id';
 
 /**
- * Scrollt zum TODO und hebt es hervor (`[data-goal-revealed]`, index.css); bei „weniger Bewegung“
- * springt es ohne Gleiten und leuchtet ohne Pulsieren. Falsch, solange es nicht sichtbar im DOM steht.
+ * Scrolls to the TODO and highlights it (`[data-goal-revealed]`, index.css); with „reduced motion“
+ * it jumps without gliding and glows without pulsing. False as long as it is not visibly in the DOM.
  */
 export function revealElement(root: ParentNode, todoId: string): boolean {
   const element = [...root.querySelectorAll<HTMLElement>(`[${TODO_ID_ATTRIBUTE}]`)]
@@ -52,9 +52,9 @@ export function revealElement(root: ParentNode, todoId: string): boolean {
 }
 
 /**
- * Für eine Ansicht des Ziels: Steht ein Auftrag für dieses Ziel an und kennt die Ansicht das TODO,
- * klappt `open` auf, was es verdeckt; sobald es sichtbar gerendert ist, wird es gezeigt und der
- * Auftrag ist erledigt. Ein TODO, das erst nach dem Nachladen ankommt, wird gezeigt, sobald es da ist.
+ * For a view of the goal: if an order for this goal is pending and the view knows the TODO,
+ * `open` unfolds what hides it; as soon as it is rendered visibly, it is shown and the
+ * order is done. A TODO that arrives only after reloading is shown as soon as it is there.
  */
 export function useRevealInView(goalId: string, rootRef: RefObject<HTMLElement | null>, known: (todoId: string) => boolean,
   open: (todoId: string) => void) {
@@ -70,7 +70,7 @@ export function useRevealInView(goalId: string, rootRef: RefObject<HTMLElement |
   useEffect(() => {
     if (seq !== null && todoId) openRef.current(todoId);
   }, [seq, todoId]);
-  // Nach jedem Rendern: ist es jetzt sichtbar? (das Aufklappen braucht einen Durchgang)
+  // After every render: is it visible now? (unfolding needs one pass)
   useEffect(() => {
     if (seq === null || !todoId || !rootRef.current) return;
     if (revealElement(rootRef.current, todoId)) done(seq);

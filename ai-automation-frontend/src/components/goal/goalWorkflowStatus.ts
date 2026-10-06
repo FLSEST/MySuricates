@@ -4,8 +4,8 @@ import type { RunStatus } from '../../types';
 import type { WorkflowResultStatus, WorkflowWidgetEntry } from '../dashboard/workflowWidgetContract';
 
 /**
- * Stand eines Workflows am Ziel (52bc1e8c) aus dem vorhandenen Lesepfad `/dashboard/workflow-results`:
- * Farbe des letzten Laufs, bei einem Workflow mit Rolle STATUS die Ampel seines Ergebnisses. Rein.
+ * State of a workflow at the goal (52bc1e8c) from the existing read path `/dashboard/workflow-results`:
+ * colour of the last run, for a workflow with role STATUS the traffic light of its result. Pure.
  */
 
 export type RunTone = 'success' | 'warning' | 'danger' | 'info' | 'neutral';
@@ -21,7 +21,7 @@ const RUN_TONE: Record<RunStatus, RunTone> = {
   PAUSED: 'info',
 };
 
-/** Punkt je Ton – feste Klassennamen für Tailwind. */
+/** Dot per tone - fixed class names for Tailwind. */
 export const TONE_DOT: Record<RunTone, string> = {
   success: 'bg-success',
   warning: 'bg-warning',
@@ -32,19 +32,19 @@ export const TONE_DOT: Record<RunTone, string> = {
 
 const LIGHT_TONE: Record<WorkflowResultStatus, RunTone> = { GREEN: 'success', YELLOW: 'warning', RED: 'danger' };
 
-/** Ton des letzten Laufs; ohne Lauf neutral. */
+/** Tone of the last run; neutral without a run. */
 export function runTone(entry: WorkflowWidgetEntry | null | undefined): RunTone {
   return entry?.run ? RUN_TONE[entry.run.status] : 'neutral';
 }
 
-/** Die Ampel eines Ergebnisses: aus dem Ergebnis-Vertrag, sonst dem Gate-Status des Laufs; null, wenn keins da ist. */
+/** The traffic light of a result: from the result contract, otherwise the gate status of the run; null if there is none. */
 export function lightOf(entry: WorkflowWidgetEntry | null | undefined): WorkflowResultStatus | null {
   return entry?.result?.status ?? entry?.run?.gateStatus ?? null;
 }
 
 /**
- * Was der Punkt eines Workflows zeigt: bei „liefert den Stand“ die Ampel, solange der letzte Lauf
- * nicht gerade läuft oder scheiterte – sonst immer den Lauf.
+ * What the dot of a workflow shows: for „liefert den Stand“ the traffic light, as long as the last run
+ * is not currently running or failed - otherwise always the run.
  */
 export function shownTone(entry: WorkflowWidgetEntry | null | undefined, status: boolean): RunTone {
   const run = runTone(entry);
@@ -52,12 +52,12 @@ export function shownTone(entry: WorkflowWidgetEntry | null | undefined, status:
   return status && light && run !== 'info' && run !== 'danger' ? LIGHT_TONE[light] : run;
 }
 
-/** Zeitpunkt des letzten Laufs: Ende, sonst Start. */
+/** Time of the last run: end, otherwise start. */
 export function lastRunAt(entry: WorkflowWidgetEntry | null | undefined): string | null {
   return entry?.run ? entry.run.completedAt ?? entry.run.startedAt : null;
 }
 
-/** „vor 5 Minuten“, „vor 3 Stunden“, „vor 2 Tagen“ – in der Sprache der Oberfläche. */
+/** „vor 5 Minuten“, „vor 3 Stunden“, „vor 2 Tagen“ - in the language of the UI. */
 export function ago(iso: string, now: Date, locale: Locale): string {
   const minutes = Math.max(0, Math.round((now.getTime() - Date.parse(iso)) / 60_000));
   if (minutes < 60) return formatRelativeUnit(-minutes, 'minute', locale);
@@ -66,10 +66,10 @@ export function ago(iso: string, now: Date, locale: Locale): string {
   return formatRelativeUnit(-Math.round(hours / 24), 'day', locale);
 }
 
-/** Link zum Lauf – die Seite des Laufs im Workflow. */
+/** Link to the run - the page of the run in the workflow. */
 export const runPath = (workflowId: string, runId: string) => `/workflows/${workflowId}/run/${runId}`;
 
-/** Läuft der letzte Lauf noch (oder wartet er)? Dann startet ▶ keinen zweiten daneben. */
+/** Is the last run still running (or waiting)? Then ▶ does not start a second one alongside. */
 export function runActive(entry: WorkflowWidgetEntry | null | undefined): boolean {
   return runTone(entry) === 'info';
 }

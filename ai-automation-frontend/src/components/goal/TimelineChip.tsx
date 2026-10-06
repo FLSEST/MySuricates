@@ -17,16 +17,16 @@ import { useDecisionScope } from './decisionContext';
 import type { GoalTodoItem, GoalWorkPackage } from '../../types';
 
 /**
- * So sieht ein TODO auf dem Zeitstrahl aus: Statuspunkt und Titel, überfällig rot, erledigt
- * durchgestrichen. Der Punkt sitzt `CHIP_ANCHOR` px vom Rand – genau auf dem Fälligkeitstag.
+ * This is what a TODO looks like on the timeline: status dot and title, overdue red, done
+ * struck through. The dot sits `CHIP_ANCHOR` px from the edge - exactly on the due day.
  */
 export function ChipFace({ todo, overdue, flipped = false, lifted = false, compact = false }: {
   todo: GoalTodoItem;
   overdue: boolean;
   flipped?: boolean;
-  /** Das Bild unter dem Mauszeiger beim Ziehen. */
+  /** The image under the mouse pointer while dragging. */
   lifted?: boolean;
-  /** Schmal im Bereich „ohne Datum“ einer Zeile. */
+  /** Narrow, in the „ohne Datum“ area of a row. */
   compact?: boolean;
 }) {
   const done = todo.status === 'DONE';
@@ -43,29 +43,29 @@ export function ChipFace({ todo, overdue, flipped = false, lifted = false, compa
 
 interface TimelineChipProps {
   todo: GoalTodoItem;
-  /** Alle Pakete des Ziels – das Menü bietet die des eigenen Projekts an. */
+  /** All packages of the goal - the menu offers those of its own project. */
   workPackages: GoalWorkPackage[];
   today: number;
   /**
-   * Platz im Zeitstrahl; ohne steht der Chip im Fluss (Bereich „ohne Datum“ einer Zeile). `anchor`:
-   * Abstand vom linken Rand zum Tag, auf dem der Statuspunkt sitzt.
+   * Place in the timeline; without it, the chip sits in the flow („ohne Datum“ area of a row). `anchor`:
+   * distance from the left edge to the day on which the status dot sits.
    */
   placement?: { left: number; top: number; flipped: boolean; anchor: number };
-  /** Schmal und so breit wie sein Platz – im Bereich „ohne Datum“. */
+  /** Narrow and as wide as its place - in the „ohne Datum“ area. */
   compact?: boolean;
-  /** Aus dem Menü des Chips – dem Weg ohne Ziehen. */
+  /** From the chip's menu - the way without dragging. */
   onPlan: (todoId: string, changes: PlanChanges) => void;
   onOpenTodo: (todoId: string) => void;
 }
 
-/** So lange nach dem Loslassen gilt ein Klick noch als Ende des Ziehens, nicht als Klick. */
+/** For this long after release, a click still counts as the end of the drag, not as a click. */
 const CLICK_AFTER_DRAG_MS = 300;
 
 /**
- * Ein TODO auf dem Zeitstrahl (TODO e192df18): mit der Maus oder per Tastatur (Leertaste, dann
- * Pfeiltasten – TODO ff6f08fd) ziehbar. Ein Klick (oder Enter) öffnet den TODO-Dialog (c60bf914, Flo:
- * „anklickbar“); das Menü mit „Datum setzen“, „Arbeitspaket“ und „Entscheiden“ öffnet ⋯ daneben oder
- * die rechte Maustaste. Ein Klick direkt nach dem Ziehen zählt nicht.
+ * A TODO on the timeline (TODO e192df18): draggable with the mouse or by keyboard (space, then
+ * arrow keys - TODO ff6f08fd). A click (or Enter) opens the TODO dialog (c60bf914, Flo:
+ * „anklickbar“); the menu with „Datum setzen“, „Arbeitspaket“ and „Entscheiden“ opens via ⋯ next to it or
+ * the right mouse button. A click right after dragging does not count.
  */
 export function TimelineChip({ todo, workPackages, today, placement, compact = false, onPlan, onOpenTodo }: TimelineChipProps) {
   const t = useT();
@@ -166,7 +166,7 @@ function ChipMenu({ todo, workPackages, alignRight, triggerRef, onClose, onPlan,
   onClose: () => void;
   onPlan: (changes: PlanChanges) => void;
   onOpenTodo: () => void;
-  /** Offene Frage entscheiden bzw. die Entscheidung ändern (68a5e24e); fehlt ohne Frage und Entscheidung. */
+  /** Decide an open question or change the decision (68a5e24e); absent without a question and decision. */
   onDecide?: () => void;
 }) {
   const t = useT();
@@ -205,7 +205,7 @@ function ChipMenu({ todo, workPackages, alignRight, triggerRef, onClose, onPlan,
         <select id={packageId} value={todo.workPackageId ?? ''} onChange={(event) => onPlan({ workPackageId: event.target.value })}
           className="input-base w-full py-1 text-sm">
           <option value="">{tt.noWorkPackageOption}</option>
-          {/* Nur Pakete des eigenen Projekts (c60bf914) – und das bisherige, auch wenn es nicht passt */}
+          {/* Only packages of its own project (c60bf914) - and the current one, even if it does not fit */}
           {packageOptions(workPackages, todo.projectId, todo.workPackageId ?? '').map((item) => {
             const range = packageRange(item);
             return (
