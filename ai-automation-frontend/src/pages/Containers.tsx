@@ -113,7 +113,7 @@ function ImageCard({ image }: { image: ContainerImageView }) {
       {explanation && <p className="text-xs text-text-tertiary">{explanation}</p>}
 
       {image.base && (
-        <dl className="grid grid-cols-[auto,1fr] gap-x-3 gap-y-1 text-sm">
+        <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-sm">
           <dt className="text-text-tertiary">{t.containers.base}</dt>
           <dd className="font-mono text-xs text-text self-center">{image.base}</dd>
           <dt className="text-text-tertiary">{t.containers.tools}</dt>
