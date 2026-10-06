@@ -11,7 +11,7 @@ export type { DiagramSelection, RunStatus } from './bpmnLayout';
 
 export type DiagramOrientation = 'horizontal' | 'vertical';
 
-/** Kurzes Aufblitzen eines Blocks (Querverweis Liste ↔ Diagramm); ein neuer `nonce` blitzt erneut. */
+/** Brief flash of a block (cross-reference list ↔ diagram); a new `nonce` flashes again. */
 export type BlockFlash = { index: number; nonce: number; scroll?: boolean };
 
 export default function BpmnDiagramView({
@@ -27,9 +27,9 @@ export default function BpmnDiagramView({
   onSelectBlock?: (selection: DiagramSelection) => void;
   /** Live status per top-level block index (colors the matching box). */
   statusByBlock?: Map<number, RunStatus>;
-  /** Zeilenbereich je Block-Index — eingeschaltet zeigt jeder Kasten „#N · Z.a–b". */
+  /** Line range per block index — when switched on, each box shows „#N · Z.a–b". */
   infoByBlock?: Map<number, { start: number; end: number }>;
-  /** Fluss-Richtung: links→rechts (Standard) oder oben→unten. */
+  /** Flow direction: left→right (default) or top→bottom. */
   orientation?: DiagramOrientation;
   /** Makes the box of this top-level block flash briefly; a new `nonce` flashes again. */
   flashBlock?: BlockFlash | null;

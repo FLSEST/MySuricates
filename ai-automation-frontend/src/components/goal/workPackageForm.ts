@@ -9,9 +9,9 @@ import type { CreateGoalWorkPackageRequest, GoalWorkPackage, UpdateGoalWorkPacka
 export interface WorkPackageDraft {
   title: string;
   projectId: string;
-  /** `YYYY-MM-DD` oder leer. */
+  /** `YYYY-MM-DD` or empty. */
   start: string;
-  /** `YYYY-MM-DD` oder leer. */
+  /** `YYYY-MM-DD` or empty. */
   end: string;
 }
 

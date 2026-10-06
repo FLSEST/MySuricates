@@ -15,7 +15,7 @@ function serveApproval(body: Record<string, unknown>) {
 
 describe('useRunInputRecovery', () => {
   // Closing after an answer or via X: useRunPendingInput (settle) — the hook here only delivers what the server reports.
-  it('stellt eine wartende Freigabe wieder her', async () => {
+  it('restores a waiting approval', async () => {
     serveApproval({ pending: true, blockId: 'b1', question: 'Weiter?', options: ['Ja'], rejectOptions: ['Nein'], stepIndex: 2 });
     const { result } = renderHook(() => useRunInputRecovery('run-1'));
     await waitFor(() => expect(result.current.recoveredApproval).not.toBeNull());
@@ -25,7 +25,7 @@ describe('useRunInputRecovery', () => {
     expect(result.current.recoveredHumanInput).toBeNull();
   });
 
-  it('stellt eine wartende Eingabe mit Vorgabewerten wieder her', async () => {
+  it('restores a waiting input with default values', async () => {
     serveApproval({ pending: true, type: 'human-input', blockId: 'b2', question: 'Name?', stepIndex: 0 });
     const { result } = renderHook(() => useRunInputRecovery('run-1'));
     await waitFor(() => expect(result.current.recoveredHumanInput).not.toBeNull());

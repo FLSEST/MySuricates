@@ -125,7 +125,7 @@ class GoalWorkPackagesMigrationTest {
             st.executeUpdate("INSERT INTO goal_work_packages (id, goal_id, project_id, title, position, created_at, updated_at) "
                     + "VALUES ('wp-open', 'g1', 'pA', 'Irgendwann', 2, '2026-09-27T00:00:00Z', '2026-09-27T00:00:00Z')");
 
-            // Neue Meilensteine: Verknuepfung mit Paketen, Kaskaden in beide Richtungen
+            // New milestones: link to packages, cascades in both directions
             st.executeUpdate("INSERT INTO goal_milestone_work_packages (milestone_id, work_package_id) VALUES ('ms-new', 'm1')");
             st.executeUpdate("INSERT INTO goal_milestone_work_packages (milestone_id, work_package_id) VALUES ('ms-new', 'wp-open')");
             assertThatThrownBy(() -> st.executeUpdate(
@@ -139,7 +139,7 @@ class GoalWorkPackagesMigrationTest {
                     .containsExactly("m1");
             assertThat(rows(st, "PRAGMA foreign_key_check")).isEmpty();
 
-            // Ziel loeschen: Pakete, Meilensteine, Verknuepfungen und Zielprojekte gehen mit, die TODOs bleiben
+            // Delete goal: packages, milestones, links and goal projects go with it, the TODOs stay
             st.executeUpdate("DELETE FROM goals WHERE id = 'g1'");
             assertThat(rows(st, "SELECT id FROM goal_work_packages")).containsExactly("m3");
             assertThat(rows(st, "SELECT COUNT(*) FROM goal_milestones")).containsExactly("0");
@@ -235,7 +235,7 @@ class GoalWorkPackagesMigrationTest {
         return result;
     }
 
-    /** Jede Zeile als {@code a|b|c}; NULL als {@code null}. */
+    /** Each row as {@code a|b|c}; NULL as {@code null}. */
     private static List<String> rows(Statement st, String query) throws SQLException {
         List<String> out = new ArrayList<>();
         try (ResultSet rs = st.executeQuery(query)) {

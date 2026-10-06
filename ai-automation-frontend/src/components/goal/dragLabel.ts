@@ -10,7 +10,7 @@ import { acceptsTarget, bandOfDragged, type Dragged, type LiveLine } from './tim
  * so. Dates in the language of the UI.
  */
 
-/** Ein Tag mit Wochentag: „Mo., 12.10.“ / „Mon, 10/12“. */
+/** A day with weekday: „Mo., 12.10.“ / „Mon, 10/12“. */
 export function dayText(day: number, locale: Locale): string {
   return formatDate(dateOfDay(day), locale, { weekday: 'short', day: 'numeric', month: 'numeric' });
 }

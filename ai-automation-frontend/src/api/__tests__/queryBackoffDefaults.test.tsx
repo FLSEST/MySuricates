@@ -14,7 +14,7 @@ import { appQueryDefaults, installRateLimitRecovery } from '../queryDefaults';
 import { api, resetRateLimitBackoff } from '../client';
 
 const NOW = Date.parse('2026-09-14T12:00:00.000Z');
-/** Retry-After des Mocks. */
+/** Retry-After of the mock. */
 const LOCK_MS = 5_000;
 
 let queryFnCalls = 0;
@@ -119,7 +119,7 @@ describe('QueryClient-Defaults im 429-Backoff (f3fb193f)', () => {
     expect(queryFnCalls).toBe(2);
   });
 
-  it('wiederholt 429 nicht (Bestandsverhalten)', async () => {
+  it('does not retry 429 (existing behaviour)', async () => {
     const queryClient = createClient();
     renderProbe(queryClient);
     await advance(LOCK_MS - 1_000);

@@ -55,11 +55,11 @@ describe('RateLimitBanner (c168293d)', () => {
 
     const banner = view.getByRole('status');
     expect(banner.textContent).toContain('Zu viele Anfragen');
-    // App-Sprache, nicht Browser-Locale.
+    // App language, not browser locale.
     expect(banner.textContent).toContain(new Date(NOW + 5_000).toLocaleTimeString('de-DE'));
   });
 
-  it('nutzt Warn-Token statt fester Tailwind-Farben', async () => {
+  it('uses the warning token instead of fixed Tailwind colours', async () => {
     await triggerBackoff();
     const view = render(<RateLimitBanner />);
     await advance(0);
@@ -69,7 +69,7 @@ describe('RateLimitBanner (c168293d)', () => {
     expect(banner.className).toContain('text-warning');
   });
 
-  it('verschwindet, sobald die Sperre abgelaufen ist', async () => {
+  it('disappears as soon as the lock has expired', async () => {
     await triggerBackoff();
     const view = render(<RateLimitBanner />);
     await advance(0);

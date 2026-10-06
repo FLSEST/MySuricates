@@ -50,7 +50,7 @@ class WorkflowContextDataServiceTest {
         service = service(new PreviousReportVariable(runRepository, stepResultRepository), new OpenTodosVariable(todoRepository));
     }
 
-    /** Der Einsammler mit allen fuenf Quellen in ihrer Reihenfolge; die ersten beiden austauschbar. */
+    /** The collector with all five sources in their order; the first two are replaceable. */
     private WorkflowContextDataService service(PlatformVariableSource previousReport, PlatformVariableSource openTodos) {
         return new WorkflowContextDataService(List.of(previousReport, openTodos,
                 new RequestMetricsVariable(requestMetricsFactSheet), new GoalVariables(goalContextSource, com.automation.modules.ModuleRegistry.allEnabled()),
@@ -66,7 +66,7 @@ class WorkflowContextDataServiceTest {
         };
     }
 
-    /** Eine Quelle mit festem Wert. */
+    /** A source with a fixed value. */
     private static PlatformVariableSource fixed(String name, String value) {
         return new PlatformVariableSource() {
             @Override public List<String> allNames() { return List.of(name); }
@@ -182,7 +182,7 @@ class WorkflowContextDataServiceTest {
     // injection -- and in exactly this gap it went unnoticed on 2026-09-18 that the
     // live workflow had never received the change (run cd335b5c).
 
-    /** Kontext ohne Vorgeschichte: die beiden anderen Lader liefern ihre Platzhalter. */
+    /** Context without history: the two other loaders deliver their placeholders. */
     private ExecutionContext injectWithoutHistory() {
         when(runRepository.findTop5ByWorkflowIdOrderByStartedAtDesc("wf-1")).thenReturn(List.of());
         when(todoRepository.findByProjectIdAndStatusIn(eq("proj-1"), anyList())).thenReturn(List.of());
@@ -243,7 +243,7 @@ class WorkflowContextDataServiceTest {
         assertThat(ctx.getVariable("open_todos")).isEqualTo("(keine offenen TODOs)");
     }
 
-    // --- injectPlatformData: jede Injektion mit eigenem Fehlerpfad (TODO 62d186b8) ------
+    // --- injectPlatformData: each injection with its own error path (TODO 62d186b8) ------
     //
     // The shared catch(Exception) around all three injections hid the failure of
     // request_metrics for months: the variable stayed absent, the shell block saw

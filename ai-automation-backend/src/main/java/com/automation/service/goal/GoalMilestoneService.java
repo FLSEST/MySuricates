@@ -101,7 +101,7 @@ public class GoalMilestoneService {
         return MilestoneProgress.toResponse(saved, workPackageIds, completedOf(workPackageIds), clock.instant());
     }
 
-    /** Loescht den Meilenstein samt Verknuepfungen; die Arbeitspakete bleiben. */
+    /** Deletes the milestone with its links; the work packages stay. */
     @Transactional
     public void delete(String goalId, String milestoneId) {
         GoalMilestone milestone = find(goalId, milestoneId);
@@ -110,8 +110,8 @@ public class GoalMilestoneService {
     }
 
     /**
-     * Ziel, TODO-Zeilen, Arbeitspakete und Meilensteine mit Zustand – fuer die Meilenstein-Liste und die
-     * Kontextvariable {@code goal_status}; unbekanntes Ziel = 404.
+     * Goal, TODO rows, work packages and milestones with state – for the milestone list and the
+     * context variable {@code goal_status}; unknown goal = 404.
      */
     @Transactional
     public GoalSnapshot snapshot(String goalId) {
@@ -126,7 +126,7 @@ public class GoalMilestoneService {
         return new GoalSnapshot(loaded.goal(), rows, workPackages, milestones, GoalService.progressOf(rows));
     }
 
-    /** Die gerade abgeschlossenen Pakete aus bereits berechneten Paket-Zustaenden. */
+    /** The just-completed packages from already computed package states. */
     static Set<String> completed(List<GoalWorkPackageResponse> workPackages) {
         return workPackages.stream().filter(p -> p.state() == GoalDueState.REACHED)
                 .map(GoalWorkPackageResponse::id).collect(Collectors.toSet());

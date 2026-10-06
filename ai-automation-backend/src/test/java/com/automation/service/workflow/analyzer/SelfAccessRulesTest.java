@@ -19,7 +19,7 @@ import java.util.stream.Collectors;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-/** Zugriff eines Blocks auf die eigene Plattform (TODO d0348479): Muster, Ausnahmen, Schwere. */
+/** A block's access to its own platform (TODO d0348479): patterns, exceptions, severity. */
 class SelfAccessRulesTest {
 
     private static BlockDefinition block(String type, String name, Map<String, Object> config) {
@@ -240,7 +240,7 @@ class SelfAccessRulesTest {
                     assertThat(f.severity()).isEqualTo(Severity.HIGH);
                     assertThat(f.detail()).contains("app_settings");
                 });
-        // 260b3daf LernApp Generator: lernapp_settings war ein Fehlbefund
+        // 260b3daf LernApp Generator: lernapp_settings was a false finding
         assertThat(apply(block("simple", "l", Map.of("command", "Lies lernapp_settings.json")))).isEmpty();
     }
 
@@ -310,7 +310,7 @@ class SelfAccessRulesTest {
                 .hasSize(1);
     }
 
-    /** HYGIENE_POOL_API_ALLOWED aus scripts/lib/hygiene-rules.sh. */
+    /** HYGIENE_POOL_API_ALLOWED from scripts/lib/hygiene-rules.sh. */
     private static Set<String> poolAllowedProbes() throws IOException {
         Path rules = Files.exists(Path.of("../scripts/lib/hygiene-rules.sh"))
                 ? Path.of("../scripts/lib/hygiene-rules.sh") : Path.of("scripts/lib/hygiene-rules.sh");

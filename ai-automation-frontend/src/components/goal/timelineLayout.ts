@@ -101,9 +101,9 @@ export interface UnscheduledPackage {
 
 /** A project band: header row, one row per work package, "without work package" and the "without period" strip. */
 export interface TimelineBand {
-  /** Projekt-ID oder {@link NO_PROJECT_BAND}. */
+  /** Project ID or {@link NO_PROJECT_BAND}. */
   key: string;
-  /** Projektname; null = ohne Projekt. */
+  /** Project name; null = no project. */
   name: string | null;
   /** Belongs to the goal's projects - only then can packages be created in it. */
   linked: boolean;
@@ -111,7 +111,7 @@ export interface TimelineBand {
   rows: PackageRow[];
   /** TODOs of the project without a package - the row appears only if something is in it (or while dragging). */
   noPackage: PackageRow;
-  /** Pakete ohne Zeitraum, in ihrer Reihenfolge: die Leiste „ohne Zeitraum“. */
+  /** Packages without a period, in their order: the „ohne Zeitraum“ strip. */
   unscheduled: UnscheduledPackage[];
 }
 
@@ -149,19 +149,19 @@ export interface PlanChanges {
 
 // ── Tage ──────────────────────────────────────────────────────────────────────
 
-/** Tag des lokalen Kalenders als ganze Zahl (Tage seit 1970-01-01). */
+/** Day of the local calendar as an integer (days since 1970-01-01). */
 export function dayOf(value: string | number | Date): number {
   const date = value instanceof Date ? value : new Date(value);
   return Math.round(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()) / DAY_MS);
 }
 
-/** Mitternacht (Ortszeit) des Tages. */
+/** Midnight (local time) of the day. */
 export function dateOfDay(day: number): Date {
   const utc = new Date(day * DAY_MS);
   return new Date(utc.getUTCFullYear(), utc.getUTCMonth(), utc.getUTCDate());
 }
 
-/** `YYYY-MM-DD` – der Wert eines `<input type="date">`. */
+/** `YYYY-MM-DD` – the value of an `<input type="date">`. */
 export function isoDateOfDay(day: number): string {
   return new Date(day * DAY_MS).toISOString().slice(0, 10);
 }
@@ -179,7 +179,7 @@ export function dueDateOfDay(day: number): string {
   return date.toISOString();
 }
 
-/** Beginn eines Pakets: Anfang des Tages, 00:00 Ortszeit, als ISO-Zeitpunkt. */
+/** Start of a package: beginning of the day, 00:00 local time, as an ISO timestamp. */
 export function startDateOfDay(day: number): string {
   return dateOfDay(day).toISOString();
 }
@@ -483,7 +483,7 @@ export const MILESTONES_DROP_ID = 'milestones';
 
 /**
  * Target of a drop from the ID of the drop surface: `row:<band>:<package|none>`,
- * `undated:<Band>:<Paket|none>`, `strip:<Band>`, `tray:<Band>`, `pill:<Band>:<Paket>` oder `milestones`.
+ * `undated:<Band>:<Paket|none>`, `strip:<Band>`, `tray:<Band>`, `pill:<Band>:<Paket>` or `milestones`.
  */
 export function dropTargetOf(id: string): DropTarget | null {
   if (id === MILESTONES_DROP_ID) return { kind: 'milestones' };
@@ -553,7 +553,7 @@ export function planChanges(
   return changes;
 }
 
-/** Zeitraum um `shift` Tage verschoben – die Dauer bleibt. */
+/** Period shifted by `shift` days – the duration stays. */
 export function movedRange(range: DayRange, shift: number): DayRange {
   return { start: range.start + shift, end: range.end + shift };
 }

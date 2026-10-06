@@ -70,7 +70,7 @@ final class SelfAccessRules {
     private static final Pattern LOCAL_HOST = Pattern.compile(
             "(?i)(localhost|127\\.0\\.0\\.1|0\\.0\\.0\\.0|\\[::1]|host\\.docker\\.internal)(:\\d+)?|.*(\\{\\{|}}|\\$).*");
 
-    /** Aufrufer wie HYGIENE_POOL_API_CALLERS. */
+    /** Callers like HYGIENE_POOL_API_CALLERS. */
     private static final List<String> CALLERS = List.of("curl", "wget", "requests.", "urllib", "fetch(", "http.client");
 
     /** As in the script: a good command line around the match. */

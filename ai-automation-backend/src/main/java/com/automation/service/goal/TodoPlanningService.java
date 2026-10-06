@@ -19,9 +19,9 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.Instant;
 
 /**
- * Einordnung und Einschaetzung eines einzelnen TODOs (TODO dc0566f8): Ziel, Rang, Komplexitaet,
- * empfohlener Effort, Begruendung und offene Frage. Mensch und KI schreiben ueber denselben Weg;
- * {@code ratedBy} haelt fest, wer zuletzt eingeschaetzt hat.
+ * Classification and rating of a single TODO (TODO dc0566f8): goal, rank, complexity,
+ * recommended effort, rationale and open question. Human and AI write through the same path;
+ * {@code ratedBy} records who rated last.
  */
 @Service
 @RequiredArgsConstructor

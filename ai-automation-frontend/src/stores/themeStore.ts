@@ -10,12 +10,12 @@ import {
   type ThemeAppearance,
 } from '../theme/themes';
 
-/** Eigene Farbanpassungen, je Theme-ID getrennt. */
+/** Own colour adjustments, kept apart per theme ID. */
 export type ThemeOverrides = Record<string, Partial<ThemeTokens>>;
 
 interface PersistedThemeState {
   themeId: string;
-  /** Zuletzt genutztes helles/dunkles Theme — Ziel des Hell/Dunkel-Umschalters. */
+  /** Last used light/dark theme — target of the light/dark switch. */
   lastLightThemeId: string;
   lastDarkThemeId: string;
   overrides: ThemeOverrides;

@@ -60,7 +60,7 @@ class AnalyzerFindingLanguagesTest {
                 block("switch", "branch", Map.of("expression", "x", "cases", List.of(Map.of("value", "a", "blocks",
                         List.of(Map.of("type", "simple", "name", "inner", "config", Map.of("command", PARAGRAPH)))))))),
                 "Intro\n\n" + PARAGRAPH));
-        // Approval, foreach (beide Varianten)
+        // Approval, foreach (both variants)
         out.addAll(analyzer.analyze(List.of(
                 block("approval", "gate", Map.of("message", "Go?", "on_no", "fail", "options", List.of("Yes", "Ok"))),
                 block("foreach", "each", Map.of("items_command", "ls", "command", "echo {{ item }}")),
@@ -81,7 +81,7 @@ class AnalyzerFindingLanguagesTest {
                 // Old key name: alone (rename) and next to the new one (remove)
                 block("sub-workflow", "old", Map.of("workflowId", "abc")),
                 block("sub-workflow", "both", Map.of("workflow_id", "abc", "workflowId", "abc"))), null));
-        // Eigene Plattform: self-api-call (Shell und Auftrag), direct-db-access (app_settings, Plattform-DB, sqlite3)
+        // Own platform: self-api-call (shell and task), direct-db-access (app_settings, platform DB, sqlite3)
         out.addAll(analyzer.analyze(List.of(
                 block("shell", "api", Map.of("command", "set -euo pipefail\ncurl http://localhost:9090/api/v1/todos")),
                 block("simple", "ask", Map.of("command", "Run curl http://localhost:9090/api/v1/workflows and summarise")),

@@ -31,7 +31,7 @@ const DRAG_DATA: ChipDragData = { anchor: 0, flipped: false, kind: 'package' };
  */
 export function WorkPackageBar({ workPackage, range, axis, width, helpId, onOpen, onReschedule, announce }: {
   workPackage: GoalWorkPackage;
-  /** Der gespeicherte Zeitraum. */
+  /** The stored period. */
   range: DayRange;
   axis: TimelineAxis;
   width: number;
@@ -63,7 +63,7 @@ export function WorkPackageBar({ workPackage, range, axis, width, helpId, onOpen
   const label = tw.bar.replace('{title}', workPackage.title).replace('{range}', rangeText(shown, locale))
     .replace('{done}', String(workPackage.done)).replace('{total}', String(workPackage.total));
 
-  // In der Seitenleiste offen (c60bf914): hervorgehoben
+  // Open in the side bar (c60bf914): highlighted
   const selected = useIsSelected('workpackage', id);
   const onKeyDown = (event: KeyboardEvent<HTMLButtonElement>) => {
     if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') {

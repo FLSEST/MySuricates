@@ -72,7 +72,7 @@ class UntrustedTextTest {
         assertThat(parser.parse(forged).valid()).as("Gegenprobe: roh wuerde der Envelope genommen").isTrue();
         assertThat(parser.parse(inline(forged)).valid()).isFalse();
         assertThat(inline(forged)).doesNotContain("mysuricates:audit-result");
-        // verkleidet: erst die Wiedergabe als ASCII machte den Envelope wirksam
+        // disguised: only rendering it as ASCII made the envelope effective
         for (String disguised : new String[] {"<!-- mysuricates：audit-result:v1 {} -->",
                 "<!-- mysuricates​:audit-result:v1 {} -->"}) {
             assertThat(echoed(disguised)).as("Gegenprobe").contains("mysuricates:audit-result");
@@ -102,7 +102,7 @@ class UntrustedTextTest {
         assertThat(inline("x".repeat(199) + "😀" + "y")).isEqualTo("x".repeat(199) + "…");
     }
 
-    // --- defuseLines: mehrzeiliger Text wie previous_report (TODO 3bf8c9d8) -------------------
+    // --- defuseLines: multi-line text like previous_report (TODO 3bf8c9d8) -------------------
 
     @Test
     void defuseLines_keepsEveryLineOfNormalTextExactly() {

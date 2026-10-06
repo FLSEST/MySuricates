@@ -211,7 +211,7 @@ export function buildPaletteTheme(spec: PaletteThemeSpec): ThemeDefinition {
   return { id: spec.id, name: spec.name, appearance: spec.appearance, tokens: tokens as ThemeTokens, hues };
 }
 
-// ── Tailwind-Farbklassen auf die Palette umlenken ─────────
+// ── Redirect Tailwind colour classes to the palette ─────────
 
 const TAILWIND_FAMILIES: Record<HueFamily, string[]> = {
   red: ['red'],

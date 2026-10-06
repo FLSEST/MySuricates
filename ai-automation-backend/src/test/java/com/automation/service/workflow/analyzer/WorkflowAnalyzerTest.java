@@ -242,7 +242,7 @@ class WorkflowAnalyzerTest {
         assertThat(findings.getFirst().severity()).isEqualTo(AnalyzerFinding.Severity.HIGH);
     }
 
-    // --- TODO 41aeeb09: on_no ohne Option, die ablehnt ---
+    // --- TODO 41aeeb09: on_no without an option that rejects ---
 
     @Test
     void onNoOhneAblehnendeOptionIstEinBefund() {

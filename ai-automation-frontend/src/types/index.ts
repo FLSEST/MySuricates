@@ -818,7 +818,7 @@ export interface CalendarEvent {
 
 export interface CalendarDataResponse {
   upcoming: ScheduledWorkflow[];
-  /** Listenzeilen ohne Schritte (MySuricates-TODO 168e3d7f). */
+  /** List rows without steps (MySuricates-TODO 168e3d7f). */
   pastRuns: WorkflowRunListItem[];
   /**
    * All runs of the period; `pastRuns` are the newest up to the limit (86777fb4). Missing for older
@@ -1545,11 +1545,11 @@ export interface UpdateTodoPlanningRequest {
   ratingNote?: string;
   openQuestion?: string;
   ratedBy?: RatedBy;
-  /** Arbeitspaket desselben Ziels; `''` nimmt es weg. */
+  /** Work package of the same goal; `''` removes it. */
   workPackageId?: string;
   /** Only for an older backend (before c60bf914): there the field is still called that. */
   milestoneId?: string;
-  /** Entscheidung (68a5e24e): Text leert die offene Frage, `''` nimmt die Entscheidung weg. */
+  /** Decision (68a5e24e): text clears the open question, `''` removes the decision. */
   decision?: string;
 }
 
@@ -1638,22 +1638,22 @@ export interface GoalWorkPackage {
   /** null only for legacy data or if the project was deleted. */
   projectId: string | null;
   title: string;
-  /** Beginn (lokaler Tagesbeginn); null = ohne Zeitraum. */
+  /** Start (local start of day); null = no period. */
   startDate: string | null;
-  /** Ende (lokales Tagesende); null = ohne Zeitraum. */
+  /** End (local end of day); null = no period. */
   endDate: string | null;
-  /** Reihenfolge innerhalb des Projekts. */
+  /** Order within the project. */
   position: number;
   /** Basis is the end: due soon, overdue, completed. */
   state: WorkPackageState;
-  /** Zugeordnete TODOs ohne ARCHIVED. */
+  /** Assigned TODOs without ARCHIVED. */
   total: number;
   done: number;
-  /** Nicht erledigte TODOs mit offener Frage. */
+  /** Unfinished TODOs with an open question. */
   openQuestions: number;
   /** Entschiedene TODOs (68a5e24e). */
   decided: number;
-  /** Erster Abschluss; bleibt stehen. */
+  /** First completion; stays. */
   completedAt: string | null;
   /** Was already completed, is no longer because of a new TODO. */
   reopened: boolean;
@@ -1678,7 +1678,7 @@ export interface GoalMilestone {
   workPackageIds: string[];
   packagesTotal: number;
   packagesDone: number;
-  /** Erstes Erreichen; bleibt stehen. */
+  /** First reached; stays. */
   reachedAt: string | null;
   reopened: boolean;
   createdAt: string;
@@ -1742,7 +1742,7 @@ export interface GoalTodoItem {
   updatedAt: string;
   /** Due date (TODO 259f4f66); null = unplanned. */
   dueDate: string | null;
-  /** Arbeitspaket des Ziels (c60bf914); null = keins. */
+  /** Work package of the goal (c60bf914); null = none. */
   workPackageId: string | null;
   /** Decision on the (earlier) open question (68a5e24e). */
   decision: string | null;
@@ -1819,7 +1819,7 @@ export interface GoalTodoOrigin {
 }
 
 export interface GoalTodoWorker {
-  /** `LINKED`: Fix-Workflow am TODO; `TRIGGER`: ein aktiver TodoTrigger passt. */
+  /** `LINKED`: fix workflow on the TODO; `TRIGGER`: an active TodoTrigger matches. */
   kind: 'LINKED' | 'TRIGGER';
   workflowId: string;
   workflowName: string;
@@ -1858,14 +1858,14 @@ export interface GoalRelations {
   goalId: string;
   /** Active TodoTriggers in total; 0 means no TODO can attach via a trigger. */
   activeTriggers: number;
-  /** TODOs des Ziels in Arbeitsreihenfolge, danach die Kandidaten. */
+  /** The goal's TODOs in working order, then the candidates. */
   todos: GoalTodoRelation[];
 }
 
 export interface CreateGoalRequest {
   title: string;
   description?: string;
-  /** `YYYY-MM-DD` oder ISO-Zeitpunkt. */
+  /** `YYYY-MM-DD` or ISO timestamp. */
   targetDate?: string;
   /** Projects the goal is assigned to right away. */
   projectIds?: string[];
@@ -2036,7 +2036,7 @@ export interface ChainRun {
 }
 
 export interface ScheduleRunsResponse {
-  /** Listenzeilen ohne Schritte (MySuricates-TODO 168e3d7f). */
+  /** List rows without steps (MySuricates-TODO 168e3d7f). */
   workflowRuns: WorkflowRunListItem[];
   chainRuns: ChainRun[];
   /** All runs of the schedule; the lists are the newest up to the limit (86777fb4). Missing for older backends. */

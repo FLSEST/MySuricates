@@ -10,7 +10,7 @@ export type GoalSelection = { kind: 'milestone' | 'workpackage'; id: string };
 
 export const SELECTION_PARAM = 'item';
 
-/** `milestone:<id>` / `workpackage:<id>` → Auswahl; alles andere → keine. */
+/** `milestone:<id>` / `workpackage:<id>` → selection; anything else → none. */
 export function parseSelection(value: string | null): GoalSelection | null {
   if (!value) return null;
   const index = value.indexOf(':');

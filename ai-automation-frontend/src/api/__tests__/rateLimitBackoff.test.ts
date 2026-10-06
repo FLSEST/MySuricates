@@ -30,12 +30,12 @@ function jsonResponse(status: number, body: unknown, headers: Record<string, str
 }
 
 describe('parseRetryAfter', () => {
-  it('liest Sekunden als Delta', () => {
+  it('reads seconds as a delta', () => {
     expect(parseRetryAfter('5', NOW)).toBe(5);
     expect(parseRetryAfter(' 42 ', NOW)).toBe(42);
   });
 
-  it('liest ein HTTP-Datum als Abstand zu jetzt', () => {
+  it('reads an HTTP date as the distance to now', () => {
     expect(parseRetryAfter('Mon, 14 Sep 2026 12:00:07 GMT', NOW)).toBe(7);
   });
 
@@ -103,7 +103,7 @@ describe('429-Backoff im API-Client', () => {
     expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 
-  it('nimmt 10 s, wenn Retry-After fehlt', async () => {
+  it('takes 10 s when Retry-After is missing', async () => {
     fetchMock.mockImplementation(async () => jsonResponse(429, { error: 'nope', timestamp: 'x' }));
     await expect(api.get('/system/info')).rejects.toMatchObject({ retryAfterSeconds: 10 });
     expect(rateLimitRemainingSeconds('/system/info')).toBe(10);
@@ -155,7 +155,7 @@ describe('Sperre je Endpoint-Muster (b6feccbc)', () => {
     await expect(api.get(`/executions/${UUID_A}`)).rejects.toMatchObject({ status: 429 });
     vi.setSystemTime(NOW + GLOBAL_LOCK_MS);
 
-    // Anderes Muster ⇒ eigene Sperre, also genau eine weitere Anfrage.
+    // Different pattern ⇒ own lock, so exactly one more request.
     await expect(api.get(`/executions/${UUID_A}/steps`)).rejects.toMatchObject({ status: 429 });
     expect(fetchMock).toHaveBeenCalledTimes(2);
   });
@@ -173,7 +173,7 @@ describe('Sperre je Endpoint-Muster (b6feccbc)', () => {
   });
 });
 
-describe('Ausnahmen von der globalen Kurzsperre (b6feccbc)', () => {
+describe('Exceptions to the global short lock (b6feccbc)', () => {
   let fetchMock: ReturnType<typeof vi.fn>;
 
   beforeEach(() => {
@@ -201,7 +201,7 @@ describe('Ausnahmen von der globalen Kurzsperre (b6feccbc)', () => {
     expect(fetchMock).toHaveBeenCalledTimes(3);
   });
 
-  it('sperrt die Ausnahme-Pfade nach ihrem eigenen 429 trotzdem', async () => {
+  it('still locks the exception paths after their own 429', async () => {
     await expect(api.fetchWsTicket()).rejects.toMatchObject({ status: 429 });
     await expect(api.fetchWsTicket()).rejects.toMatchObject({ status: 429 });
     expect(fetchMock).toHaveBeenCalledTimes(1);
@@ -230,7 +230,7 @@ describe('Raw calls go through the backoff (b6feccbc)', () => {
     resetRateLimitBackoff();
   });
 
-  it('BPMN-Export: zweiter Aufruf im Fenster ohne Netzanfrage', async () => {
+  it('BPMN export: second call within the window without a network request', async () => {
     await expect(fetchWorkflowBpmn(UUID_A)).rejects.toMatchObject({ status: 429, code: 'RATE_LIMITED' });
     expect(fetchMock).toHaveBeenCalledTimes(1);
 
@@ -238,7 +238,7 @@ describe('Raw calls go through the backoff (b6feccbc)', () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
-  it('BPMN-Import: im Fenster eines anderen 429 ohne Netzanfrage', async () => {
+  it('BPMN import: within the window of another 429 without a network request', async () => {
     await expect(api.get('/system/capabilities')).rejects.toMatchObject({ status: 429 });
     await expect(importWorkflowBpmn('<bpmn/>', 'p1')).rejects.toMatchObject({ status: 429 });
     expect(fetchMock).toHaveBeenCalledTimes(1);
@@ -274,7 +274,7 @@ describe('Raw calls go through the backoff (b6feccbc)', () => {
   });
 });
 
-describe('Backoff-Parameter vom Server (37b98c97)', () => {
+describe('Backoff parameters from the server (37b98c97)', () => {
   let fetchMock: ReturnType<typeof vi.fn>;
 
   beforeEach(() => {
@@ -288,10 +288,10 @@ describe('Backoff-Parameter vom Server (37b98c97)', () => {
   afterEach(() => {
     vi.useRealTimers();
     vi.unstubAllGlobals();
-    resetRateLimitBackoff(); // stellt auch die eingebauten Fallback-Werte wieder her
+    resetRateLimitBackoff(); // also restores the built-in fallback values
   });
 
-  it('nimmt ohne Serverwerte die eingebauten Konstanten (2 s / 10 s)', async () => {
+  it('takes the built-in constants without server values (2 s / 10 s)', async () => {
     expect(parseRetryAfter(null, NOW)).toBe(10);
 
     await expect(api.get('/system/capabilities')).rejects.toMatchObject({ retryAfterSeconds: 10 });
@@ -307,7 +307,7 @@ describe('Backoff-Parameter vom Server (37b98c97)', () => {
     await expect(api.get('/system/capabilities')).rejects.toMatchObject({ retryAfterSeconds: 30 });
     expect(rateLimitRemainingSeconds('/system/capabilities')).toBe(30);
 
-    // Fremder Pfad: jetzt 5 s statt 2 s gesperrt.
+    // Foreign path: now locked for 5 s instead of 2 s.
     expect(rateLimitRemainingSeconds('/workflows')).toBe(5);
     vi.setSystemTime(NOW + 2_000);
     expect(rateLimitRemainingSeconds('/workflows')).toBe(3);
@@ -332,7 +332,7 @@ describe('Backoff-Parameter vom Server (37b98c97)', () => {
     expect(rateLimitRemainingSeconds('/workflows')).toBe(4);
   });
 
-  it('deckelt die globale Sperre weiterhin durch Retry-After', async () => {
+  it('still caps the global lock by Retry-After', async () => {
     applyServerRateLimitConfig({ globalBackoffSeconds: 5, defaultRetryAfterSeconds: 30 });
     fetchMock.mockImplementation(async () =>
       jsonResponse(429, { error: 'nope', timestamp: 'x' }, { 'Retry-After': '1' }));

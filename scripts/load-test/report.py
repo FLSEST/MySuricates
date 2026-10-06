@@ -26,20 +26,20 @@ import sys
 
 # Thresholds of the verdict. Deliberately few and coarse: the load test is meant to show collapses,
 # not millisecond fluctuations between two runs.
-RED_ERROR_RATE = 0.01          # mehr als 1 % fehlgeschlagene Anfragen
-RED_P95_MS = 5000              # eine Route braucht im p95 mehr als 5 s
-YELLOW_P95_MS = 1000           # eine Leseroute braucht im p95 mehr als 1 s
+RED_ERROR_RATE = 0.01          # more than 1 % failed requests
+RED_P95_MS = 5000              # a route needs more than 5 s at p95
+YELLOW_P95_MS = 1000           # a read route needs more than 1 s at p95
 # The share of waiting time for the single DB connection is always high under load with pool-size 1 (in the
 # first run 50-79 % on almost every route, with p95 under 450 ms) — that is the design, not a finding.
 # It therefore only explains a route that is too slow anyway, and appears as an overall value in the sheet.
 YELLOW_HEAP_PERCENT = 85.0
-REGRESSION_FACTOR = 1.5        # p95 einer Route gegen die Baseline
+REGRESSION_FACTOR = 1.5        # p95 of a route against the baseline
 # Machine load per CPU (1-minute load, median of the load phase) from which the measurement is not reliable.
 # A trial run next to parallel builds was 5 to 20 times slower than the real run shortly after —
 # a regression against the baseline would then be a false alarm (TODO b8e1de5e).
 HOST_BUSY_PER_CPU = 1.0
-MIN_SAMPLES = 30               # darunter ist ein p95 kein Befund
-MIN_MEANINGFUL_MS = 25         # 3 ms gegen 1 ms ist Faktor drei und bedeutet nichts
+MIN_SAMPLES = 30               # below that a p95 is not a finding
+MIN_MEANINGFUL_MS = 25         # 3 ms vs 1 ms is a factor of three and means nothing
 
 
 def percentile(sorted_values, pct):

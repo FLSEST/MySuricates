@@ -28,7 +28,7 @@ export function parseTarget(id: string | number | null | undefined): MapTarget |
   return null;
 }
 
-/** Der gezogene Workflow – so viel braucht die Karte von ihm. */
+/** The dragged workflow – this much is what the map needs from it. */
 export interface DraggedWorkflow {
   id: string;
   name: string;
@@ -44,7 +44,7 @@ export interface MapContext {
   packages: ReadonlyMap<string, { title: string }>;
   /** The backend knows workflows on the goal (otherwise only the link on the TODO). */
   attachSupported: boolean;
-  /** Vorhandene Zuordnungen am Ziel und an Paketen. */
+  /** Existing assignments on the goal and on packages. */
   attachments: readonly Pick<GoalWorkflow, 'workflowId' | 'workPackageId' | 'id' | 'guard'>[];
 }
 

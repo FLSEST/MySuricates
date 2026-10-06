@@ -44,8 +44,8 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 /**
- * Arbeitspakete: Zustaende, die completedAt-Regel, Zeitraum und Pflege (TODO 259f4f66, c60bf914 Ziele
- * Stufe 1: Ziel → Projekte → Arbeitspakete → TODOs, Meilensteine, Gliederung und Zeitstrahl).
+ * Work packages: states, the completedAt rule, period and maintenance (TODO 259f4f66, c60bf914 goals
+ * stage 1: goal → projects → work packages → TODOs, milestones, outline and timeline).
  */
 @ExtendWith(MockitoExtension.class)
 class GoalWorkPackageServiceTest {

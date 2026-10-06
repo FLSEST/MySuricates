@@ -27,7 +27,7 @@ final class ExecutionSettingKeys {
      */
     record Bound(double min, double max, boolean decimal) {
 
-        /** Schluessel mit ganzzahligem Wert. */
+        /** Key with an integer value. */
         static Bound whole(long min, long max) {
             return new Bound(min, max, false);
         }

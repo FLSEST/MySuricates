@@ -182,7 +182,7 @@ describe('429 storm reproduction (d89b2cc1)', () => {
   });
 });
 
-describe('429 auf /system/auth-status (d89b2cc1)', () => {
+describe('429 on /system/auth-status (d89b2cc1)', () => {
   beforeEach(() => {
     prepare();
     stubFetch('rate-limited');
@@ -211,7 +211,7 @@ describe('429 auf /system/auth-status (d89b2cc1)', () => {
   });
 });
 
-describe('ApiKeyGuard mountet die App nicht erneut (d89b2cc1)', () => {
+describe('ApiKeyGuard does not mount the app again (d89b2cc1)', () => {
   let mounts = 0;
 
   function CountingPage() {
@@ -310,7 +310,7 @@ describe('Key entry goes through the backoff (b6feccbc)', () => {
     expect(requests.filter((p) => p === '/projects')).toHaveLength(1);
     expect(view.container.textContent).toContain('Zu viele Anfragen');
 
-    // Zweiter Versuch im Sperrfenster: keine weitere Netzanfrage.
+    // Second attempt within the lock window: no further network request.
     await submitKey(view, 'typed-key-2');
     expect(requests.filter((p) => p === '/projects')).toHaveLength(1);
     expect(useSettingsStore.getState().apiKey).toBe('');

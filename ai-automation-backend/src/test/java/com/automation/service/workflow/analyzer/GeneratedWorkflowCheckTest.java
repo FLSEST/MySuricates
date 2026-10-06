@@ -56,7 +56,7 @@ class GeneratedWorkflowCheckTest {
     @Test
     void findingsLassenLowWegUndStellenHighNachVorn() {
         var blocks = List.of(
-                block("shell", "messung", Map.of("command", "echo ok")),              // nur LOW: missing-strict-mode
+                block("shell", "messung", Map.of("command", "echo ok")),              // LOW only: missing-strict-mode
                 block("simple", "report", Map.of("prompt", "Fasse {{ previous_output }} zusammen")));
 
         var findings = check.findings(blocks, null);
@@ -96,7 +96,7 @@ class GeneratedWorkflowCheckTest {
                 .isEqualTo("- HIGH missing-required-config-key — Block 2 \"report\": required key command is missing");
         assertThat(GeneratedWorkflowCheck.format(List.of(f), "de")).isEqualTo(GeneratedWorkflowCheck.format(List.of(f)));
         assertThat(GeneratedWorkflowCheck.summaryLines(many, "en")).last().isEqualTo("… and 2 more");
-        assertThat(GeneratedWorkflowCheck.summaryLines(many, "en").get(0)).endsWith(": Detail 0");   // ohne detailEn
+        assertThat(GeneratedWorkflowCheck.summaryLines(many, "en").get(0)).endsWith(": Detail 0");   // without detailEn
     }
 
     @Test
@@ -203,7 +203,7 @@ class GeneratedWorkflowCheckTest {
         assertThat(result.blocks()).isSameAs(original);
     }
 
-    /** Kaputter Block plus gesunder Block danach. */
+    /** Broken block plus a healthy block after it. */
     private static List<BlockDefinition> badAndHealthy() {
         return new ArrayList<>(List.of(
                 block("simple", "zusammenfassung", Map.of("prompt", "Fasse zusammen")),

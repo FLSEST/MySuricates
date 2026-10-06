@@ -34,7 +34,7 @@ export interface OutlinePackage {
 }
 
 export interface OutlineProject {
-  /** Projekt-ID oder {@link NO_PROJECT}. */
+  /** Project ID or {@link NO_PROJECT}. */
   key: string;
   /** null for „Ohne Projekt“. */
   project: GoalProject | null;
@@ -76,7 +76,7 @@ const sumCounts = (parts: OutlineCounts[]): OutlineCounts => parts.reduce(
   { total: 0, done: 0, openQuestions: 0, decided: 0 },
 );
 
-/** Anteil erledigt in Prozent, 0 ohne TODOs. */
+/** Share done in percent, 0 without TODOs. */
 export function percentDone(counts: OutlineCounts): number {
   return counts.total === 0 ? 0 : Math.round((counts.done / counts.total) * 100);
 }

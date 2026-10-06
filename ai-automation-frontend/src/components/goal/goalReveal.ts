@@ -30,7 +30,7 @@ export const useGoalReveal = create<RevealState>()((set) => ({
   clear: () => set({ request: null }),
 }));
 
-/** So lange leuchtet das gezeigte TODO. */
+/** How long the shown TODO lights up. */
 export const REVEAL_MS = 2000;
 
 /** Attribute of the row or chip of a TODO - this is how „Zeigen“ finds it. */

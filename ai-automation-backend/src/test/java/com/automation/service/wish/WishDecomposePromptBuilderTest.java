@@ -203,7 +203,7 @@ class WishDecomposePromptBuilderTest {
                 workflows.add(wf);
             }
             when(workflowRepository.findByProjectId("proj-1")).thenReturn(workflows);
-            // Die Datenbank liefert in beliebiger Reihenfolge — hier bewusst umgekehrt.
+            // The database returns in arbitrary order — deliberately reversed here.
             when(memoryRepository.findByWorkflowIdInAndActiveTrue(List.of("wf-1", "wf-2", "wf-3"))).thenReturn(List.of(
                     WorkflowMemory.builder().workflowId("wf-3").title("Third").content("C").active(true).build(),
                     WorkflowMemory.builder().workflowId("wf-1").title("First").content("A").active(true).build()));
@@ -283,7 +283,7 @@ class WishDecomposePromptBuilderTest {
             verify(workflowRepository, never()).findById(anyString());
         }
 
-        /** 73036bbd: die Execution Intelligence bekommt die schon gelesenen Projekt-Workflows. */
+        /** 73036bbd: the Execution Intelligence gets the project workflows already read. */
         @Test
         void executionIntelligence_usesTheProjectWorkflowsReadOnce() {
             stubDefaults();

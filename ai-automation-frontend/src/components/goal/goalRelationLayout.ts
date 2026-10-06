@@ -28,7 +28,7 @@ export const ROW_HEIGHT = 44;
 export const GROUP_LABEL_HEIGHT = 24;
 const GAP_HEIGHT = 22;
 const GAP_WIDTH = 110;
-/** Mindestabstand zwischen zusammengefassten Knoten einer Spalte. */
+/** Minimum distance between merged nodes of a column. */
 const NODE_SPACING = 8;
 
 export type NodeKind = 'origin' | 'todo' | 'worker' | 'result' | 'gap';
@@ -99,7 +99,7 @@ export interface MapGroup {
  * the package of a TODO - it comes from the goal (`GoalDetail.todos[].workPackageId`).
  */
 export interface MapStructure {
-  /** Projekte des Ziels in ihrer Reihenfolge. */
+  /** The goal's projects in their order. */
   projectOrder: string[];
   /** Packages of the goal in their order (per project by position). */
   packages: { id: string; title: string; projectId: string | null }[];
@@ -261,7 +261,7 @@ export function layoutRelations(todos: GoalTodoRelation[], structure?: MapStruct
   const rowsBottom = cursor;
   groups.forEach((group, index) => { group.h = (groups[index + 1]?.y ?? rowsBottom) - group.y; });
 
-  // ── Herkunft: ein Knoten je Workflow bzw. Art ──
+  // ── Origin: one node per workflow or kind ──
   const origins = new Map<string, Pending>();
   for (const todo of todos) {
     const key = originKey(todo);
