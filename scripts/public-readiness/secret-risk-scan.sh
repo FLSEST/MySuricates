@@ -29,8 +29,8 @@ sensitive_filename_candidates | while IFS= read -r file; do
   fi
 done | head -180 | redact
 
-# Die eigentliche Handpruefung der Stichwort-Treffer (TODO 48f4ef25): echte
-# Schluesselbloecke im getrackten Bestand. Nur Dateinamen, nie Inhalte.
+# The actual manual check of the keyword hits (TODO 48f4ef25): real
+# key blocks in the tracked stock. Only file names, never contents.
 section "PEM private key blocks in tracked files"
 pem_files=$(git grep -lIE -- '-----BEGIN [A-Z ]*PRIVATE KEY-----' 2>/dev/null || true)
 printf 'pem_private_key_files: %s\n' "$(printf '%s' "$pem_files" | grep -c . || true)"

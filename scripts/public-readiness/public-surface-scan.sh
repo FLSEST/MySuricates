@@ -34,8 +34,8 @@ if [ -d ai-automation-frontend/src ]; then
 fi
 
 inventory_section ".env.example presence"
-# Eine Wurzel-.env gibt es nicht: Container-Instanzen bekommen ihre Umgebung von
-# scripts/instance.sh (deploy/instances/<name>.env), der Rest liest die beiden Dateien hier
+# There is no root .env: container instances get their environment from
+# scripts/instance.sh (deploy/instances/<name>.env), the rest reads the two files here
 # (TODO 428ee1ec).
 for f in ai-automation-backend/.env.example ai-automation-frontend/.env.example; do
   [ -f "$f" ] && echo "present: $f" || echo "absent: $f"
@@ -43,8 +43,8 @@ done
 [ -f scripts/instance.sh ] && echo "container_env: scripts/instance.sh -> deploy/instances/<name>.env"
 
 inventory_section "Public-API documentation markers"
-# grep -c gibt bei null Treffern "0" aus UND endet mit 1 — ein "|| echo 0" schrieb deshalb
-# eine zweite, unbeschriftete Zeile (TODO 428ee1ec). Die API-Referenz zaehlt als API-Doku.
+# grep -c prints "0" on zero hits AND exits with 1 — an "|| echo 0" therefore wrote
+# a second, unlabeled line (TODO 428ee1ec). The API reference counts as API docs.
 for f in AGENTS.md docs/api-referenz.md docs/en/api-referenz.md README.md; do
   if [ -f "$f" ]; then
     endpoint_refs=$(grep -cE '/api/v[0-9]+' "$f" 2>/dev/null)
@@ -53,9 +53,9 @@ for f in AGENTS.md docs/api-referenz.md docs/en/api-referenz.md README.md; do
 done
 echo "note: README.md links the API reference instead of listing paths; api_path_refs=0 there is expected"
 
-# Endpunkte, die bis auf den Host reichen oder Betriebsdaten herausgeben (TODO
-# bcfec862): Ihre Absicherung steht im Vertrauensmodell von docs/deployment.md.
-# Hier wird nur deterministisch belegt, dass jeder dort genannt ist.
+# Endpoints that reach down to the host or hand out operational data (TODO
+# bcfec862): their protection is described in the trust model of docs/deployment.md.
+# Here we only establish deterministically that each one is named there.
 inventory_section "Host-reaching endpoints documented in the trust model (docs/deployment.md)"
 for ep in '/api/v1/debug/' '/api/v1/system/open-path' '/api/v1/system/browse' '/api/v1/system/backups/{filename}'; do
   if grep -qF -- "$ep" docs/deployment.md 2>/dev/null; then doc=yes; else doc=no; fi

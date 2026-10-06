@@ -1,16 +1,16 @@
 #!/usr/bin/env python3
-"""Gemeinsame Markdown-Bausteine der Doku-Pruefungen.
+"""Shared Markdown building blocks of the docs checks.
 
-Hier steht nur, was mehr als ein Pruefskript braucht: die Slug-Regel, die
-fence-bewusste Ueberschriften- und Link-Erkennung, die Dateiliste und die
-DE/EN-Paarzuordnung. Herausgeloest aus `docs_parity_check.py`, als
-`docs_orphan_scan.py` denselben Linkbegriff brauchte — zwei Fassungen
-derselben Regel waeren die sicherste Art, dass die Gates sich eines Tages
-widersprechen.
+Only what more than one check script needs lives here: the slug rule, the
+fence-aware heading and link detection, the file list and the
+DE/EN pair mapping. Extracted from `docs_parity_check.py` when
+`docs_orphan_scan.py` needed the same notion of a link — two versions
+of the same rule would be the surest way for the gates to contradict
+each other one day.
 
-Importiert wird mit dem Verzeichnis auf `sys.path`, weil beide Skripte in
-Tests ueber `spec_from_file_location` geladen werden und dabei ihr eigenes
-Verzeichnis *nicht* auf dem Pfad liegt:
+Imported with the directory on `sys.path`, because both scripts are loaded in
+tests via `spec_from_file_location`, and their own
+directory is *not* on the path then:
 
     sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
     from md_common import slug, headings, tracked_markdown
@@ -25,18 +25,18 @@ from typing import Iterator
 LINK = re.compile(r"\[[^\]]*\]\(([^)]+)\)")
 FENCE = re.compile(r"^\s*(?:```|~~~)")
 
-#: Praefix der englischen Spiegelung unterhalb von docs/.
+#: Prefix of the English mirror below docs/.
 MIRROR_PREFIX = "docs/en/"
 DOCS_PREFIX = "docs/"
 
 
 def slug(heading: str) -> str:
-    """Anker-Slug nach GitHubs Regeln.
+    """Anchor slug following GitHub's rules.
 
-    Kleinschreibung, alles ausser Buchstaben/Ziffern/Unterstrich/Bindestrich/Leerzeichen
-    faellt weg, dann wird **jedes einzelne** Leerzeichen zu einem Bindestrich. Das letzte
-    Detail ist der Fallstrick: Wer Leerzeichenfolgen zu einem Bindestrich zusammenzieht,
-    haelt korrekte Anker faelschlich fuer tot (passiert bei der Erstfassung dieses Skripts).
+    Lowercase, everything except letters/digits/underscore/hyphen/space
+    is dropped, then **every single** space becomes a hyphen. That last
+    detail is the pitfall: collapsing runs of spaces into one hyphen
+    wrongly treats correct anchors as dead (happened in the first version of this script).
     """
     text = heading.lstrip("#").strip().lower()
     text = re.sub(r"[^\w\- ]", "", text, flags=re.UNICODE)
@@ -44,10 +44,10 @@ def slug(heading: str) -> str:
 
 
 def headings(path: Path) -> list[str]:
-    """Ueberschriften einer Datei, ohne die in Code-Bloecken.
+    """Headings of a file, excluding those in code blocks.
 
-    Ein `# Kommentar` in einem Shell-Beispiel ist keine Ueberschrift — ohne die
-    Fence-Erkennung zaehlt er mit und erzeugt einen Phantom-Unterschied.
+    A `# Kommentar` in a shell example is not a heading — without the
+    fence detection it counts and creates a phantom difference.
     """
     out: list[str] = []
     fence = False
@@ -62,11 +62,11 @@ def headings(path: Path) -> list[str]:
 
 
 def iter_links(path: Path) -> Iterator[tuple[int, str]]:
-    """Aktive relative Markdown-Links einer Datei als (Zeilennummer, Ziel).
+    """Active relative Markdown links of a file as (line number, target).
 
-    Ausgelassen wird, was kein Verweis auf eine Datei im Repository ist: Links in
-    Code-Bloecken, auskommentierte Zeilen (die Screenshot-Platzhalter in beiden READMEs
-    stehen genau so da), externe Ziele und Routen-Vorlagen wie `/workflows/<id>`.
+    Skipped is whatever is not a reference to a file in the repository: links in
+    code blocks, commented-out lines (the screenshot placeholders in both READMEs
+    look exactly like that), external targets and route templates like `/workflows/<id>`.
     """
     fence = False
     for no, line in enumerate(path.read_text(encoding="utf-8", errors="replace").splitlines(), 1):
@@ -95,11 +95,11 @@ def tracked_markdown(root: Path) -> list[str]:
 
 
 def mirror_pair(rel: str) -> str | None:
-    """Der jeweils andere Pfad eines DE/EN-Paares, oder None ausserhalb von docs/.
+    """The respective other path of a DE/EN pair, or None outside docs/.
 
-    `docs/x.md` <-> `docs/en/x.md`, und ebenso eine Ebene tiefer:
-    `docs/onboarding/FAQ.md` <-> `docs/en/onboarding/FAQ.md`. Die flache Zuordnung
-    allein wuerde die gespiegelten Unterverzeichnisse uebersehen.
+    `docs/x.md` <-> `docs/en/x.md`, and likewise one level deeper:
+    `docs/onboarding/FAQ.md` <-> `docs/en/onboarding/FAQ.md`. The flat mapping
+    alone would miss the mirrored subdirectories.
     """
     if rel.startswith(MIRROR_PREFIX):
         return DOCS_PREFIX + rel[len(MIRROR_PREFIX):]
@@ -109,10 +109,10 @@ def mirror_pair(rel: str) -> str | None:
 
 
 def to_de_path(rel: str) -> str:
-    """Faltet die englische Spiegelung auf den deutschen Pfad.
+    """Folds the English mirror onto the German path.
 
-    Die Identitaet eines Findings darf nicht davon abhaengen, ob es gerade eine
-    Uebersetzung gibt: `docs/en/x.md` und `docs/x.md` sind dasselbe Dokument.
+    The identity of a finding must not depend on whether a
+    translation currently exists: `docs/en/x.md` and `docs/x.md` are the same document.
     """
     if rel.startswith(MIRROR_PREFIX):
         return DOCS_PREFIX + rel[len(MIRROR_PREFIX):]

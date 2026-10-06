@@ -78,15 +78,7 @@
 3 scripts/load-test/report.py
 1 scripts/public-readiness/arch-findings.py
 3 scripts/public-readiness/doc_facts_check.py
-54 scripts/public-readiness/docs_orphan_scan.py
-64 scripts/public-readiness/docs_parity_check.py
-52 scripts/public-readiness/frontend-metrics.sh
-18 scripts/public-readiness/md_common.py
-28 scripts/public-readiness/ncloc.py
-5 scripts/public-readiness/public-surface-scan.sh
-2 scripts/public-readiness/safe-inventory.sh
-1 scripts/public-readiness/secret-risk-scan.sh
-41 scripts/readme-sync/readme_sync.py
+1 scripts/public-readiness/docs_parity_check.py
 64 scripts/release-handover.sh
 17 scripts/release-notes.sh
 85 scripts/setup.sh
