@@ -1,17 +1,17 @@
 #!/usr/bin/env bash
-# Tests fuer scripts/public-readiness/docs-check.sh (TODO 3e57b1be).
+# Tests for scripts/public-readiness/docs-check.sh (TODO 3e57b1be).
 #
-# Das Skript meldet, welche oeffentlichen Dokumente vorhanden sind, und setzt das
-# Gate auf YELLOW, sobald eines der Pflichtdokumente fehlt. Bis 2026-09-20 pruefte
-# es fuenf Dateinamen, die es in diesem Projekt nie gab (docs/architecture.md,
+# The script reports which public documents exist and sets the
+# gate to YELLOW as soon as one of the mandatory documents is missing. Until 2026-09-20 it checked
+# five file names that never existed in this project (docs/architecture.md,
 # docs/agentic-development.md, docs/public-readiness.md, docs/security.md,
-# docs/use-cases.md) — das Gate stand dadurch dauerhaft auf YELLOW und war als
-# Signal wertlos. Fall 4 haelt genau diese Regression fest.
+# docs/use-cases.md) - the gate therefore stood permanently at YELLOW and was worthless as a
+# signal. Case 4 pins exactly this regression.
 #
-# Die Tests arbeiten auf einem Miniatur-Repository, damit sie nicht mitwandern,
-# wenn das echte Repo waechst.
+# The tests work on a miniature repository so that they do not move along
+# when the real repo grows.
 #
-# Run: bash scripts/tests/test-docs-check.sh   (exit 0 = alle Checks ok)
+# Run: bash scripts/tests/test-docs-check.sh   (exit 0 = all checks ok)
 set -uo pipefail
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -24,13 +24,13 @@ check() {  # $1 = label, $2 = shell condition
   if eval "$2"; then echo "  ok   $1"; PASS=$((PASS + 1)); else echo "  FAIL $1"; FAIL=$((FAIL + 1)); fi
 }
 
-# Miniatur-Repo mit allen Pflichtdokumenten.
+# Miniature repo with all mandatory documents.
 FAKE="$TMP/fake"
 mkdir -p "$FAKE/docs"
 for f in README.md README.de.md LICENSE NOTICE SECURITY.md CONTRIBUTING.md; do
   echo "# $f" > "$FAKE/$f"
 done
-# Ein README ohne Ueberschrift zum Ausprobieren ist seit TODO 1b84ecab ein Befund.
+# A README without a heading for trying it out has been a finding since TODO 1b84ecab.
 for f in README.md README.de.md; do printf '# %s\n\nKurz.\n\n## Quickstart\n' "$f" > "$FAKE/$f"; done
 for f in GETTING-STARTED.md architektur.md baukasten.md workflow-pool-kuratierung.md; do
   echo "# $f" > "$FAKE/docs/$f"

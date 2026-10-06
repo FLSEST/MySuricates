@@ -80,17 +80,6 @@
 3 scripts/public-readiness/doc_facts_check.py
 1 scripts/public-readiness/docs_parity_check.py
 1 scripts/release-handover.sh
-44 scripts/tests/test-arch-metrics.sh
-130 scripts/tests/test-audit-facts.sh
-40 scripts/tests/test-coverage-snapshot.sh
-2 scripts/tests/test-dependency-risk-scan.sh
-15 scripts/tests/test-deploy-files.sh
-1 scripts/tests/test-deps.sh
-53 scripts/tests/test-doc-facts-check.sh
-7 scripts/tests/test-docs-check.sh
-14 scripts/tests/test-frontend-metrics.sh
-3 scripts/tests/test-i18n.sh
-8 scripts/tests/test-installer-probe.sh
 48 scripts/tests/test-instance.sh
 3 scripts/tests/test-module-preset.sh
 2 scripts/tests/test-netaddr.sh

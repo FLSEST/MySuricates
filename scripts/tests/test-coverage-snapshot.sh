@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
-# Tests fuer den Messblock von workflow-pool/mysuricates-test-coverage.json (TODO 68f37d25).
+# Tests for the measuring block of workflow-pool/mysuricates-test-coverage.json (TODO 68f37d25).
 #
-# Das Audit-Center wertet den Envelope des Report-Blocks als vollstaendigen Snapshot:
-# ein Finding, das im naechsten Snapshot fehlt, wird RESOLVED. Solange der Messblock
-# nur ein Top-N-Fenster liefert, verschwinden Klassen aus dem Snapshot, ohne getestet
-# worden zu sein. Dieser Test pinnt deshalb: der Messblock listet ALLE Klassen unter
-# der Schwelle, nennt die Gesamtzahl und liefert je Klasse genau eine kompakte Zeile.
+# The Audit Center treats the envelope of the report block as a complete snapshot:
+# a finding that is missing in the next snapshot becomes RESOLVED. As long as the measuring block
+# delivers only a top-N window, classes disappear from the snapshot without having been
+# tested. This test therefore pins: the measuring block lists ALL classes below
+# the threshold, names the total count and delivers exactly one compact line per class.
 #
-# Run: bash scripts/tests/test-coverage-snapshot.sh   (exit 0 = alle Checks ok)
+# Run: bash scripts/tests/test-coverage-snapshot.sh   (exit 0 = all checks ok)
 set -uo pipefail
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -22,20 +22,20 @@ check() {  # $1 = label, $2 = shell condition
 }
 
 # ---------------------------------------------------------------------------
-# Fixture: 21 ungetestete Klassen (mehr als das alte Top-15-Fenster), davon eine
-# ohne jede "public "-Zeile, zwei duenn getestete und eine getestete Klasse ohne
-# "public "-Zeile. Die Klassen ohne "public " sind der Regressionsfall zu
-# "grep -c ... || echo 0": grep gibt bei 0 Treffern "0" aus UND Exit 1 zurueck,
-# das alte "|| echo 0" haengte eine zweite Null an. Im UNTESTED-Abschnitt
-# verschob das die Spalten der Messzeile (im Repo 24 von 115 Zeilen), in den
-# duennen Tests brach es die Pruefung mit "Ganzzahliger Ausdruck erwartet" ab.
+# Fixture: 21 untested classes (more than the old top-15 window), among them one
+# without any "public " line, two thinly tested ones and one tested class without a
+# "public " line. The classes without "public " are the regression case for
+# "grep -c ... || echo 0": with 0 hits grep prints "0" AND returns exit 1,
+# the old "|| echo 0" appended a second zero. In the UNTESTED section
+# that shifted the columns of the measuring line (in the repo 24 of 115 lines), in the
+# thin tests it aborted the check with "Ganzzahliger Ausdruck erwartet".
 # ---------------------------------------------------------------------------
 FIX="$TMP/fixture"
 MAIN="$FIX/ai-automation-backend/src/main/java/com/automation"
 TESTS="$FIX/ai-automation-backend/src/test/java/com/automation"
 mkdir -p "$MAIN/service/deep" "$MAIN/controller" "$TESTS/service/deep" "$FIX/ai-automation-frontend/src"
 
-java_class() {  # $1 = datei, $2 = zeilen, $3 = anzahl public-methoden
+java_class() {  # $1 = file, $2 = lines, $3 = number of public methods
   local file="$1" lines="$2" pubs="$3" i
   { echo "package com.automation;"
     for ((i = 0; i < pubs; i++)); do echo "    public void m$i() {}"; done
@@ -46,21 +46,21 @@ java_class() {  # $1 = datei, $2 = zeilen, $3 = anzahl public-methoden
 for i in $(seq -w 1 20); do
   java_class "$MAIN/service/deep/Untested$i.java" "$((10#$i * 10))" 3
 done
-# Duenn getestet: 8 public, 2 @Test  -> 25 %
+# Thinly tested: 8 public, 2 @Test  -> 25 %
 java_class "$MAIN/controller/ThinOne.java" 60 8
 { echo "class ThinOneTest {"; echo "    @Test void a() {}"; echo "    @Test void b() {}"; echo "}"; } \
   > "$TESTS/ThinOneTest.java"
-# Duenn getestet: 10 public, 1 @Test -> 10 %
+# Thinly tested: 10 public, 1 @Test -> 10 %
 java_class "$MAIN/controller/ThinTwo.java" 70 10
 { echo "class ThinTwoTest {"; echo "    @Test void a() {}"; echo "}"; } > "$TESTS/ThinTwoTest.java"
-# Getestet, aber ohne public-Zeile: darf keinen Shell-Fehler ausloesen
+# Tested, but without a public line: must not trigger a shell error
 { echo "package com.automation.controller;"; echo "class NoPublic {}"; } > "$MAIN/controller/NoPublic.java"
 { echo "class NoPublicTest {"; echo "    @Test void a() {}"; echo "}"; } > "$TESTS/NoPublicTest.java"
-# Ungetestet UND ohne public-Zeile: der im Repo haeufige Fall (24 von 115),
-# dessen Messzeile die alte Variante verstuemmelt hat
+# Untested AND without a public line: the case that is frequent in the repo (24 of 115),
+# whose measuring line the old variant mangled
 { echo "package com.automation.controller;"; echo "enum NoPublicUntested { A, B }"; } \
   > "$MAIN/controller/NoPublicUntested.java"
-# Records und Interfaces als Top-Level-Typ sind keine Testgegenstaende (59e22c53) — auch ohne public.
+# Records and interfaces as top-level type are not test subjects (59e22c53) - even without public.
 { echo "package com.automation.service.deep;"; echo "public record PlainRecord(String a) {}"; } \
   > "$MAIN/service/deep/PlainRecord.java"
 { echo "package com.automation.service.deep;"; echo "interface PlainPort {"; echo "    void run();"; echo "}"; } \
@@ -72,7 +72,7 @@ git init -q "$FIX" && ( cd "$FIX" && git -c user.name=t -c user.email=t@example.
   add -A && git -c user.name=t -c user.email=t@example.invalid commit -q -m init )
 
 # ---------------------------------------------------------------------------
-# Messblock aus der Pool-Definition ziehen und gegen das Fixture laufen lassen
+# Pull the measuring block out of the pool definition and run it against the fixture
 # ---------------------------------------------------------------------------
 python3 - "$DEF" "$FIX" > "$TMP/command.sh" <<'PY'
 import json, sys
@@ -121,8 +121,8 @@ echo "4) Soll-Groesse des Snapshots"
 check "Zeile 'ERWARTETE FINDINGS: 23'"        'grep -qx "ERWARTETE FINDINGS: 23" "$TMP/out.txt"'
 
 echo "5) Report-Prompt bindet den Snapshot an die vollstaendige Liste"
-# Seit fa66ea31 setzt der Shell-Block report (metadata.audit.reportBlock) den Envelope zusammen; der
-# KI-Prompt steht im Block metadata.audit.promptBlock.
+# Since fa66ea31 the shell block report (metadata.audit.reportBlock) assembles the envelope; the
+# AI prompt stands in the block metadata.audit.promptBlock.
 PROMPT="$TMP/prompt.txt"
 python3 - "$DEF" > "$PROMPT" <<'PY'
 import json, sys
@@ -135,8 +135,8 @@ check "Prompt nennt 'UNTESTED gesamt'"        'grep -q "UNTESTED gesamt" "$PROMP
 check "Prompt nennt kein Top-15-Fenster"      '! grep -q "Top 15" "$PROMPT"'
 check "Prompt begruendet snapshotComplete"    'grep -q "snapshotComplete" "$PROMPT"'
 check "Prompt kennt den Unvollstaendig-Fall"  'grep -q "snapshotComplete\": *false\|snapshotComplete\":false" "$PROMPT"'
-# 1cf996df: Empfohlen wird nur, was nicht bewusst eingeordnet ist; im Snapshot bleibt jede gelistete
-# Klasse, sonst stimmte die Soll-Zahl nicht mehr.
+# 1cf996df: only what is not deliberately classified is recommended; every listed class stays in the snapshot,
+# otherwise the target number would no longer match.
 check "Prompt bekommt die bekannten Befunde"   'grep -q "{{ audit_findings }}" "$PROMPT"'
 check "Empfehlung nur nicht eingeordnete Klassen" \
   'grep -q "^Waehlbar fuer NAECHSTER SCHRITT und die Roadmap (naechste 5) sind nur Klassen, die unter BEKANNTE BEFUNDE nicht ACCEPTED_RISK oder DISMISSED sind" "$PROMPT"'
@@ -148,9 +148,9 @@ check "Prompt fordert naechster_schritt und BEFUND-TEXTE an" \
   'grep -q "naechster_schritt: <subject>" "$PROMPT" && grep -q "^2. Ein Abschnitt, der mit der Zeile \"BEFUND-TEXTE:\" beginnt" "$PROMPT"'
 
 echo "6) Gate-Verdict prueft den Snapshot deterministisch"
-# Platzhalter werden wie in TemplateResolver.resolveShellSafe single-quoted eingesetzt
-# (Block fuehrt "shell_escape_variables": true), damit der Block lokal laufen kann.
-render_gate() {  # $1 = previous_output, $2 = metrik-output, $3 = report-output
+# Placeholders are inserted single-quoted as in TemplateResolver.resolveShellSafe
+# (block carries "shell_escape_variables": true), so that the block can run locally.
+render_gate() {  # $1 = previous_output, $2 = metric output, $3 = report output
   python3 - "$DEF" "$1" "$2" "$3" <<'PY'
 import json, re, sys
 definition = json.load(open(sys.argv[1], encoding='utf-8'))
@@ -170,7 +170,7 @@ print(re.sub(r'\{\{\s*([^}]+?)\s*}}', substitute, config['command']))
 PY
 }
 
-envelope_report() {  # $1 = anzahl ruleKeys, $2 = snapshotComplete (true|false)
+envelope_report() {  # $1 = number of ruleKeys, $2 = snapshotComplete (true|false)
   local i findings=""
   for ((i = 0; i < $1; i++)); do
     findings="$findings{\"ruleKey\":\"test-coverage.untested-class\",\"subject\":\"p/C$i.java\",\"severity\":\"MEDIUM\",\"title\":\"t\"},"
@@ -182,7 +182,7 @@ envelope_report() {  # $1 = anzahl ruleKeys, $2 = snapshotComplete (true|false)
 GATE_METRICS="$(printf 'UNTESTED gesamt: 20\nDUENNE TESTS gesamt: 0\nERWARTETE FINDINGS: 20\n')"
 GATE_PREV="$(printf 'Kurzfassung\ngate_status: YELLOW\n')"
 
-run_gate() {  # $1 = report-output, schreibt Gate-Ausgabe nach $TMP/gate.txt
+run_gate() {  # $1 = report output, writes gate output to $TMP/gate.txt
   render_gate "$GATE_PREV" "$GATE_METRICS" "$1" > "$TMP/gate.sh"
   bash "$TMP/gate.sh" > "$TMP/gate.txt" 2> "$TMP/gate-err.txt"
 }
@@ -211,9 +211,9 @@ check "ohne ERWARTETE FINDINGS: RED"         'grep -qx "gate_status: RED" "$TMP/
 check "ohne ERWARTETE FINDINGS: incomplete"  'grep -qx "gate_category: audit-incomplete" "$TMP/gate.txt"'
 
 echo "7) Gate zaehlt wie die Ingestion nur den letzten Envelope (1cf996df)"
-# previous_report sind die ersten 3000 Zeichen des Vorlaufs, bei kurzen Reports samt Envelope. Gibt das
-# Modell ihn wieder, steht vor dem eigenen ein alter Envelope, ganz oder abgeschnitten. Gezaehlt wird
-# nur der letzte, wie in AuditResultParser; ein offener letzter gilt als fehlend.
+# previous_report is the first 3000 characters of the previous run, with short reports including the envelope. If the
+# model repeats it, an old envelope stands before the own one, whole or cut off. Only the last
+# one is counted, as in AuditResultParser; an open last one counts as missing.
 CUT_ECHO="$(printf '%s\n' '<!-- mysuricates:audit-result:v1' \
   '{"snapshotComplete":true,"findings":[{"ruleKey":"test-coverage.untested-class","subject":"p/C0.java"' \
   '[...gekürzt]')"
@@ -226,18 +226,18 @@ check "abgeschnittener alter vor dem eigenen: nicht RED" \
 run_gate "$(envelope_report 20 true; printf '%s\n' '<!-- mysuricates:audit-result:v1' '{"snapshotComplete":true,"findings":[')"
 check "eigener abgeschnitten nach vollstaendigem altem: RED" \
   'grep -qx "gate_status: RED" "$TMP/gate.txt" && grep -qx "gate_category: audit-invalid" "$TMP/gate.txt"'
-# Beginnt und endet der Envelope in derselben Zeile, zaehlt er ebenso; was danach kommt, gehoert nicht dazu.
+# If the envelope begins and ends in the same line, it counts as well; what comes after does not belong to it.
 GATE_METRICS="$(printf 'UNTESTED gesamt: 1\nDUENNE TESTS gesamt: 0\nERWARTETE FINDINGS: 1\n')" \
   run_gate "$(printf '%s\n' '### Coverage-Coach' 'gate_status: YELLOW' \
   '<!-- mysuricates:audit-result:v1 {"snapshotComplete":true,"findings":[{"ruleKey":"test-coverage.untested-class","subject":"p/C0.java","severity":"MEDIUM","title":"t"}]} -->' \
   'Nachsatz ohne Envelope')"
 check "einzeiliger Envelope wird gezaehlt, der Nachsatz nicht" \
   '! grep -q "gate_status: RED" "$TMP/gate.txt" && grep -qx "gate_category: test-coverage" "$TMP/gate.txt"'
-# Zitate beginnen und beenden nichts, wie im Parser: ein Marker ohne "<!--" oder ohne JSON-Beginn, ein
-# Envelope-Anfang mitten in einer Zeile eines offenen Envelopes (Text eines Findings), ein "-->" im Text.
-# Je Zeile ein Finding, das Zitat im elften: Begaenne das Gate dort neu oder schloesse es dort, fehlten
-# Findings, und es meldete RED, obwohl die Ingestion den Report annimmt.
-envelope_lines() {  # $1 = anzahl findings, $2 = description des elften
+# Quotes begin and end nothing, as in the parser: a marker without "<!--" or without JSON start, an
+# envelope start in the middle of a line of an open envelope (text of a finding), a "-->" in the text.
+# One finding per line, the quote in the eleventh: if the gate restarted or closed there, findings
+# would be missing, and it would report RED although the ingestion accepts the report.
+envelope_lines() {  # $1 = number of findings, $2 = description of the eleventh
   local i sep desc
   printf '%s\n' '### Coverage-Coach' 'gate_status: YELLOW' '<!-- mysuricates:audit-result:v1' \
     '{"snapshotComplete":true,"findings":['
@@ -270,9 +270,9 @@ check "Nachsatz mit Marker und JSON-Beginn: offener Envelope, RED wie die Ingest
 check "Gate laeuft auch hier ohne stderr" '[ ! -s "$TMP/gate-err.txt" ]'
 
 echo "8) Records mit eigener Logik bleiben testpflichtig (134e7226)"
-# Seit 59e22c53 nimmt der Messblock Records aus, gedacht fuer reine Datentraeger. Ein Record mit Parser
-# (ICalContentLine, 19 Verzweigungen) fiel damit aus dem Snapshot. Ausgenommen bleibt ein Record nur ohne
-# Methode mit Rumpf, abgesehen von Accessoren und Konstruktoren; ein Methodenkopf im Kommentar zaehlt nicht.
+# Since 59e22c53 the measuring block excludes records, meant for pure data carriers. A record with a parser
+# (ICalContentLine, 19 branches) thereby fell out of the snapshot. A record stays excluded only without a
+# method with a body, apart from accessors and constructors; a method head in a comment does not count.
 FIXR="$TMP/fixture-records"
 MAINR="$FIXR/ai-automation-backend/src/main/java/com/automation/service/ical"
 mkdir -p "$MAINR" "$FIXR/ai-automation-backend/src/test/java/com/automation/service/ical" \
@@ -345,11 +345,11 @@ check "nur die zwei Records ohne Logik ausgenommen" \
 check "Messblock laeuft ohne stderr" '[ ! -s "$TMP/err-records.txt" ]'
 
 echo "9) Envelope deterministisch aus der Soll-Liste (fa66ea31)"
-# Run 073e9933: die KI gab drei Klassen doppelt aus (52 statt 50 Findings), das Gate wurde RED und der Lauf
-# war wertlos. Jetzt baut der Shell-Block report den Envelope aus den Listen des Messblocks; die KI liefert
-# nur Bericht, naechster_schritt und Texte je Klasse. Duplikate sind damit unmoeglich, fehlende Texte
-# ersetzt ein Standardtext, ein Envelope der KI zaehlt nicht.
-render_block() {  # $1 = name des Blocks, $2 = metrik-output, $3 = coach-output, $4 = report-output
+# Run 073e9933: the AI output three classes twice (52 instead of 50 findings), the gate went RED and the run
+# was worthless. Now the shell block report builds the envelope from the lists of the measuring block; the AI delivers
+# only report, naechster_schritt and texts per class. Duplicates are thus impossible, missing texts
+# are replaced by a default text, an envelope from the AI does not count.
+render_block() {  # $1 = name of the block, $2 = metric output, $3 = coach output, $4 = report output
   python3 - "$DEF" "$1" "$2" "$3" "$4" <<'PY'
 import json, re, sys
 definition = json.load(open(sys.argv[1], encoding='utf-8'))
@@ -366,18 +366,18 @@ PY
 }
 check "reportBlock ist der Shell-Block report, promptBlock der KI-Block coach" \
   'python3 -c "import json,sys; d=json.load(open(sys.argv[1])); a=d[\"metadata\"][\"audit\"]; t={b.get(\"name\"): b[\"type\"] for b in d[\"blocks\"]}; sys.exit(not (a[\"reportBlock\"] == \"report\" and t[\"report\"] == \"shell\" and a[\"promptBlock\"] == \"coach\" and t[\"coach\"] == \"simple\"))" "$DEF"'
-assemble() {  # $1 = metrik-output, $2 = coach-output -> $TMP/report.txt, Envelope-JSON in $TMP/envelope.json
+assemble() {  # $1 = metric output, $2 = coach output -> $TMP/report.txt, envelope JSON in $TMP/envelope.json
   render_block report "$1" "$2" "" > "$TMP/report.sh"
   bash "$TMP/report.sh" > "$TMP/report.txt" 2> "$TMP/report-err.txt"
   awk '/^<!-- mysuricates:audit-result:v1$/ { getline; print }' "$TMP/report.txt" > "$TMP/envelope.json"
 }
-finding_field() {  # $1 = subject, $2 = feld
+finding_field() {  # $1 = subject, $2 = field
   python3 -c 'import json,sys; e=json.load(open(sys.argv[1])); print(next(f[sys.argv[3]] for f in e["findings"] if f["subject"] == sys.argv[2]))' \
     "$TMP/envelope.json" "$1" "$2"
 }
 METRICS_OUT="$(cat "$TMP/out.txt")"
-# Wie Run 073e9933: die KI listet Klassen doppelt, nennt eine erfundene, schreibt einen eigenen Envelope
-# mit 25 Findings und benutzt Tab, " | " und Aufzaehlungszeichen gemischt.
+# Like run 073e9933: the AI lists classes twice, names an invented one, writes its own envelope
+# with 25 findings and uses tab, " | " and bullet characters mixed.
 COACH_OUT="$(printf '%s\n' '### Coverage-Coach' '' '**Status**: 40.0%' '' \
   '**naechster_schritt:** `service/deep/Untested05.java`' '' 'BEFUND-TEXTE:' \
   "service/deep/Untested20.java${TAB}Groesste Klasse: Kernpfade mit UntestedTest als Vorlage pruefen." \
@@ -432,8 +432,8 @@ check "Kopfzeile fehlt: Gate RED audit-invalid" \
 assemble "$(printf '%s\n' "$METRICS_OUT" | sed '/^service\/deep\/Untested03\.java/d')" "$COACH_OUT"
 check "Kopfzeile zaehlt mehr Zeilen als gelistet: snapshotComplete false" 'grep -q "\"snapshotComplete\": false" "$TMP/envelope.json"'
 
-# Fehlt "ENDE BEFUND-TEXTE", endet der Abschnitt an der naechsten gate_- oder naechster_schritt-Zeile: Sonst
-# verschluckte er Urteil und naechsten Schritt (Review fa66ea31).
+# If "ENDE BEFUND-TEXTE" is missing, the section ends at the next gate_ or naechster_schritt line: otherwise
+# it would swallow the verdict and next step (review fa66ea31).
 assemble "$METRICS_OUT" "$(printf '%s\n' '### Coverage-Coach' 'BEFUND-TEXTE:' \
   'service/deep/Untested09.java | Text ohne Abschlusszeile.' '' '**gate_status:** YELLOW' 'gate_category: test-coverage' \
   'naechster_schritt: service/deep/Untested05.java' 'Schlusssatz des Berichts.')"
@@ -441,8 +441,8 @@ check "ohne ENDE BEFUND-TEXTE: gate-Zeilen bleiben im Bericht" \
   'grep -qx "\*\*gate_status:\*\* YELLOW" "$TMP/report.txt" && grep -qx "gate_category: test-coverage" "$TMP/report.txt" && grep -qx "Schlusssatz des Berichts." "$TMP/report.txt"'
 check "ohne ENDE BEFUND-TEXTE: naechster Schritt wird HIGH, Text davor gilt" \
   '[ "$(finding_field service/deep/Untested05.java severity)" = HIGH ] && [ "$(finding_field service/deep/Untested09.java description)" = "Text ohne Abschlusszeile." ]'
-# Nennt die KI ein subject mit anderem Pfad, gilt der Text der Klasse mit demselben Dateinamen, wenn er
-# eindeutig ist; sonst bleibt der Standardtext. Dasselbe fuer naechster_schritt.
+# If the AI names a subject with a different path, the text of the class with the same file name applies, if it
+# is unambiguous; otherwise the default text stays. The same for naechster_schritt.
 TWIN_METRICS="$(printf '%s\n' 'UNTESTED gesamt: 3' "a/Twin.java${TAB}50" "b/Twin.java${TAB}40" "service/deep/Solo.java${TAB}30" '' \
   'DUENNE TESTS gesamt: 0' '' 'ERWARTETE FINDINGS: 3')"
 assemble "$TWIN_METRICS" "$(printf '%s\n' 'naechster_schritt: com/automation/service/deep/Solo.java' 'BEFUND-TEXTE:' \
@@ -454,8 +454,8 @@ check "abweichender Pfad im naechsten Schritt: HIGH ueber den Dateinamen" \
 check "mehrdeutiger Dateiname: Standardtext fuer beide" \
   'finding_field a/Twin.java description | grep "^Eigenen Test fuer Twin" >/dev/null && finding_field b/Twin.java description | grep "^Eigenen Test fuer Twin" >/dev/null'
 
-# Gleichnamige Klassen in zwei Paketen ergaeben dasselbe thin-test-subject zweimal: der Messblock listet
-# je Name nur die duennste Zeile, ERWARTETE FINDINGS zaehlt sie einmal.
+# Classes of the same name in two packages would yield the same thin-test-subject twice: the measuring block lists
+# only the thinnest line per name, EXPECTED FINDINGS counts it once.
 FIXD="$TMP/fixture-dup"
 mkdir -p "$FIXD/ai-automation-backend/src/main/java/com/automation/a" "$FIXD/ai-automation-backend/src/main/java/com/automation/b" \
          "$FIXD/ai-automation-backend/src/test/java/com/automation/a" "$FIXD/ai-automation-frontend/src"
