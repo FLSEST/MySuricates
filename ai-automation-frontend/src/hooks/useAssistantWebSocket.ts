@@ -41,8 +41,8 @@ export function useAssistantWebSocket(
     // Reuse existing client if connected
     if (clientRef.current?.connected) return;
 
-    // Kein API-Key in der Handshake-URL: stompjs wartet vor jedem Verbindungsversuch (auch vor
-    // jedem Reconnect) auf beforeConnect — dort holen wir ein frisches Einmal-Ticket.
+    // No API key in the handshake URL: stompjs waits for beforeConnect before every connection attempt (also before
+    // every reconnect) — there we fetch a fresh one-time ticket.
     let wsTicket = '';
     let disposed = false;
 
@@ -50,14 +50,14 @@ export function useAssistantWebSocket(
       beforeConnect: async () => {
         wsTicket = await api.fetchWsTicket().catch(() => '');
       },
-      // Nur der WebSocket-Transport: ein SockJS-Fallback (xhr-streaming …) eröffnet eine neue
-      // Session und bräuchte ein zweites Ticket — das erste ist dann schon verbraucht.
+      // WebSocket transport only: a SockJS fallback (xhr-streaming …) opens a new
+      // session and would need a second ticket — the first one is already used up by then.
       webSocketFactory: () =>
         new SockJS(`${window.location.origin}/ws?ticket=${encodeURIComponent(wsTicket)}`, null, {
           transports: ['websocket'],
         }),
       reconnectDelay: 5000,
-      // Jeder Versuch kostet einen POST /ws-ticket — bei totem Backend nicht ewig im 5s-Takt klopfen
+      // Every attempt costs a POST /ws-ticket — with a dead backend, do not keep knocking every 5s forever
       reconnectTimeMode: ReconnectionTimeMode.EXPONENTIAL,
       maxReconnectDelay: 60_000,
       onConnect: () => setConnected(true),

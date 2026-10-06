@@ -2,9 +2,9 @@ import { useSyncExternalStore } from 'react';
 import { rateLimitBackoffUntil, subscribeRateLimitBackoff } from '../api/client';
 
 /**
- * Ende des aktiven 429-Backoffs als Epoch-ms, 0 wenn nichts gesperrt ist (c168293d).
+ * End of the active 429 backoff as epoch ms, 0 if nothing is blocked (c168293d).
  *
- * Der Client meldet Beginn *und* Ablauf einer Sperre, ein eigener Takt ist also nicht nötig.
+ * The client reports the start *and* the expiry of a block, so a clock of its own is not needed.
  */
 export function useRateLimitBackoffUntil(): number {
   return useSyncExternalStore(subscribeRateLimitBackoff, () => rateLimitBackoffUntil(), () => 0);

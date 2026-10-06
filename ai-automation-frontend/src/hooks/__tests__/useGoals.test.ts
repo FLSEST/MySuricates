@@ -25,7 +25,7 @@ describe('normalizeGoalDetail', () => {
     progress: { total: 3, open: 3, inProgress: 0, backlog: 0, done: 0, openQuestions: 1, percentDone: 0 },
     guard: { enabled: false, workflowId: null, scheduleId: null, nextRunAt: null },
   };
-  /** Was ein Backend vor c60bf914 „milestone“ nannte, ist ein Arbeitspaket mit nur einer Fälligkeit. */
+  /** What a backend before c60bf914 called "milestone" is a work package with only one due date. */
   const oldPackage = {
     id: 'm1', goalId: 'g1', title: 'Promo', dueDate: '2026-12-31T22:59:59Z', state: 'OPEN', total: 3, done: 0,
     reachedAt: '2026-09-01T00:00:00Z', reopened: false, createdAt: '', updatedAt: '',

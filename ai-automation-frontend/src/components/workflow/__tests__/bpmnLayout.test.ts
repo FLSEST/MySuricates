@@ -8,7 +8,7 @@ const HEAD = `<?xml version="1.0" encoding="UTF-8"?>
              xmlns:di="http://www.omg.org/spec/DD/20100524/DI"
              id="Definitions_1" targetNamespace="http://bpmn.io/schema/bpmn">`;
 
-/** Start → Skript → Ende, waagerecht wie vom Backend exportiert. */
+/** Start → script → end, horizontal as exported by the backend. */
 const MINIMAL_XML = `${HEAD}
   <process id="p1" isExecutable="false">
     <startEvent id="start" name="Start" />
@@ -28,7 +28,7 @@ const MINIMAL_XML = `${HEAD}
   </bpmndi:BPMNDiagram>
 </definitions>`;
 
-/** Ein Block mit Ausgabe-Datenobjekt (dataOutputAssociation als Kind-Element). */
+/** A block with an output data object (dataOutputAssociation as a child element). */
 const DATA_XML = `${HEAD}
   <process id="p1" isExecutable="false">
     <scriptTask id="b_0_tests" name="tests">
@@ -47,7 +47,7 @@ const DATA_XML = `${HEAD}
 </definitions>`;
 
 describe('parseBpmn', () => {
-  it('liest Kästen mit Typ, Name und Bounds sowie Kanten mit Enden und Waypoints', () => {
+  it('reads boxes with type, name and bounds as well as edges with ends and waypoints', () => {
     const d = parseBpmn(MINIMAL_XML)!;
     expect(d.shapes.map((s) => [s.id, s.kind, s.name])).toEqual([
       ['start', 'startEvent', 'Start'],
@@ -61,18 +61,18 @@ describe('parseBpmn', () => {
     });
   });
 
-  it('löst Datenassoziationen auf die umgebende Aktivität auf und zeichnet sie gestrichelt', () => {
+  it('resolves data associations to the surrounding activity and draws them dashed', () => {
     const edge = parseBpmn(DATA_XML)!.edges[0]!;
     expect(edge).toMatchObject({ sourceRef: 'b_0_tests', targetRef: 'dataref_tests', dashed: true });
   });
 
-  it('liefert null für kaputtes XML', () => {
+  it('returns null for broken XML', () => {
     expect(parseBpmn('<kein xml')).toBeNull();
   });
 });
 
 describe('verticalLayout', () => {
-  it('transponiert über die Mitte, staucht Lücken auf 70px und routet Kanten unten→oben neu', () => {
+  it('transposes about the center, compresses gaps to 70px and re-routes edges bottom→top', () => {
     const v = verticalLayout(parseBpmn(MINIMAL_XML)!);
     expect(v.shapes.map((s) => [s.x, s.y, s.w, s.h])).toEqual([
       [182, 100, 36, 36],
@@ -85,7 +85,7 @@ describe('verticalLayout', () => {
     ]);
   });
 
-  it('legt ein Datenobjekt unter seinen Erzeuger', () => {
+  it('places a data object below its producer', () => {
     const v = verticalLayout(parseBpmn(DATA_XML)!);
     const producer = v.shapes.find((s) => s.id === 'b_0_tests')!;
     const data = v.shapes.find((s) => s.id === 'dataref_tests')!;
@@ -94,17 +94,17 @@ describe('verticalLayout', () => {
 });
 
 describe('diagramBounds', () => {
-  it('umschließt Kästen, Beschriftungsraum und Kanten mit 40px Rand', () => {
+  it('encloses boxes, label space and edges with a 40px margin', () => {
     expect(diagramBounds(parseBpmn(MINIMAL_XML)!)).toEqual({ minX: 60, minY: 120, width: 552, height: 180 });
   });
 });
 
 describe('wrapLabel', () => {
-  it('bricht an Wortgrenzen um', () => {
+  it('wraps at word boundaries', () => {
     expect(wrapLabel('Maven Tests ausführen', 100)).toEqual(['Maven Tests', 'ausführen']);
   });
 
-  it('trennt überlange Wörter hart und kürzt auf drei Zeilen mit Ellipse', () => {
+  it('splits overlong words hard and truncates to three lines with an ellipsis', () => {
     const lines = wrapLabel('x'.repeat(60), 100);
     expect(lines).toHaveLength(3);
     expect(lines[0]).toBe('x'.repeat(13));
@@ -115,7 +115,7 @@ describe('wrapLabel', () => {
 describe('localizeName', () => {
   const maps = { prefix: { KI: 'AI', Freigabe: 'Approval' }, tip: {}, event: { Ende: 'End' } };
 
-  it('übersetzt Event-Namen, Typ-Präfixe und namenlose Typen, lässt Block-Namen stehen', () => {
+  it('translates event names, type prefixes and unnamed types, leaves block names alone', () => {
     expect(localizeName('Ende', maps)).toBe('End');
     expect(localizeName('KI: git status', maps)).toBe('AI: git status');
     expect(localizeName('Freigabe', maps)).toBe('Approval');
@@ -124,7 +124,7 @@ describe('localizeName', () => {
 });
 
 describe('selectionOf', () => {
-  it('leitet Block und Teilpfad aus der Element-ID ab', () => {
+  it('derives block and sub-path from the element ID', () => {
     expect(selectionOf('start')).toBeNull();
     expect(selectionOf('b_4_report')).toEqual({ blockIndex: 4 });
     expect(selectionOf('b_2_c1_task')).toEqual({ blockIndex: 2, sub: { kind: 'case', caseIndex: 1 } });

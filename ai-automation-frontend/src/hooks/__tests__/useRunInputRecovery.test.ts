@@ -14,7 +14,7 @@ function serveApproval(body: Record<string, unknown>) {
 }
 
 describe('useRunInputRecovery', () => {
-  // Schließen nach Antwort oder per X: useRunPendingInput (settle) — der Hook hier liefert nur, was der Server meldet.
+  // Closing after an answer or via X: useRunPendingInput (settle) — the hook here only delivers what the server reports.
   it('stellt eine wartende Freigabe wieder her', async () => {
     serveApproval({ pending: true, blockId: 'b1', question: 'Weiter?', options: ['Ja'], rejectOptions: ['Nein'], stepIndex: 2 });
     const { result } = renderHook(() => useRunInputRecovery('run-1'));
@@ -36,7 +36,7 @@ describe('useRunInputRecovery', () => {
     expect(result.current.recoveredApproval).toBeNull();
   });
 
-  it('bleibt leer ohne wartenden Schritt, bei Fehlern und ohne runId', async () => {
+  it('stays empty without a waiting step, on errors and without runId', async () => {
     let calls = 0;
     server.use(http.get('/api/v1/executions/:runId/approval', () => { calls++; return HttpResponse.json({ pending: false }); }));
     const { result } = renderHook(() => useRunInputRecovery('run-1'));
@@ -56,7 +56,7 @@ describe('useRunInputRecovery', () => {
     expect(calls).toBe(0);
   });
 
-  it('fragt bei neuem refreshKey erneut und räumt auf, sobald nichts mehr wartet', async () => {
+  it('asks again on a new refreshKey and cleans up as soon as nothing is waiting anymore', async () => {
     let pending = false;
     let calls = 0;
     server.use(http.get('/api/v1/executions/:runId/approval', () => {
@@ -81,12 +81,12 @@ describe('useRunInputRecovery', () => {
     expect(calls).toBe(3);
   });
 
-  it('übernimmt nur die Antwort der jüngsten Abfrage', async () => {
+  it('takes only the answer of the latest query', async () => {
     let calls = 0;
     server.use(http.get('/api/v1/executions/:runId/approval', async () => {
       calls++;
       if (calls === 1) {
-        // die erste Abfrage kommt zuletzt zurück, mit dem inzwischen veralteten Stand
+        // the first query returns last, with the state that is stale by now
         await delay(80);
         return HttpResponse.json({ pending: true, blockId: 'approval-0', question: 'Alt?', options: ['Ja'], stepIndex: 0 });
       }
@@ -100,7 +100,7 @@ describe('useRunInputRecovery', () => {
     expect(result.current.recoveredApproval).toBeNull();
   });
 
-  it('gibt die Frage eines Laufs nicht an den nächsten weiter', async () => {
+  it('does not pass the question of one run on to the next', async () => {
     server.use(http.get('/api/v1/executions/:runId/approval', async ({ params }) => {
       if (params.runId === 'run-2') await delay(80);
       return HttpResponse.json(params.runId === 'run-1'

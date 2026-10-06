@@ -10,7 +10,7 @@ import { useToast } from './useToast';
 import { useT } from '../i18n';
 import type { DialogSessionInfo, DialogWorkflowSuggestion, Workflow, BlockDefinition } from '../types';
 
-/** Schlüssel der Gruppe „Andere Sessions“ (Sessions ohne bekanntes Projekt). */
+/** Key of the group "Andere Sessions" (sessions without a known project). */
 export const OTHER_DIALOG_GROUP = '__other__';
 
 export interface DialogProjectGroup {
@@ -22,10 +22,10 @@ export interface DialogProjectGroup {
 }
 
 /**
- * Zustand der Seite „Session2Workflow“: Projektgruppen aus den Session-Zahlen (aktive Projekte mit
- * Sessions, absteigend nach Zahl, dazu „Andere Sessions“ für unbekannte Pfade), die Sessions der
- * gewählten Gruppe (erst nach der Auswahl geladen; „Andere“ lädt global und filtert hier), Suche
- * und Filter „nur substanzielle“, die Workflows des Projekts sowie Analysieren und Anlegen.
+ * State of the page "Session2Workflow": project groups from the session counts (active projects with
+ * sessions, descending by count, plus "Andere Sessions" for unknown paths), the sessions of the
+ * selected group (loaded only after the selection; "Andere" loads globally and filters here), search
+ * and the filter "nur substanzielle", the project's workflows as well as analyzing and creating.
  */
 export function useDialogImport() {
   const t = useT();
@@ -44,7 +44,7 @@ export function useDialogImport() {
   const analyzeMutation = useAnalyzeDialog();
   const createMutation = useCreateWorkflowFromDialog();
 
-  // Aktives Projekt bestimmen
+  // Determine the active project
   const activeProjects = useMemo(
     () => (projects ?? []).filter(p => !p.archivedAt),
     [projects],
@@ -55,7 +55,7 @@ export function useDialogImport() {
     [activeProjects],
   );
 
-  // Gruppen aus Projekten + Counts
+  // Groups from projects + counts
   const groups = useMemo<DialogProjectGroup[]>(() => {
     if (!counts) return [];
 
@@ -85,7 +85,7 @@ export function useDialogImport() {
     [groups, selectedGroupId],
   );
 
-  // Lazy-Load: Sessions nur für das gewählte Projekt
+  // Lazy load: sessions only for the selected project
   const isProjectSelected = !!selectedGroup && !selectedGroup.isOther;
   const isOtherSelected = selectedGroup?.isOther === true;
 
@@ -95,7 +95,7 @@ export function useDialogImport() {
     { enabled: isProjectSelected },
   );
 
-  // "Other Sessions": global laden, im Frontend filtern
+  // "Other Sessions": load globally, filter in the frontend
   const { data: otherSessionsRaw, isLoading: otherLoading } = useDialogSessions(
     undefined, 500,
     { enabled: isOtherSelected },
@@ -105,7 +105,7 @@ export function useDialogImport() {
     return otherSessionsRaw.filter(s => !knownProjectPaths.has(s.projectPath));
   }, [otherSessionsRaw, knownProjectPaths]);
 
-  // Sessions für die Anzeige (gefiltert)
+  // Sessions for display (filtered)
   const currentSessions = useMemo(
     () => (isOtherSelected ? otherSessions : (projectSessions ?? [])),
     [isOtherSelected, otherSessions, projectSessions],
@@ -123,7 +123,7 @@ export function useDialogImport() {
     });
   }, [currentSessions, substantialOnly, search]);
 
-  // Workflows des gewählten Projekts
+  // Workflows of the selected project
   const projectWorkflows = useMemo<Workflow[]>(() => {
     if (!selectedGroup || selectedGroup.isOther || !allWorkflows) return [];
     return allWorkflows.filter(w => w.projectId === selectedGroup.id);

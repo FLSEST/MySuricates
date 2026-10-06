@@ -7,9 +7,9 @@ import { applyPlan, type PlanChanges } from '../components/goal/timelineLayout';
 import type { GoalDetail, UpdateTodoPlanningRequest } from '../types';
 
 /**
- * Planung an einem Ziel (TODO e192df18, c60bf914): TODOs einplanen, Arbeitspakete und Meilensteine
- * pflegen. Danach ist neu zu laden, was davon abhängt – Ziele (Fortschritt, Zustände) und TODO-Listen
- * samt Cockpit („Braucht dich“).
+ * Planning on a goal (TODO e192df18, c60bf914): schedule TODOs, maintain work packages and milestones.
+ * Afterwards whatever depends on it must be reloaded – goals (progress, states) and TODO lists
+ * including the cockpit ("Braucht dich").
  */
 export function invalidatePlanning(qc: QueryClient) {
   qc.invalidateQueries({ queryKey: goalKeys.all });
@@ -17,8 +17,8 @@ export function invalidatePlanning(qc: QueryClient) {
 }
 
 /**
- * Ändert das gespeicherte Detail eines Ziels sofort (optimistisch) und gibt den alten Stand zum
- * Zurücksetzen zurück, falls der Aufruf scheitert.
+ * Changes the stored detail of a goal immediately (optimistic) and returns the old state for
+ * rollback in case the call fails.
  */
 export async function patchGoalDetail(qc: QueryClient, goalId: string, patch: (detail: GoalDetail) => GoalDetail) {
   const key = goalKeys.detail(goalId);
@@ -29,8 +29,8 @@ export async function patchGoalDetail(qc: QueryClient, goalId: string, patch: (d
 }
 
 /**
- * Das Arbeitspaket im Planungsaufruf: `workPackageId`, bei einem Backend vor c60bf914 (`legacyBackend`)
- * noch unter seinem alten Namen `milestoneId` – das neue Feld würde es stillschweigend übergehen.
+ * The work package in the planning call: `workPackageId`, for a backend before c60bf914 (`legacyBackend`)
+ * still under its old name `milestoneId` – the new field would silently ignore it.
  */
 export function workPackageField(workPackageId: string, legacyBackend: boolean | undefined): UpdateTodoPlanningRequest {
   return legacyBackend ? { milestoneId: workPackageId } : { workPackageId };
@@ -39,13 +39,13 @@ export function workPackageField(workPackageId: string, legacyBackend: boolean |
 export interface PlanGoalTodo {
   todoId: string;
   changes: PlanChanges;
-  /** Aus dem Menü eines Chips: mit Bestätigung, denn dort sieht man den Chip nicht springen. */
+  /** From a chip's menu: with confirmation, because there you do not see the chip jump. */
   announce?: boolean;
 }
 
 /**
- * Fälligkeit (`PUT /todos/{id}`) und Arbeitspaket (`PATCH …/planning`) eines TODOs. Der Chip springt
- * sofort an die neue Stelle; scheitert ein Aufruf, geht er zurück.
+ * Due date (`PUT /todos/{id}`) and work package (`PATCH …/planning`) of a TODO. The chip jumps
+ * immediately to the new place; if a call fails, it goes back.
  */
 export function usePlanGoalTodo(goalId: string) {
   const qc = useQueryClient();

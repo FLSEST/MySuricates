@@ -1,10 +1,10 @@
-/** Reine BPMN-Logik der Diagrammansicht: XML lesen, oben→unten-Layout, Beschriftungen umbrechen, Kasten → Block-Auswahl. */
+/** Pure BPMN logic of the diagram view: read XML, top→bottom layout, wrap labels, box → block selection. */
 const NS_MODEL = 'http://www.omg.org/spec/BPMN/20100524/MODEL';
 const NS_DI = 'http://www.omg.org/spec/BPMN/20100524/DI';
 const NS_DC = 'http://www.omg.org/spec/DD/20100524/DC';
 const NS_DDI = 'http://www.omg.org/spec/DD/20100524/DI';
 
-/** Übersetzt Backend-Beschriftungen (deutsches Typ-Präfix, Event-Namen) in die App-Sprache. */
+/** Translates backend labels (German type prefix, event names) into the app language. */
 export interface BpmnLabelMaps {
   prefix: Record<string, string>;
   tip: Record<string, string>;
@@ -16,8 +16,8 @@ export function localizeName(name: string, maps: BpmnLabelMaps): string {
   if (idx > 0 && maps.prefix[name.slice(0, idx)] !== undefined) {
     return maps.prefix[name.slice(0, idx)]! + name.slice(idx);        // "KI: git status" → "AI: git status"
   }
-  if (maps.prefix[name] !== undefined) return maps.prefix[name]!;      // namenlos ohne Befehl: "Freigabe" → "Approval"
-  return name;                                                         // Block-Name / Befehl: unverändert
+  if (maps.prefix[name] !== undefined) return maps.prefix[name]!;      // unnamed without command: "Freigabe" → "Approval"
+  return name;                                                         // block name / command: unchanged
 }
 
 export interface Shape {
@@ -37,7 +37,7 @@ export interface EdgeLine {
   sourceRef: string;
   targetRef: string;
   points: [number, number][];
-  /** Datenassoziation statt Kontrollfluss — wird gestrichelt gezeichnet. */
+  /** Data association instead of control flow — drawn dashed. */
   dashed: boolean;
 }
 
@@ -48,28 +48,28 @@ export interface Diagram {
 
 export type RunStatus = 'running' | 'completed' | 'failed';
 
-const VERTICAL_GAP = 70; // Leerraum zwischen Kästen im vertikalen Fluss
-/** Abstand zwischen Unterkante des Erzeugers und Oberkante seines Datenobjekts. */
+const VERTICAL_GAP = 70; // gap between boxes in the vertical flow
+/** Distance between the bottom edge of the producer and the top edge of its data object. */
 const DATA_OBJECT_GAP = 10;
 
 /**
- * Baut aus dem links→rechts-Layout ein sauberes oben→unten-Layout:
- * 1) Kästen transponieren (Position x↔y, Größe bleibt — horizontaler Text lesbar),
- * 2) Leerräume entlang der Fluss-Achse auf {@link VERTICAL_GAP} stauchen,
- * 2b) Datenobjekte unter ihren Erzeuger legen (statt auf gleiche Höhe daneben),
- * 3) Kanten aus den Kasten-Positionen NEU routen (unten-Mitte → oben-Mitte, orthogonal).
+ * Builds a clean top→bottom layout from the left→right layout:
+ * 1) transpose boxes (position x↔y, size stays — horizontal text stays readable),
+ * 2) compress gaps along the flow axis to {@link VERTICAL_GAP},
+ * 2b) place data objects below their producer (instead of beside it at the same height),
+ * 3) route edges ANEW from the box positions (bottom center → top center, orthogonal).
  *
- * Schritt 3 ist entscheidend: Ein reiner Punkt-Tausch der Waypoints dockt falsch an,
- * weil die Kästen nicht quadratisch sind (100×80). Neu-Routing setzt die Pfeile exakt
- * an die Kasten-Mitten.
+ * Step 3 is crucial: A plain swap of the waypoints attaches wrongly,
+ * because the boxes are not square (100×80). Re-routing puts the arrows exactly
+ * on the box centers.
  */
 export function verticalLayout(d: Diagram): Diagram {
-  // 1) Kästen transponieren — über die MITTE (nicht die Ecke), sonst wandern nicht-quadratische
-  //    Kästen (100×80) um (w-h)/2 seitlich weg und die Hauptlinie bekommt einen Zickzack.
-  //    Ausnahme Subprozess (Schleife): er ist kein Kasten mit Text, sondern ein Rahmen um seinen
-  //    Inhalt. Dessen Kinder liegen transponiert entlang seiner alten Breite; behielte der Rahmen
-  //    seine Größe, lägen Start und Ende der Schleife über bzw. unter ihm. Er tauscht daher Breite
-  //    und Höhe — und bleibt im Schritt 2 ein belegtes Intervall, das seinen Inhalt einschließt.
+  // 1) Transpose boxes — about the CENTER (not the corner), otherwise non-square
+  //    boxes (100×80) drift sideways by (w-h)/2 and the main line gets a zigzag.
+  //    Exception subprocess (loop): it is not a box with text but a frame around its
+  //    content. Its children lie transposed along its old width; if the frame kept
+  //    its size, start and end of the loop would lie above or below it. It therefore swaps width
+  //    and height — and stays an occupied interval in step 2 that encloses its content.
   let shapes = d.shapes.map((s) => {
     const [w, h] = s.kind === 'subProcess' ? [s.h, s.w] : [s.w, s.h];
     return {
@@ -81,7 +81,7 @@ export function verticalLayout(d: Diagram): Diagram {
     };
   });
 
-  // 2) Leerräume stauchen: belegte y-Intervalle mergen, überschüssige Lücken kürzen
+  // 2) Compress gaps: merge occupied y intervals, shorten excess gaps
   const intervals = shapes.map((s) => [s.y, s.y + s.h] as [number, number]).sort((a, b) => a[0] - b[0]);
   const merged: [number, number][] = [];
   for (const [a, b] of intervals) {
@@ -102,18 +102,18 @@ export function verticalLayout(d: Diagram): Diagram {
   };
   shapes = shapes.map((s) => ({ ...s, y: s.y - shiftFor(s.y) }));
 
-  // 2b) Datenobjekte unter ihren Erzeuger legen. Das Backend setzt sie im waagerechten Layout
-  //     UNTER die Task-Reihe; transponiert landen sie damit auf gleicher Höhe rechts neben dem
-  //     Erzeuger, und die Ausgabe-Assoziation läuft erst zurück nach oben (sichtbarer Haken).
-  //     Unterhalb des Erzeugers — seitlich versetzt, damit die Fluss-Spalte frei bleibt —
-  //     verläuft sie monoton in Fluss-Richtung. Sie passt in den {@link VERTICAL_GAP}-Zwischenraum.
-  //     Erst NACH dem Stauchen: die Datenobjekte bleiben dort als belegte Intervalle stehen, wo sie
-  //     transponiert lagen, und würden sonst mitverschoben wieder neben dem Erzeuger landen.
+  // 2b) Place data objects below their producer. In the horizontal layout the backend puts them
+  //     BELOW the task row; transposed, they end up at the same height to the right of the
+  //     producer, and the output association first runs back up (visible hook).
+  //     Below the producer — offset sideways so the flow column stays free —
+  //     it runs monotonically in flow direction. It fits into the {@link VERTICAL_GAP} gap.
+  //     Only AFTER compressing: the data objects stay where they lay transposed as occupied
+  //     intervals and would otherwise be shifted along and end up beside the producer again.
   const dataIds = new Set(shapes.filter((s) => s.kind === 'dataObjectReference').map((s) => s.id));
   const producerOf = new Map<string, string>();
   for (const e of d.edges) {
     if (e.dashed && dataIds.has(e.targetRef) && !producerOf.has(e.targetRef)) {
-      producerOf.set(e.targetRef, e.sourceRef); // dataOutputAssociation: Erzeuger → Datenobjekt
+      producerOf.set(e.targetRef, e.sourceRef); // dataOutputAssociation: producer → data object
     }
   }
   if (producerOf.size > 0) {
@@ -124,12 +124,12 @@ export function verticalLayout(d: Diagram): Diagram {
     });
   }
 
-  // 3) Kanten neu routen — orthogonal von Unterkante-Mitte der Quelle zur Oberkante-Mitte des Ziels
+  // 3) Re-route edges — orthogonal from the bottom center of the source to the top center of the target
   const byId = new Map(shapes.map((s) => [s.id, s]));
   const edges = d.edges.map((e) => {
     const src = byId.get(e.sourceRef);
     const tgt = byId.get(e.targetRef);
-    if (!src || !tgt) return { ...e }; // Fallback: alte (gespiegelte) Punkte behalten
+    if (!src || !tgt) return { ...e }; // fallback: keep the old (mirrored) points
     const sx = src.x + src.w / 2;
     const sy = src.y + src.h;
     const tx = tgt.x + tgt.w / 2;
@@ -137,14 +137,14 @@ export function verticalLayout(d: Diagram): Diagram {
     const points: [number, number][] =
       Math.abs(sx - tx) < 1
         ? [[sx, sy], [tx, ty]]
-        : [[sx, sy], [sx, (sy + ty) / 2], [tx, (sy + ty) / 2], [tx, ty]]; // orthogonaler Versatz (Verzweigung)
+        : [[sx, sy], [sx, (sy + ty) / 2], [tx, (sy + ty) / 2], [tx, ty]]; // orthogonal offset (branching)
     return { ...e, points };
   });
 
   return { shapes, edges };
 }
 
-/** Zeichenfläche des Diagramms (viewBox) inklusive Rand und Platz für Beschriftungen unter den Kästen. */
+/** Canvas of the diagram (viewBox) including margin and space for labels below the boxes. */
 export function diagramBounds(d: Diagram): { minX: number; minY: number; width: number; height: number } {
   const pad = 40;
   const xs = [...d.shapes.flatMap((s) => [s.x, s.x + s.w]), ...d.edges.flatMap((e) => e.points.map((p) => p[0]))];
@@ -184,9 +184,9 @@ export function parseBpmn(xml: string): Diagram | null {
     const flow = byId.get(e.getAttribute('bpmnElement') ?? '');
     const kind = flow?.localName ?? '';
     const dashed = kind === 'dataInputAssociation' || kind === 'dataOutputAssociation';
-    // sequenceFlow trägt die Enden als Attribute, Datenassoziationen als Kind-Elemente; deren
-    // zweites Ende ist die Aktivität, in der sie steht (bei dataInputAssociation zeigt targetRef
-    // nur auf den property-Platzhalter).
+    // sequenceFlow carries the ends as attributes, data associations as child elements; their
+    // second end is the activity they sit in (for dataInputAssociation targetRef points
+    // only to the property placeholder).
     const endpoint = (name: string): string =>
       flow?.getAttribute(name) ??
       Array.from(flow?.children ?? []).find((c) => c.localName === name)?.textContent?.trim() ??
@@ -207,15 +207,15 @@ export function parseBpmn(xml: string): Diagram | null {
 }
 
 const LABEL_FONT_PX = 12;
-const CHAR_PX = LABEL_FONT_PX * 0.55; // grobe Mittelwert-Breite eines Zeichens bei 12px
+const CHAR_PX = LABEL_FONT_PX * 0.55; // rough average width of a character at 12px
 const MAX_LINES = 3;
-/** Zeilenbreite der Datenobjekt-Beschriftung — sie steht unter dem schmalen 36px-Symbol. */
+/** Line width of the data object label — it sits below the narrow 36px symbol. */
 export const DATA_LABEL_W = 130;
 
 /**
- * Bricht einen Namen so um, dass jede Zeile in die Box-Innenbreite passt.
- * Umbruch primär an Wortgrenzen; überlange Einzelwörter werden hart getrennt;
- * bei Überlänge endet die letzte Zeile mit Ellipsis — nichts ragt mehr heraus.
+ * Wraps a name so that every line fits the box's inner width.
+ * Wrapping primarily at word boundaries; overlong single words are split hard;
+ * on overflow the last line ends with an ellipsis — nothing sticks out anymore.
  */
 export function wrapLabel(name: string, boxWidth: number): string[] {
   const maxChars = Math.max(4, Math.floor((boxWidth - 12) / CHAR_PX));
@@ -223,7 +223,7 @@ export function wrapLabel(name: string, boxWidth: number): string[] {
   let current = '';
 
   const pushWord = (word: string) => {
-    // Wort länger als eine ganze Zeile → hart in Stücke schneiden
+    // word longer than a whole line → cut hard into pieces
     while (word.length > maxChars) {
       if (current) {
         lines.push(current);
@@ -248,7 +248,7 @@ export function wrapLabel(name: string, boxWidth: number): string[] {
   if (current) lines.push(current);
 
   if (lines.length <= MAX_LINES) return lines;
-  // Überlänge: auf MAX_LINES kürzen und die letzte Zeile ellipsieren
+  // overflow: truncate to MAX_LINES and ellipsize the last line
   const kept = lines.slice(0, MAX_LINES);
   let last = kept[MAX_LINES - 1]!;
   last = last.length > maxChars - 1 ? last.slice(0, maxChars - 1) : last;
@@ -256,7 +256,7 @@ export function wrapLabel(name: string, boxWidth: number): string[] {
   return kept;
 }
 
-/** Verweist auf einen (ggf. verschachtelten) Teil einer Block-Definition. */
+/** Points to a (possibly nested) part of a block definition. */
 export type DiagramSelection = {
   blockIndex: number;
   sub?:
@@ -268,9 +268,9 @@ export type DiagramSelection = {
 };
 
 /**
- * Leitet aus einer BPMN-Element-ID die Block-Auswahl ab. Die IDs kodieren den Pfad
- * deterministisch: `b_<i>_c<k>_…` (Switch-Case k), `b_<i>_default`, `b_<i>_then/else`
- * (Conditional), `b_<i>_body` (Schleife), sonst der Block selbst.
+ * Derives the block selection from a BPMN element ID. The IDs encode the path
+ * deterministically: `b_<i>_c<k>_…` (switch case k), `b_<i>_default`, `b_<i>_then/else`
+ * (conditional), `b_<i>_body` (loop), otherwise the block itself.
  */
 export function selectionOf(shapeId: string): DiagramSelection | null {
   const base = shapeId.match(/^b_(\d+)/);

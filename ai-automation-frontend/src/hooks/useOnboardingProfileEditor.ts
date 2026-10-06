@@ -11,11 +11,11 @@ import { contentOf, type ContentByLanguage, type ContentLanguage } from '../util
 type Bilingual = { de: string; en: string };
 
 /**
- * Bearbeitungszustand der Seite Onboarding-Profile: das ausgewählte Profil (aus der Live-Liste),
- * der Entwurf von Name, Beschreibung und Inhalt je Sprache, die Sprache, deren Inhalt gerade
- * bearbeitet wird, `hasChanges` sowie Speichern, Löschen und das Zurücksetzen auf den
- * ausgelieferten Text. Eine Auswahl lädt den Entwurf aus dem Profil und verwirft ungespeicherte
- * Änderungen; nach dem Zurücksetzen zeigt der Editor den übernommenen Text.
+ * Editing state of the onboarding profiles page: the selected profile (from the live list),
+ * the draft of name, description and content per language, the language whose content is currently
+ * being edited, `hasChanges` as well as saving, deleting and resetting to the
+ * shipped text. A selection loads the draft from the profile and discards unsaved
+ * changes; after the reset the editor shows the taken-over text.
  */
 export function useOnboardingProfileEditor(profiles: OnboardingProfile[] | undefined) {
   const locale = useI18nStore(s => s.locale);

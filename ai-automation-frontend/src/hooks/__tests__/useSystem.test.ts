@@ -99,7 +99,7 @@ describe('useSystemInfo', () => {
     expect(result.current.data!.version).toBe('0.5.0');
   });
 
-  it('übernimmt die Rate-Limit-Parameter der Instanz für den 429-Backoff (37b98c97)', async () => {
+  it('takes over the rate limit parameters of the instance for the 429 backoff (37b98c97)', async () => {
     server.use(http.get(`${apiBase}/system/info`, () => HttpResponse.json({
       version: '0.5.0',
       rateLimit: { enabled: true, requestsPerMinute: 600, globalBackoffSeconds: 7, defaultRetryAfterSeconds: 21 },
@@ -109,13 +109,13 @@ describe('useSystemInfo', () => {
     const { result } = renderHook(() => useSystemInfo(), { wrapper: Wrapper });
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
 
-    // Ohne den Serverwert stünden hier die eingebauten 10 s.
+    // Without the server value the built-in 10 s would be here.
     expect(parseRetryAfter(null)).toBe(21);
     resetRateLimitBackoff();
     expect(parseRetryAfter(null)).toBe(10);
   });
 
-  it('bleibt bei den eingebauten Werten, wenn die Instanz kein rateLimit meldet', async () => {
+  it('keeps the built-in values when the instance reports no rateLimit', async () => {
     const { Wrapper } = createWrapper();
     const { result } = renderHook(() => useSystemInfo(), { wrapper: Wrapper });
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
@@ -302,7 +302,7 @@ describe('useEnableRemoteAccess', () => {
     await act(async () => {
       await result.current.mutateAsync();
     });
-    // TanStack benachrichtigt Beobachter per setTimeout(0) — der Status kann nach act noch fehlen
+    // TanStack notifies observers via setTimeout(0) — the status may still be missing after act
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
     expect(invalidateSpy).toHaveBeenCalledWith(
       expect.objectContaining({ queryKey: ['system', 'remote-access'] }),
@@ -323,7 +323,7 @@ describe('useDisableRemoteAccess', () => {
     await act(async () => {
       await result.current.mutateAsync();
     });
-    // TanStack benachrichtigt Beobachter per setTimeout(0) — der Status kann nach act noch fehlen
+    // TanStack notifies observers via setTimeout(0) — the status may still be missing after act
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
     expect(invalidateSpy).toHaveBeenCalledWith(
       expect.objectContaining({ queryKey: ['system', 'remote-access'] }),

@@ -2,33 +2,33 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState, type RefObje
 
 export const ZOOM_MIN = 0.25;
 export const ZOOM_MAX = 3;
-/** Faktor je Zoom-Stufe (Knopf oder eine Mausrad-Raste). */
+/** Factor per zoom step (button or one mouse wheel notch). */
 export const ZOOM_STEP = 1.25;
-/** Eingepasst schrumpft das horizontale Diagramm höchstens auf diesen Anteil seiner Breite (dann Scrollen). */
+/** Fitted, the horizontal diagram shrinks to at most this fraction of its width (then scrolling). */
 export const FIT_MIN_WIDTH_RATIO = 0.75;
 
-/** Eine Mausrad-Raste liefert ~100 px deltaY; Trackpad-Pinch kommt in kleinen Schritten mit ctrlKey. */
+/** One mouse wheel notch delivers ~100 px deltaY; trackpad pinch comes in small steps with ctrlKey. */
 const WHEEL_DELTA_PER_STEP = 100;
 
 const clamp = (scale: number) => Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, scale));
 
 /**
- * Zoom des Ablauf-Diagramms. `scale === null` heißt eingepasst — das Verhalten ohne Zoom: horizontal
- * breitenfüllend (`fit: 'width'`), vertikal in nativer Größe (`fit: 'native'`). Der Zoom gilt nur für den
- * `layoutKey`, in dem er eingestellt wurde; ein Wechsel der Ausrichtung passt wieder ein.
+ * Zoom of the flow diagram. `scale === null` means fitted — the behavior without zoom: horizontal
+ * fills the width (`fit: 'width'`), vertical at native size (`fit: 'native'`). The zoom applies only to the
+ * `layoutKey` in which it was set; a change of orientation fits again.
  *
- * Strg/⌘ + Mausrad (und Trackpad-Pinch) zoomt am Mauszeiger, die Knöpfe um die Mitte des Ausschnitts.
- * Verschoben wird per Scrollen im Container `containerRef` — den Ref hält der Aufrufer, damit das
- * Rückgabeobjekt keinen Ref enthält und im Render gelesen werden darf.
+ * Ctrl/⌘ + mouse wheel (and trackpad pinch) zooms at the mouse pointer, the buttons about the center of the viewport.
+ * Panning is done by scrolling in the container `containerRef` — the caller holds the ref, so that the
+ * return object contains no ref and may be read during render.
  */
 export function useDiagramZoom(
   containerRef: RefObject<HTMLDivElement | null>, layoutKey: string, contentWidth: number, fit: 'width' | 'native',
 ) {
   const [zoom, setZoom] = useState<{ key: string; scale: number } | null>(null);
-  // Anderes Layout: Zoom verwerfen (abgeleiteter State im Render, kein Effekt) — zurück heißt eingepasst
+  // Different layout: discard zoom (derived state in render, no effect) — back means fitted
   if (zoom && zoom.key !== layoutKey) setZoom(null);
   const scale = zoom && zoom.key === layoutKey ? zoom.scale : null;
-  /** Scroll-Position, die den Anker nach dem nächsten Render an derselben Stelle hält. */
+  /** Scroll position that keeps the anchor in the same place after the next render. */
   const pendingScroll = useRef<{ left: number; top: number } | null>(null);
 
   const zoomBy = useCallback((factor: number, anchor?: { x: number; y: number }) => {
@@ -59,7 +59,7 @@ export function useDiagramZoom(
     pendingScroll.current = null;
   }, [containerRef, scale]);
 
-  // Nicht-passiv, sonst lässt sich der Seiten-Zoom des Browsers bei Strg + Mausrad nicht verhindern
+  // Non-passive, otherwise the browser's page zoom cannot be prevented on Ctrl + mouse wheel
   useEffect(() => {
     const el = containerRef.current;
     if (!el) return;

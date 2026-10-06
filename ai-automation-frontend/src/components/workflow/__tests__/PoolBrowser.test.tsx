@@ -44,7 +44,7 @@ describe('PoolBrowser scope badge', () => {
     useI18nStore.setState({ locale: 'de' });
   });
 
-  it('rendert das Badge "repo" fuer repo-gebundene Eintraege', () => {
+  it('renders the badge "repo" for repo-bound entries', () => {
     mockEntries([entry({ scope: 'repo' })]);
 
     render(<PoolBrowser onSelect={() => {}} />);
@@ -52,7 +52,7 @@ describe('PoolBrowser scope badge', () => {
     expect(screen.getByTestId('pool-scope-build-gate')).toHaveTextContent('repo');
   });
 
-  it('rendert das Badge "portable" fuer portable Eintraege', () => {
+  it('renders the badge "portable" for portable entries', () => {
     mockEntries([entry({ id: 'readme', scope: 'portable' })]);
 
     render(<PoolBrowser onSelect={() => {}} />);
@@ -60,7 +60,7 @@ describe('PoolBrowser scope badge', () => {
     expect(screen.getByTestId('pool-scope-readme')).toHaveTextContent('portable');
   });
 
-  it('nutzt den deutschen Hinweistext, wenn die Sprache Deutsch ist', () => {
+  it('uses the German hint text when the language is German', () => {
     mockEntries([entry({ scope: 'repo' })]);
 
     render(<PoolBrowser onSelect={() => {}} />);
@@ -68,7 +68,7 @@ describe('PoolBrowser scope badge', () => {
     expect(screen.getByTestId('pool-scope-build-gate')).toHaveAttribute('title', de.pool.scopeRepoHint);
   });
 
-  it('nutzt den englischen Hinweistext, wenn die Sprache Englisch ist', () => {
+  it('uses the English hint text when the language is English', () => {
     useI18nStore.setState({ locale: 'en' });
     mockEntries([entry({ scope: 'repo' })]);
 
@@ -77,11 +77,11 @@ describe('PoolBrowser scope badge', () => {
     const badge = screen.getByTestId('pool-scope-build-gate');
     expect(badge).toHaveAttribute('title', en.pool.scopeRepoHint);
     expect(badge).not.toHaveAttribute('title', de.pool.scopeRepoHint);
-    // Das Label selbst ist bewusst sprachneutral — 'repo' steht so auch in der Definition.
+    // The label itself is deliberately language-neutral — 'repo' appears like this in the definition too.
     expect(badge).toHaveTextContent('repo');
   });
 
-  it('zeigt external mit dem Hinweis auf das Werkzeug außerhalb von Repo und Projekt (7ddacd1d)', () => {
+  it('shows external with the hint about the tool outside repo and project (7ddacd1d)', () => {
     useI18nStore.setState({ locale: 'de' });
     mockEntries([entry({ id: 'saas-scaffold', scope: 'external' })]);
 
@@ -92,7 +92,7 @@ describe('PoolBrowser scope badge', () => {
     expect(badge).toHaveAttribute('title', de.pool.scopeExternalHint);
   });
 
-  it('zeigt einen unbekannten scope so, wie er in der Datei steht', () => {
+  it('shows an unknown scope as it appears in the file', () => {
     mockEntries([entry({ scope: 'someday' as PoolWorkflowEntry['scope'] })]);
 
     render(<PoolBrowser onSelect={() => {}} />);
@@ -100,7 +100,7 @@ describe('PoolBrowser scope badge', () => {
     expect(screen.getByTestId('pool-scope-build-gate')).toHaveTextContent('someday');
   });
 
-  it('übersetzt die Kategorien', () => {
+  it('translates the categories', () => {
     useI18nStore.setState({ locale: 'de' });
     mockEntries([entry({ category: 'MONITORING' }), entry({ id: 'docs', category: 'DOCUMENTATION' })]);
 
@@ -110,7 +110,7 @@ describe('PoolBrowser scope badge', () => {
     expect(screen.getByRole('button', { name: 'Dokumentation' })).toBeInTheDocument();
   });
 
-  it('zeigt kein Badge, wenn der Eintrag keinen scope deklariert', () => {
+  it('shows no badge when the entry declares no scope', () => {
     mockEntries([entry({ scope: null })]);
 
     render(<PoolBrowser onSelect={() => {}} />);

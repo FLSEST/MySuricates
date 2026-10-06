@@ -6,8 +6,8 @@ import { goalKeys, normalizeGoalDetail } from './useGoals';
 import type { GoalDetail } from '../types';
 
 /**
- * Projekte eines Ziels (c60bf914): Ein Ziel wird ausdrücklich einem oder mehreren Projekten
- * zugeordnet. Hinzufügen und Umsortieren liefern das neue Detail, Entfernen nichts.
+ * Projects of a goal (c60bf914): A goal is explicitly assigned to one or more projects.
+ * Adding and reordering return the new detail, removing returns nothing.
  */
 function refresh(qc: QueryClient) {
   qc.invalidateQueries({ queryKey: goalKeys.all });
@@ -24,7 +24,7 @@ function useDetailReply(goalId: string) {
   };
 }
 
-/** Idempotent: ein schon zugeordnetes Projekt bleibt, wo es ist. */
+/** Idempotent: a project that is already assigned stays where it is. */
 export function useAddGoalProject(goalId: string) {
   const toast = useToast();
   const t = useT();
@@ -40,9 +40,9 @@ export function useAddGoalProject(goalId: string) {
 }
 
 /**
- * Löst ein Projekt vom Ziel. Hängen noch Arbeitspakete oder TODOs daran, antwortet der Server mit 409 –
- * das meldet der Aufrufer selbst (er bietet dann die Kaskade an), deshalb hier kein Fehler-Toast.
- * `cascade` löscht die Arbeitspakete des Projekts in diesem Ziel und löst seine TODOs vom Ziel.
+ * Detaches a project from the goal. If work packages or TODOs still hang on it, the server answers with 409 –
+ * the caller reports that itself (it then offers the cascade), hence no error toast here.
+ * `cascade` deletes the project's work packages in this goal and detaches its TODOs from the goal.
  */
 export function useRemoveGoalProject(goalId: string) {
   const qc = useQueryClient();
@@ -61,7 +61,7 @@ export function useRemoveGoalProject(goalId: string) {
   });
 }
 
-/** Neue Reihenfolge der Projekte des Ziels (`ids`: alle Projekt-IDs). */
+/** New order of the goal's projects (`ids`: all project IDs). */
 export function useReorderGoalProjects(goalId: string) {
   const toast = useToast();
   const t = useT();

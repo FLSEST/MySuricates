@@ -156,7 +156,7 @@ describe('useAssistantWebSocket', () => {
 
       await act(async () => { await openSocket(); });
 
-      // Ein SockJS-Fallback-Transport eröffnet eine neue Session und braucht ein zweites Ticket
+      // A SockJS fallback transport opens a new session and needs a second ticket
       expect(lastSockJsOptions).toEqual({ transports: ['websocket'] });
     });
 

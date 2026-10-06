@@ -23,14 +23,14 @@ beforeEach(() => {
 });
 
 describe('BpmnImportButton', () => {
-  it('importiert bei nur einem Projekt direkt und navigiert zum neuen Workflow', async () => {
+  it('imports directly when there is only one project and navigates to the new workflow', async () => {
     mutate.mockImplementation((_vars, opts) => opts.onSuccess({ id: 'new-42' }));
     const { container } = render(<BpmnImportButton />);
     expect(screen.getByText('BPMN importieren')).toBeInTheDocument();
 
     const input = container.querySelector('input[type="file"]') as HTMLInputElement;
     const file = new File(['<definitions/>'], 'wf.bpmn', { type: 'application/xml' });
-    // jsdom-File.text() liefert den Inhalt
+    // jsdom File.text() returns the content
     fireEvent.change(input, { target: { files: [file] } });
 
     await waitFor(() => expect(mutate).toHaveBeenCalled());
@@ -39,7 +39,7 @@ describe('BpmnImportButton', () => {
     expect(toastSuccess).toHaveBeenCalledWith('Workflow aus BPMN importiert');
   });
 
-  it('zeigt die Backend-Meldung bei BPMN ohne Erweiterung (400) woertlich im Toast und navigiert nicht', async () => {
+  it('shows the backend message for BPMN without extension (400) verbatim in the toast and does not navigate', async () => {
     mutate.mockImplementation((_vars, opts) =>
       opts.onError({ code: 'INVALID_ARGUMENT', error: 'Diese BPMN enthält keine mysuricates:blockConfig-Erweiterung' }),
     );

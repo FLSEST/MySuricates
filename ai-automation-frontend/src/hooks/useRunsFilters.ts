@@ -15,11 +15,11 @@ const FILTER_STATUSES = [
 ] as const;
 
 /**
- * Tabs und Filter der Seite „Ausführungen“: gemerkte Filter je Tab (Status, Workflow, Projekt,
- * Suche), Seitenzahlen (jeder Filterwechsel beginnt wieder bei Seite 0, die Suche entprellt), der
- * Tabwechsel (leert die Filter des verlassenen Tabs) und die Abfrageparameter für
+ * Tabs and filters of the page "Ausführungen": remembered filters per tab (status, workflow, project,
+ * search), page numbers (every filter change starts at page 0 again, the search is debounced), the
+ * tab switch (clears the filters of the tab that was left) and the query parameters for
  * `useAllRuns`/`useAllChainRuns`.
- * Ist das Modul `chains` aus, gilt immer der Workflow-Tab, auch wenn der Ketten-Tab gemerkt ist.
+ * If the `chains` module is off, the workflow tab always applies, even if the chain tab is remembered.
  */
 export function useRunsFilters(chainsEnabled: boolean) {
   const t = useT();

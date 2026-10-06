@@ -4,7 +4,7 @@ import { blockFromDraft, draftFromBlock, emptyDraft, type BlockDraft } from './b
 import type { DiagramSelection } from './bpmnLayout';
 import type { BlockDefinition, BlockType, Workflow } from '../../types';
 
-/** Primäres Config-Feld je Block-Typ — die Zeile, auf die ein Top-Level-Klick springt. */
+/** Primary config field per block type — the line a top-level click jumps to. */
 const PRIMARY_FIELD: Partial<Record<BlockType, string>> = {
   shell: 'command', simple: 'command', retry: 'command',
   agentic: 'goal', approval: 'question', 'human-input': 'prompt',
@@ -14,7 +14,7 @@ const PRIMARY_FIELD: Partial<Record<BlockType, string>> = {
   compress: 'source', 'compress-ai': 'source',
 };
 
-/** Ermittelt aus einer Diagramm-Auswahl den JSON-Suchtext, auf den der Editor springen soll. */
+/** Determines from a diagram selection the JSON search text the editor should jump to. */
 export function revealTextFor(blocks: BlockDefinition[], sel: DiagramSelection): string | undefined {
   const block = blocks[sel.blockIndex];
   const config = block?.config as Record<string, unknown> | undefined;
@@ -32,16 +32,16 @@ export function revealTextFor(blocks: BlockDefinition[], sel: DiagramSelection):
       case 'body': return '"command"';
     }
   }
-  // Top-Level: primäres Feld des Block-Typs, falls vorhanden
+  // Top level: primary field of the block type, if present
   const key = block ? PRIMARY_FIELD[block.type] : undefined;
   return key && key in config ? `"${key}"` : undefined;
 }
 
 /**
- * Blöcke der Workflow-Detailseite bearbeiten: Hinzufügen (Entwurf im Dialog), Bearbeiten eines
- * Blocks samt Sprungziel im JSON (`reveal`, etwa nach einem Klick im Diagramm), Speichern und
- * Entfernen. Ungültiges JSON speichert nichts — der Editor zeigt den Fehler. `workflow` darf noch
- * fehlen (Laden); dann tun die Aktionen nichts.
+ * Edit the blocks of the workflow detail page: add (draft in the dialog), edit a
+ * block including jump target in the JSON (`reveal`, e.g. after a click in the diagram), save and
+ * remove. Invalid JSON saves nothing — the editor shows the error. `workflow` may still be
+ * missing (loading); then the actions do nothing.
  */
 export function useWorkflowBlockEditor(workflow: Workflow | undefined) {
   const updateWorkflow = useUpdateWorkflow();
@@ -87,7 +87,7 @@ export function useWorkflowBlockEditor(workflow: Workflow | undefined) {
 
   const selectFromDiagram = (sel: DiagramSelection) => {
     if (!workflow) return;
-    // Jeder Kasten öffnet den Block-Editor und springt zur passenden Definitionszeile
+    // Every box opens the block editor and jumps to the matching definition line
     openEditBlock(sel.blockIndex, revealTextFor(workflow.blocks, sel));
   };
 

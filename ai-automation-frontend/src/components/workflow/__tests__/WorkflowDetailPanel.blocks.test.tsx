@@ -17,7 +17,7 @@ vi.mock('../../../api/client', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../api/client')>()),
   fetchWorkflowBpmn: (id: string) => fetchBpmn(id),
 }));
-// Stellvertreter fürs Diagramm: zeigt den angefragten Blitz und meldet Klicks wie das echte
+// Stand-in for the diagram: shows the requested flash and reports clicks like the real one
 vi.mock('../BpmnDiagramView', () => ({
   default: ({ flashBlock, onSelectBlock }: {
     flashBlock?: { index: number } | null;

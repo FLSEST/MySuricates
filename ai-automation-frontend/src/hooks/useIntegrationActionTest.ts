@@ -3,9 +3,9 @@ import { useTestIntegrationAction } from './useIntegrations';
 import type { IntegrationActionInfo } from '../types';
 
 /**
- * Probelauf einer Integrations-Aktion im Detailbereich: welche Aktion gerade läuft (Ladezustand
- * ihres Knopfs) und das Ergebnis als eingerücktes JSON. Ein neuer Lauf leert das alte Ergebnis;
- * einen Fehler meldet `useTestIntegrationAction` als Toast, das Ergebnis bleibt dann leer.
+ * Test run of an integration action in the detail area: which action is running right now (loading state
+ * of its button) and the result as indented JSON. A new run clears the old result;
+ * an error is reported by `useTestIntegrationAction` as a toast, the result then stays empty.
  */
 export function useIntegrationActionTest() {
   const testAction = useTestIntegrationAction();

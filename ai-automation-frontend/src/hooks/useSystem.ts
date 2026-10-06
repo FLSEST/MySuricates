@@ -14,9 +14,9 @@ export function useSystemHealth() {
 }
 
 /**
- * Plattform-Info der Instanz. Nebenbei die einzige Quelle der 429-Backoff-Parameter: der Client
- * übernimmt `rateLimit` von hier, statt 2 s/10 s zu raten (37b98c97). Der Endpunkt wird ohnehin
- * beim Start geladen (Sidebar) und braucht keinen API-Key — also kein eigener Request.
+ * Platform info of the instance. Incidentally the only source of the 429 backoff parameters: the client
+ * takes `rateLimit` from here instead of guessing 2 s/10 s (37b98c97). The endpoint is loaded anyway
+ * at startup (sidebar) and needs no API key — so no request of its own.
  */
 export function useSystemInfo() {
   return useQuery({
