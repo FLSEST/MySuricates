@@ -17,9 +17,9 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 
 /**
- * Zustand der Ziel-Waechter fuer eine Zielliste in hoechstens einer Abfrage (TODO 259f4f66):
- * ohne Waechter-Workflow keine, sonst eine fuer alle. Ein Workflow mit mehreren Zeitplaenen zeigt
- * den aktiven, sonst den neuesten.
+ * State of the goal guards for a goal list in at most one query (TODO 259f4f66):
+ * no guard workflow means none, otherwise one for all. A workflow with several schedules shows
+ * the active one, otherwise the newest.
  */
 @Component
 @RequiredArgsConstructor
@@ -31,7 +31,7 @@ public class GoalGuardLookup {
 
     private final ScheduledWorkflowRepository scheduleRepository;
 
-    /** Ziel-ID → Waechter; Ziele ohne Waechter bekommen {@link GoalGuardResponse#NONE}. */
+    /** Goal ID → guard; goals without a guard get {@link GoalGuardResponse#NONE}. */
     public Map<String, GoalGuardResponse> byGoal(Collection<Goal> goals) {
         List<String> workflowIds = goals.stream().map(Goal::getGuardWorkflowId).filter(Objects::nonNull).distinct().toList();
         Map<String, GuardScheduleRow> schedules = workflowIds.isEmpty() ? Map.of()

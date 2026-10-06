@@ -3,7 +3,7 @@ package com.automation.service.export.bpmn;
 import java.util.ArrayList;
 import java.util.List;
 
-/** Teil-Graph mit relativen Koordinaten; wird beim Einhängen verschoben. */
+/** Partial graph with relative coordinates; shifted when attached. */
 class BpmnSegment {
     final List<BpmnModel.Node> nodes = new ArrayList<>();
     final List<BpmnModel.Edge> edges = new ArrayList<>();

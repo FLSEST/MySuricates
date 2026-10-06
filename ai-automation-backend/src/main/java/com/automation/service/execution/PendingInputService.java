@@ -15,11 +15,11 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Die Läufe, die gerade auf eine Antwort warten, über alle Workflows hinweg (TODO 52d946cc).
+ * The runs currently waiting for an answer, across all workflows (TODO 52d946cc).
  *
- * <p>Die Fragen liegen nur im Speicher ({@link WorkflowExecutionRegistry}); aus der DB kommen allein
- * die Workflow-Namen, in einer Abfrage. Wartet nichts, fällt gar keine an — die Seitenleiste pollt
- * diesen Weg von jeder Seite aus.
+ * <p>The questions live in memory only ({@link WorkflowExecutionRegistry}); from the DB only
+ * the workflow names come, in one query. If nothing is waiting, none is issued — the sidebar polls
+ * this path from every page.
  */
 @Service
 @RequiredArgsConstructor

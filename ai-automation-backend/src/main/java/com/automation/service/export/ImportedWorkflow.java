@@ -5,8 +5,8 @@ import com.automation.entity.BlockDefinition;
 import java.util.List;
 
 /**
- * Ergebnis eines Format-Imports: Workflow-Name + geordnete Block-Liste.
- * Bewusst kein fertiger {@code Workflow} — Projekt-Zuordnung und Persistenz macht der Controller.
+ * Result of a format import: workflow name + ordered block list.
+ * Deliberately not a finished {@code Workflow} — project assignment and persistence are done by the controller.
  */
 public record ImportedWorkflow(String name, List<BlockDefinition> blocks) {
 }

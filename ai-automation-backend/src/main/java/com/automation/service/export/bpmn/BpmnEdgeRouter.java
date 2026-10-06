@@ -3,7 +3,7 @@ package com.automation.service.export.bpmn;
 import java.util.List;
 import java.util.Map;
 
-/** Rechtwinkliges Kanten-Routing (Spec §5). */
+/** Orthogonal edge routing (spec §5). */
 final class BpmnEdgeRouter {
 
     private final Map<String, BpmnModel.Node> nodeIndex;
@@ -26,12 +26,12 @@ final class BpmnEdgeRouter {
         if (Math.abs(sy - ty) < 1) {
             e.waypoints.add(new double[]{s.x + s.w, sy});
             e.waypoints.add(new double[]{t.x, ty});
-        } else if (ty > sy) { // abwärts: unten aus der Quelle, dann nach rechts ins Ziel
+        } else if (ty > sy) { // downwards: out of the source at the bottom, then to the right into the target
             double sx = s.x + s.w / 2;
             e.waypoints.add(new double[]{sx, s.y + s.h});
             e.waypoints.add(new double[]{sx, ty});
             e.waypoints.add(new double[]{t.x, ty});
-        } else { // aufwärts: rechts aus der Quelle, dann oben ins Ziel
+        } else { // upwards: out of the source on the right, then at the top into the target
             double tx = t.x + t.w / 2;
             e.waypoints.add(new double[]{s.x + s.w, sy});
             e.waypoints.add(new double[]{tx, sy});

@@ -9,9 +9,9 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Regelbasierte Konvertierung ohne KI: jede erfolgreiche Aktion eines agentic-Laufs wird ein
- * simple-Block. Rückfall von {@link WorkflowConversionService#suggestWorkflow}, wenn der KI-Vorschlag
- * scheitert; aus dem Service herausgelöst, damit der unter der Größengrenze bleibt (TODO 935af6d3).
+ * Rule-based conversion without AI: every successful action of an agentic run becomes a
+ * simple block. Fallback of {@link WorkflowConversionService#suggestWorkflow} when the AI suggestion
+ * fails; extracted from the service so that it stays under the size limit (TODO 935af6d3).
  */
 final class RuleBasedConversion {
 

@@ -12,15 +12,15 @@ import java.io.StringReader;
 import java.util.ArrayList;
 import java.util.List;
 
-/** DOM-Helfer für den BPMN-Import: XXE-sicheres Parsen und Kind-Element-Zugriff. */
+/** DOM helpers for the BPMN import: XXE-safe parsing and child element access. */
 final class BpmnDom {
 
     private BpmnDom() {
     }
 
     /**
-     * Parst namespace-aware und gehärtet: kein DOCTYPE, keine externen Entities, kein XInclude,
-     * keine Entity-Expansion (OWASP XXE Prevention Cheat Sheet).
+     * Parses namespace-aware and hardened: no DOCTYPE, no external entities, no XInclude,
+     * no entity expansion (OWASP XXE Prevention Cheat Sheet).
      */
     static Document secureParse(String xml) throws Exception {
         DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
@@ -49,7 +49,7 @@ final class BpmnDom {
         return result;
     }
 
-    /** Erstes direktes Kind-Element mit Namespace + lokalem Namen, sonst {@code null}. */
+    /** First direct child element with namespace + local name, otherwise {@code null}. */
     static Element firstChild(Element parent, String namespace, String localName) {
         for (Element el : childElements(parent)) {
             if (namespace.equals(el.getNamespaceURI()) && localName.equals(el.getLocalName())) {

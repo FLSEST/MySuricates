@@ -20,12 +20,12 @@ final class BpmnGatewayBuilder {
         BpmnSegment buildChain(List<BlockDefinition> blocks, String idPrefix);
 
         /**
-         * Traegt einen Knoten als Endpunkt fuer Datenassoziationen ein.
+         * Registers a node as an endpoint for data associations.
          *
-         * <p>Blöcke tun das beim Bauen selbst. Die Zweig-Tasks eines {@code conditional} sind aber
-         * keine Blöcke, sondern Kommandos aus der Config ({@code then_command}/{@code else_command})
-         * — ohne diese Eintragung landet eine Referenz aus einem Zweig beim conditional-Block
-         * selbst, also am Gateway, und BPMN erlaubt dort keine Datenassoziation: sie wurde verworfen
+         * <p>Blocks do that themselves when being built. The branch tasks of a {@code conditional} are
+         * not blocks, though, but commands from the config ({@code then_command}/{@code else_command})
+         * — without this registration a reference from a branch ends up at the conditional block
+         * itself, i.e. at the gateway, and BPMN allows no data association there: it was discarded
          * (TODO 7557b928).
          */
         void registerActivity(String idBase, String nodeId);
@@ -141,10 +141,10 @@ final class BpmnGatewayBuilder {
     }
 
     /**
-     * Hängt eine Case-Zeile unterhalb der Hauptlinie ein; leere Zeilen werden zur Direktkante
-     * (kein Achsen-Verbrauch). Höhenbewusst: die nächste Zeilenachse berücksichtigt die reale
-     * vertikale Ausdehnung der Zeile (z. B. verschachtelte conditional-Blöcke oder SubProcesse),
-     * damit sich Zeilen nicht überlappen (Finding 2 des Branch-Reviews).
+     * Hangs a case row below the main line; empty rows become the direct edge
+     * (no axis consumption). Height-aware: the next row axis takes the real
+     * vertical extent of the row into account (e.g. nested conditional blocks or sub-processes),
+     * so that rows do not overlap (finding 2 of the branch review).
      */
     private double attachRow(BpmnSegment seg, BpmnModel.Node split, BpmnModel.Node merge,
                           BpmnSegment row, String label, double rowAxis, boolean isDefault) {
@@ -156,8 +156,8 @@ final class BpmnGatewayBuilder {
             }
             return rowAxis;
         }
-        // Ausdehnung VOR dem Verschieben ermitteln: bei y=0 (eigene Achse) ist n.y + n.h
-        // exakt die Ausdehnung unterhalb/um die Zeilenachse.
+        // Determine the extent BEFORE shifting: at y=0 (own axis) n.y + n.h
+        // is exactly the extent below/around the row axis.
         double extentBelow = maxYExtentBelow(row);
         row.translate(GW + GAP, rowAxis);
         seg.nodes.addAll(row.nodes);
@@ -168,13 +168,13 @@ final class BpmnGatewayBuilder {
         if (isDefault) {
             split.defaultFlowId = in.id;
         }
-        return rowAxis + Math.max(ROW_STEP, extentBelow + SUB_PAD * 2); // Puffer >= SubProcess-Halbhöhe (SUB_PAD*2), sonst 5px-Überlappung bei gestapelten Loop-Rows
+        return rowAxis + Math.max(ROW_STEP, extentBelow + SUB_PAD * 2); // buffer >= sub-process half height (SUB_PAD*2), otherwise 5px overlap with stacked loop rows
     }
 
     /**
-     * Entfernt blockConfig/type/name von abgeleiteten Knoten (Switch-Case-/Default-Inhalte).
-     * Deren Config steckt bereits im Config-JSON des Switch-Blocks — ein eigenes blockConfig
-     * würde den Reimport doppelt zählen lassen. Rein visuelle Knoten bleiben so config-los.
+     * Removes blockConfig/type/name from derived nodes (switch case/default contents).
+     * Their config is already in the config JSON of the switch block — a blockConfig of their own
+     * would make the reimport count twice. Purely visual nodes thus stay config-free.
      */
     private static void stripDerivedBlockConfig(List<BpmnModel.Node> nodes) {
         for (BpmnModel.Node n : nodes) {
@@ -185,7 +185,7 @@ final class BpmnGatewayBuilder {
         }
     }
 
-    /** Vertikale Ausdehnung einer Zeile relativ zu ihrer eigenen Achse (y=0), inkl. Kindknoten. */
+    /** Vertical extent of a row relative to its own axis (y=0), including child nodes. */
     private static double maxYExtentBelow(BpmnSegment seg) {
         return maxYExtent(seg.nodes);
     }

@@ -1,8 +1,8 @@
 package com.automation.service.export.bpmn;
 
 /**
- * Fehler beim BPMN-Import (kaputtes XML, keine Prozess-Definition, fremde BPMN, unlesbare Config).
- * Erweitert {@link IllegalArgumentException} → wird vom GlobalExceptionHandler als HTTP 400 abgebildet.
+ * Error during BPMN import (broken XML, no process definition, foreign BPMN, unreadable config).
+ * Extends {@link IllegalArgumentException} → mapped by the GlobalExceptionHandler to HTTP 400.
  */
 public class BpmnImportException extends IllegalArgumentException {
     public BpmnImportException(String message) {

@@ -44,8 +44,8 @@ public class ExecutionQueryService {
     }
 
     /**
-     * Wie {@link #listExecutions}, aber inklusive DTO-Mapping innerhalb der Transaktion.
-     * OSIV ist deaktiviert — Lazy-Associations (workflow, steps) dürfen nur hier geladen werden.
+     * Like {@link #listExecutions}, but including DTO mapping inside the transaction.
+     * OSIV is disabled — lazy associations (workflow, steps) may only be loaded here.
      */
     @Transactional(readOnly = true)
     public PageResponse<WorkflowRunListItemResponse> listExecutionResponses(int page, int size, String status,
@@ -65,8 +65,8 @@ public class ExecutionQueryService {
     }
 
     /**
-     * Runs eines Workflows, absteigend nach Startzeit — Listenzeilen ohne Schritte wie bei
-     * {@code /executions} (TODO 7fd9f654). Wer die Schritte eines Runs zeigt, laedt ihn ueber
+     * Runs of a workflow, descending by start time — list rows without steps like
+     * {@code /executions} (TODO 7fd9f654). Whoever shows the steps of a run loads it via
      * {@link #getRunForWorkflow}.
      */
     @Transactional(readOnly = true)
@@ -81,7 +81,7 @@ public class ExecutionQueryService {
                 result.getTotalPages());
     }
 
-    /** Einzelner Run für die Workflow-Detailansicht ({@code 404} mit "WorkflowRun"-Wortlaut). */
+    /** Single run for the workflow detail view ({@code 404} with "WorkflowRun" wording). */
     @Transactional(readOnly = true)
     public WorkflowRunResponse getRunForWorkflow(String runId) {
         WorkflowRun run = runRepository.findById(runId)

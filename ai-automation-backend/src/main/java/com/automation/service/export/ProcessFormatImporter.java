@@ -1,15 +1,15 @@
 package com.automation.service.export;
 
 /**
- * Adapter, der ein externes Prozess-Definitionsformat in einen MySuricates-Workflow zurückliest.
- * Gegenstück zu {@link ProcessFormatAdapter}; getrennt, damit ein reiner Exporter nicht zum
- * Import gezwungen wird. BPMN ist die erste Implementierung (nur eigene Exporte, Roundtrip).
+ * Adapter that reads an external process definition format back into a MySuricates workflow.
+ * Counterpart to {@link ProcessFormatAdapter}; separate so that a pure exporter is not forced
+ * to import. BPMN is the first implementation (own exports only, round trip).
  */
 public interface ProcessFormatImporter {
 
-    /** Eindeutiger Format-Schlüssel, z. B. "bpmn". */
+    /** Unique format key, e.g. "bpmn". */
     String formatKey();
 
-    /** Parst + validiert den Inhalt und liefert Name + Block-Liste. Wirft bei ungültiger/fremder Eingabe. */
+    /** Parses + validates the content and returns name + block list. Throws on invalid/foreign input. */
     ImportedWorkflow importFrom(String content);
 }

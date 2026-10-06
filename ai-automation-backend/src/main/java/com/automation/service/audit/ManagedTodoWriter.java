@@ -26,13 +26,13 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 
 /**
- * Legt das verwaltete TODO eines Audit-Findings an und hält seinen Status an den verknüpften
- * Findings ausgerichtet.
+ * Creates the managed TODO of an audit finding and keeps its status aligned with the linked
+ * findings.
  *
- * <p>Umzug aus {@code AuditIngestionService} (TODO f57945e2) — die Ingestion entscheidet, welche
- * Findings ein TODO verdienen; wie dieses TODO entsteht und wann es sich wieder schließt, ist ein
- * eigenes Thema. Abgrenzung zu {@link ManagedTodoReconciler}: Der gleicht auf Anfrage einzelne
- * Verknüpfungen ab, hier läuft der Abgleich als Teil eines Ingest über die eben berührten Findings.
+ * <p>Moved from {@code AuditIngestionService} (TODO f57945e2) — the ingestion decides which
+ * findings deserve a TODO; how this TODO comes into being and when it closes again is a topic
+ * of its own. Distinction from {@link ManagedTodoReconciler}: that one reconciles individual links
+ * on request, here the reconciliation runs as part of an ingest over the findings just touched.
  */
 @Slf4j
 @Service
@@ -48,15 +48,15 @@ class ManagedTodoWriter {
     private final ApplicationEventPublisher eventPublisher;
     private final ActivityLogService activityLog;
 
-    /** Verdient ein offenes Finding dieser Schwere ein verwaltetes TODO? Nur CRITICAL und HIGH. */
+    /** Does an open finding of this severity deserve a managed TODO? Only CRITICAL and HIGH. */
     static boolean needsTodo(AuditSeverity severity) {
         return severity == AuditSeverity.CRITICAL || severity == AuditSeverity.HIGH;
     }
 
     /**
-     * Das verwaltete TODO je Finding — vorhandenes wiederverwenden, sonst anlegen; eine verwaltete
-     * Verknüpfung auf ein gelöschtes TODO wird ersetzt. Verknüpfungen und TODOs aller Findings kommen aus
-     * je einer Abfrage statt aus findByFindingId und findById je Finding (Folgebefund zu b2d65a20).
+     * The managed TODO per finding — reuse an existing one, otherwise create one; a managed
+     * link to a deleted TODO is replaced. Links and TODOs of all findings come from
+     * one query each instead of findByFindingId and findById per finding (follow-up finding to b2d65a20).
      */
     void ensureAll(List<AuditFinding> findings, AuditReport report) {
         if (findings.isEmpty()) return;
@@ -81,8 +81,8 @@ class ManagedTodoWriter {
     }
 
     /**
-     * Legt ein neues verwaltetes TODO für das Finding an, verknüpft es und meldet es. Ob schon eines
-     * existiert, prüft der Aufrufer ({@link #ensureAll} beim Ingest, {@link AuditFindingTodoLinker} auf Knopfdruck).
+     * Creates a new managed TODO for the finding, links it and reports it. Whether one already
+     * exists is checked by the caller ({@link #ensureAll} on ingest, {@link AuditFindingTodoLinker} on button press).
      *
      * @param manual created by hand rather than by the ingest threshold — such a TODO is never released (f2ce6c50)
      */
@@ -103,18 +103,18 @@ class ManagedTodoWriter {
     }
 
     /**
-     * Schließt verwaltete TODOs, deren Findings alle terminal sind, und öffnet sie wieder, sobald
-     * eines zurückkommt — ein Befund, der erneut auftaucht, braucht wieder eine offene Aufgabe.
-     * Liegt keines der offenen Findings mehr über der TODO-Schwelle ({@link #needsTodo}), wird das
-     * TODO freigegeben ({@link #release}) — unless it was created by hand: that was a decision about the finding,
+     * Closes managed TODOs whose findings are all terminal, and reopens them as soon as
+     * one comes back — a finding that reappears needs an open task again.
+     * If none of the open findings is above the TODO threshold any more ({@link #needsTodo}), the
+     * TODO is released ({@link #release}) — unless it was created by hand: that was a decision about the finding,
      * not the threshold's, so it follows the findings like a HIGH one (f2ce6c50).
      */
     void reconcile(List<AuditFinding> touched) {
         List<String> ids = touched.stream().map(AuditFinding::getId).distinct().toList();
         if (ids.isEmpty()) return;
-        // Je Stufe eine Abfrage statt drei je Verknüpfung (TODO be14db43): TODOs, ihre Verknüpfungen
-        // und deren Findings werden gebündelt geladen. Ein TODO mit mehreren verwalteten
-        // Verknüpfungen wird einmal abgeglichen.
+        // One query per level instead of three per link (TODO be14db43): TODOs, their links
+        // and their findings are loaded in bulk. A TODO with several managed
+        // links is reconciled once.
         List<String> todoIds = findingTodoRepository.findByFindingIdIn(ids).stream()
                 .filter(AuditFindingTodo::isManaged).map(AuditFindingTodo::getTodoId).distinct().toList();
         if (todoIds.isEmpty()) return;
@@ -128,7 +128,7 @@ class ManagedTodoWriter {
         Map<String, AuditFinding> findings = linkedFindingIds.isEmpty() ? Map.of()
                 : findingRepository.findAllById(linkedFindingIds).stream()
                         .collect(Collectors.toMap(AuditFinding::getId, Function.identity()));
-        // Geschrieben wird gesammelt (b2d65a20): geänderte TODOs per saveAll, gelöste Verknüpfungen per deleteAll.
+        // Writing is collected (b2d65a20): changed TODOs via saveAll, resolved links via deleteAll.
         List<Todo> changed = new ArrayList<>();
         List<AuditFindingTodo> released = new ArrayList<>();
         for (String todoId : todoIds) {
@@ -159,13 +159,13 @@ class ManagedTodoWriter {
     }
 
     /**
-     * Ein Finding unter der TODO-Schwelle (etwa nach geänderten Audit-Kriterien HIGH → MEDIUM) bekäme
-     * heute kein TODO — also gibt es sein altes frei: Verknüpfung lösen und archivieren, nicht DONE,
-     * denn behoben ist nichts (TODO ba0dcb3a). Steigt die Schwere wieder, legt {@link #ensureAll} ein
-     * neues an. An einem {@code IN_PROGRESS}-TODO arbeitet jemand; das bleibt unangetastet.
-     * Die verwalteten Verknüpfungen landen in {@code released}, gelöscht und gespeichert wird im Aufrufer.
+     * A finding below the TODO threshold (e.g. after changed audit criteria HIGH → MEDIUM) would
+     * get no TODO today — so its old one is released: unlink and archive, not DONE,
+     * because nothing was fixed (TODO ba0dcb3a). If the severity rises again, {@link #ensureAll} creates a
+     * new one. Someone is working on an {@code IN_PROGRESS} TODO; it stays untouched.
+     * The managed links end up in {@code released}, deleting and saving happens in the caller.
      *
-     * @return ob das TODO freigegeben wurde
+     * @return whether the TODO was released
      */
     private boolean release(Todo todo, List<AuditFindingTodo> todoLinks, List<AuditFindingTodo> released) {
         if (todo.getStatus() == Todo.Status.IN_PROGRESS) return false;

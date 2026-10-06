@@ -18,29 +18,29 @@ import static com.automation.service.export.bpmn.BpmnXmlRenderer.NS_MODEL;
 import static com.automation.service.export.bpmn.BpmnXmlRenderer.NS_MYSURICATES;
 
 /**
- * Liest einen von MySuricates exportierten BPMN-Prozess zurück in eine Block-Liste (Roundtrip).
- * Deterministisch, JDK-DOM, kein AI-Call. BPMN ohne {@code mysuricates}-Erweiterung wird
- * abgelehnt — nichts wird angelegt.
+ * Reads a BPMN process exported by MySuricates back into a block list (round trip).
+ * Deterministic, JDK DOM, no AI call. BPMN without a {@code mysuricates} extension is
+ * rejected — nothing is created.
  *
- * <p><b>Kein Echtheitsnachweis.</b> Was hier geprüft wird, ist das <i>Format</i>: trägt die Datei
- * die {@code mysuricates}-Erweiterung, aus der sich Blöcke lesen lassen? Woher sie stammt, sagt
- * das nicht — {@code exporter="MySuricates"} und der Namespace sind frei schreibbare Attribute,
- * und der mitgelieferte {@code blockConfig}-Inhalt wird als Definition übernommen. Wer eine
- * BPMN-Datei importiert, übernimmt deren Inhalt also genauso in Verantwortung wie bei einem
- * JSON-Import. Eine belastbare Herkunft bräuchte Prüfsumme oder Signatur über den Export
- * (TODO b18939a6); bis dahin ist die Prüfung bewusst nur ein Formatfilter.
+ * <p><b>No proof of authenticity.</b> What is checked here is the <i>format</i>: does the file carry
+ * the {@code mysuricates} extension from which blocks can be read? Where it comes from, that does
+ * not say — {@code exporter="MySuricates"} and the namespace are freely writable attributes,
+ * and the supplied {@code blockConfig} content is adopted as the definition. Whoever imports a
+ * BPMN file thus takes responsibility for its content just as with a
+ * JSON import. A reliable origin would need a checksum or signature over the export
+ * (TODO b18939a6); until then the check is deliberately only a format filter.
  *
- * <p>Prinzip: Je Block schreibt der Export genau ein {@code blockConfig}-tragendes Element als
- * direktes Kind von {@code <process>}, in Blockreihenfolge. Verschachtelte Switch-Cases stecken
- * bereits im Config-JSON des Eltern-Blocks; innere Schleifen-Knoten tragen kein blockConfig.
- * Also: direkte Kind-Knoten in Dokumentreihenfolge durchgehen und deren {@code blockConfig}
- * einsammeln — kein Flow-Walking nötig.
+ * <p>Principle: for each block the export writes exactly one element carrying {@code blockConfig} as a
+ * direct child of {@code <process>}, in block order. Nested switch cases are already in the
+ * config JSON of the parent block; inner loop nodes carry no blockConfig.
+ * So: walk the direct child nodes in document order and collect their {@code blockConfig}
+ * — no flow walking needed.
  */
 @Component
 @RequiredArgsConstructor
 public class BpmnImportAdapter implements ProcessFormatImporter {
 
-    /** Obergrenze für die Eingabe (Zeichen). Exporte liegen im KB-Bereich; schützt vor DoS via DOM. */
+    /** Upper limit for the input (characters). Exports are in the KB range; protects against DoS via DOM. */
     static final int MAX_CHARS = 2 * 1024 * 1024;
 
     static final String MSG_FOREIGN =
@@ -84,8 +84,8 @@ public class BpmnImportAdapter implements ProcessFormatImporter {
             blocks.add(block);
         }
 
-        // Leerer Prozess (nur Start→Ende) ist gültig, sofern die Datei das Format kennzeichnet;
-        // ohne Formatmerkmal UND ohne blockConfig ist nichts zu lesen.
+        // An empty process (only start→end) is valid, provided the file carries the format marker;
+        // without a format marker AND without blockConfig there is nothing to read.
         if (blocks.isEmpty() && !hasMySuricatesFormatHint(definitions)) {
             throw new BpmnImportException(MSG_FOREIGN);
         }
@@ -101,16 +101,16 @@ public class BpmnImportAdapter implements ProcessFormatImporter {
         }
     }
 
-    /** {@code node/extensionElements/mysuricates:blockConfig} — nur direkte Kinder, kein Tiefensuchen. */
+    /** {@code node/extensionElements/mysuricates:blockConfig} — direct children only, no deep search. */
     private static Element blockConfigOf(Element node) {
         Element ext = BpmnDom.firstChild(node, NS_MODEL, "extensionElements");
         return ext == null ? null : BpmnDom.firstChild(ext, NS_MYSURICATES, "blockConfig");
     }
 
     /**
-     * Formatmerkmal, kein Herkunftsbeleg: beide Attribute kann jeder in eine beliebige Datei
-     * schreiben. Dient nur dazu, einen leeren Export (Start→Ende ohne Block) von fremder BPMN
-     * zu unterscheiden, aus der sich ohnehin nichts lesen ließe.
+     * Format marker, not proof of origin: anyone can write both attributes into any file.
+     * Serves only to distinguish an empty export (start→end without a block) from foreign BPMN
+     * from which nothing could be read anyway.
      */
     private static boolean hasMySuricatesFormatHint(Element definitions) {
         return "MySuricates".equals(definitions.getAttribute("exporter"))

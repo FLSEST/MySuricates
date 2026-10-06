@@ -7,46 +7,46 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Die Blöcke in den Zweigen eines {@code switch} samt ihrem Id-Pfad — und die Schreibweise der
- * Block-Ids: {@link #member} je Block einer Kette, {@link #casePrefix}/{@link #defaultPrefix} je
- * Zweig. Zusammen ergibt das {@code …_c&lt;k&gt;_&lt;j&gt;} bzw. {@code …_default_&lt;j&gt;},
- * rekursiv bei Switch-in-Switch.
+ * The blocks in the branches of a {@code switch} together with their id path — and the notation of the
+ * block ids: {@link #member} per block of a chain, {@link #casePrefix}/{@link #defaultPrefix} per
+ * branch. Together this yields {@code …_c&lt;k&gt;_&lt;j&gt;} or {@code …_default_&lt;j&gt;},
+ * recursively for switch-in-switch.
  *
- * <p>Alle drei Erzeuger nutzen dieselben Helfer: {@link BpmnModelBuilder} für die Blöcke einer
- * Kette (Top-Level wie Zweig), {@link BpmnGatewayBuilder} für die Zweig-Präfixe, und der
- * {@link DataFlowReferenceScanner} baut denselben Pfad nach, um Datenassoziationen an den Zweig-Task
- * statt an das Gateway zu hängen (7557b928). BPMN erlaubt an Gateways keine Datenassoziationen —
- * der Zweig-Task ist der nächstgelegene gültige Endpunkt. Ändert sich die Schreibweise, muss sie
- * sich nur hier ändern.
+ * <p>All three producers use the same helpers: {@link BpmnModelBuilder} for the blocks of a
+ * chain (top level as well as branch), {@link BpmnGatewayBuilder} for the branch prefixes, and the
+ * {@link DataFlowReferenceScanner} rebuilds the same path to attach data associations to the branch task
+ * instead of the gateway (7557b928). BPMN allows no data associations on gateways —
+ * the branch task is the nearest valid endpoint. If the notation changes, it only has to change
+ * here.
  */
 final class BpmnBranchBlocks {
 
-    /** Ein Block in einem Zweig, mit seinem Id-Pfad relativ zum Top-Level-Block (z. B. {@code _c0_1}). */
+    /** A block in a branch, with its id path relative to the top-level block (e.g. {@code _c0_1}). */
     record Branch(String path, BlockDefinition block) {
     }
 
     private BpmnBranchBlocks() {
     }
 
-    /** Id-Basis des {@code index}-ten Blocks einer Kette — für die Top-Level-Kette wie für einen Zweig. */
+    /** Id base of the {@code index}-th block of a chain — for the top-level chain as for a branch. */
     static String member(String chainPrefix, int index) {
         return chainPrefix + "_" + index;
     }
 
-    /** Id-Präfix der Block-Kette eines Case-Zweigs. */
+    /** Id prefix of the block chain of a case branch. */
     static String casePrefix(String idBase, int caseIndex) {
         return idBase + "_c" + caseIndex;
     }
 
-    /** Id-Präfix der Block-Kette des Default-Zweigs. */
+    /** Id prefix of the block chain of the default branch. */
     static String defaultPrefix(String idBase) {
         return idBase + "_default";
     }
 
     /**
-     * Alle Blöcke in den Zweigen von {@code block}, rekursiv. Leer für jeden Block, der keine
-     * verschachtelte Blockliste hat (nur {@code switch} hat eine — {@code conditional} trägt
-     * Kommandos, keine Blöcke).
+     * All blocks in the branches of {@code block}, recursively. Empty for every block that has no
+     * nested block list (only {@code switch} has one — {@code conditional} carries
+     * commands, not blocks).
      */
     static List<Branch> of(BlockDefinition block) {
         List<Branch> out = new ArrayList<>();

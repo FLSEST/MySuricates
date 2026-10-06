@@ -13,7 +13,7 @@ import javax.xml.transform.dom.DOMSource;
 import javax.xml.transform.stream.StreamResult;
 import java.io.StringWriter;
 
-/** Serialisiert das interne Modell zu BPMN-2.0-XML (JDK-DOM, keine externe Library). */
+/** Serializes the internal model to BPMN 2.0 XML (JDK DOM, no external library). */
 class BpmnXmlRenderer {
 
     static final String NS_MODEL = "http://www.omg.org/spec/BPMN/20100524/MODEL";
@@ -43,8 +43,8 @@ class BpmnXmlRenderer {
             Element process = appendChild(doc, definitions, "process");
             process.setAttribute("id", model.processId);
             process.setAttribute("name", model.processName);
-            // false, solange serviceTasks keine Engine-Implementierung tragen (Stufe 1) —
-            // ein Camunda-Deploy würde sonst scheitern; Modeler-Ansicht unberührt.
+            // false as long as serviceTasks carry no engine implementation (stage 1) —
+            // a Camunda deploy would otherwise fail; modeler view unaffected.
             process.setAttribute("isExecutable", "false");
             for (BpmnModel.Node n : model.nodes) {
                 appendNode(doc, process, n);
@@ -65,7 +65,7 @@ class BpmnXmlRenderer {
 
     private void appendNode(Document doc, Element parent, BpmnModel.Node n) {
         if (n.warning != null) {
-            // "--" ist in XML-Kommentaren unzulässig und würde beim Re-Parsen brechen
+            // "--" is not allowed in XML comments and would break on re-parsing
             parent.appendChild(doc.createComment(" " + n.warning.replace("--", "- -") + " "));
         }
         Element el = appendChild(doc, parent, elementName(n.kind));
@@ -82,8 +82,8 @@ class BpmnXmlRenderer {
         if (n.defaultFlowId != null) {
             el.setAttribute("default", n.defaultFlowId);
         }
-        // Reihenfolge laut XSD (tActivity): documentation, extensionElements, property,
-        // dataInputAssociation, dataOutputAssociation, loopCharacteristics, script, Kinder
+        // Order according to the XSD (tActivity): documentation, extensionElements, property,
+        // dataInputAssociation, dataOutputAssociation, loopCharacteristics, script, children
         if (n.documentation != null && !n.documentation.isBlank()) {
             appendChild(doc, el, "documentation").setTextContent(n.documentation);
         }
@@ -117,9 +117,9 @@ class BpmnXmlRenderer {
     }
 
     /**
-     * Datenassoziationen der Aktivität. {@code dataInputAssociation/targetRef} ist laut XSD ein
-     * IDREF auf ein Element der Aktivität — dafür dient (wie bei bpmn.io/Camunda) ein leeres
-     * {@code property} als Platzhalter; die Semantik des Datenflusses steckt im {@code sourceRef}.
+     * Data associations of the activity. {@code dataInputAssociation/targetRef} is, per the XSD, an
+     * IDREF to an element of the activity — an empty {@code property} serves as placeholder for that
+     * (as in bpmn.io/Camunda); the semantics of the data flow lies in the {@code sourceRef}.
      */
     private void appendDataAssociations(Document doc, Element el, BpmnModel.Node n) {
         if (n.dataPropertyId != null) {

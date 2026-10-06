@@ -9,29 +9,29 @@ import java.util.Map;
 import java.util.Set;
 
 /**
- * Hängt den erkannten Datenfluss ({@link DataFlowReferenceScanner}) als Datenobjekte und
- * Datenassoziationen ans fertige Modell — inklusive Diagramm-Koordinaten.
+ * Attaches the detected data flow ({@link DataFlowReferenceScanner}) as data objects and
+ * data associations to the finished model — including diagram coordinates.
  *
- * <p>Je erzeugendem Block entsteht ein Datenobjekt unterhalb seines Tasks; der erzeugende Task
- * bekommt eine {@code dataOutputAssociation}, jeder konsumierende eine {@code dataInputAssociation}.
- * Endpunkt ist immer ein Aktivitäts-Knoten — für Referenzen aus einem Switch-Zweig der Task des
- * Zweig-Blocks (7557b928), denn an Gateways erlaubt BPMN keine Datenassoziationen. Blöcke ganz ohne
- * eigenen Aktivitäts-Knoten (der Switch/Conditional selbst) bleiben außen vor.
+ * <p>For each producing block a data object is created below its task; the producing task
+ * gets a {@code dataOutputAssociation}, every consuming one a {@code dataInputAssociation}.
+ * The endpoint is always an activity node — for references from a switch branch the task of the
+ * branch block (7557b928), because BPMN allows no data associations on gateways. Blocks without
+ * an activity node of their own (the switch/conditional itself) are left out.
  */
 final class BpmnDataFlowBuilder {
 
-    /** BPMN-Standardmaß eines Datenobjekts. */
+    /** BPMN standard size of a data object. */
     static final double DATA_W = 36, DATA_H = 50;
-    /** Abstand zwischen Unterkante der Task-Reihe und Oberkante der Datenobjekt-Reihe. */
+    /** Distance between the bottom edge of the task row and the top edge of the data object row. */
     static final double DATA_ROW_GAP = 60;
 
     private BpmnDataFlowBuilder() {
     }
 
     /**
-     * @param activityIdByBase Aktivitäts-Knoten je Id-Basis (Top-Level-Blöcke <em>und</em>
-     *                         Zweig-Blöcke), wie {@code BpmnModelBuilder} sie vergibt
-     * @param rootPrefix       Id-Präfix der Top-Level-Kette (siehe {@code DataFlowReferenceScanner.Endpoint})
+     * @param activityIdByBase activity node per id base (top-level blocks <em>and</em>
+     *                         branch blocks), as {@code BpmnModelBuilder} assigns them
+     * @param rootPrefix       id prefix of the top-level chain (see {@code DataFlowReferenceScanner.Endpoint})
      */
     static void apply(BpmnModel model, List<BlockDefinition> blocks,
                       Map<String, String> activityIdByBase, String rootPrefix) {
@@ -52,7 +52,7 @@ final class BpmnDataFlowBuilder {
             BpmnModel.Node producer = byId.get(activityIdByBase.get(ref.source().idBase(rootPrefix)));
             BpmnModel.Node consumer = byId.get(activityIdByBase.get(ref.target().idBase(rootPrefix)));
             if (producer == null || consumer == null) {
-                continue; // Gateway-Knoten (der switch/conditional selbst) an einem der beiden Enden
+                continue; // gateway node (the switch/conditional itself) at one of the two ends
             }
             BpmnModel.DataObject data = objects.get(ref.source());
             if (data == null) {
@@ -68,8 +68,8 @@ final class BpmnDataFlowBuilder {
     }
 
     /**
-     * Der Block hinter einem Endpunkt — {@code null} für Zweig-Blöcke: deren Name steckt bereits im
-     * Namen des Zweig-Tasks, und nur benannte Zweig-Blöcke können überhaupt Quelle sein.
+     * The block behind an endpoint — {@code null} for branch blocks: their name is already part of the
+     * name of the branch task, and only named branch blocks can be a source at all.
      */
     private static BlockDefinition blockAt(List<BlockDefinition> blocks, DataFlowReferenceScanner.Endpoint endpoint) {
         return endpoint.branchPath().isEmpty() ? blocks.get(endpoint.blockIndex()) : null;
@@ -96,12 +96,12 @@ final class BpmnDataFlowBuilder {
                                        BpmnModel.DataObject data, boolean input, String id) {
         BpmnModel.DataAssociation a = new BpmnModel.DataAssociation(id, data.referenceId, input);
         if (input) {
-            // Datenobjekt (rechte Kante) -> Unterkante des konsumierenden Tasks
+            // data object (right edge) -> bottom edge of the consuming task
             a.waypoints.add(new double[]{data.x + data.w, data.y + data.h / 2});
             a.waypoints.add(new double[]{activity.x + activity.w / 2, activity.y + activity.h});
             activity.dataInputs.add(a);
         } else {
-            // Unterkante des erzeugenden Tasks -> Oberkante des Datenobjekts
+            // bottom edge of the producing task -> top edge of the data object
             a.waypoints.add(new double[]{activity.x + activity.w / 2, activity.y + activity.h});
             a.waypoints.add(new double[]{data.x + data.w / 2, data.y});
             activity.dataOutputs.add(a);

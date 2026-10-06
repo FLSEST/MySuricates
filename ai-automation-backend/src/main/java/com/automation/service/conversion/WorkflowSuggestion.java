@@ -5,9 +5,9 @@ import com.automation.entity.BlockDefinition;
 import java.util.List;
 
 /**
- * Vorschlag, einen erfolgreichen agentic-Lauf als Workflow festzuhalten. {@code buildFindings} sind die
- * Befunde der Baufehler-Prüfung ab MEDIUM, HIGH zuerst (TODO 326d5987) — leer, wenn der Vorschlag sauber ist;
- * deutsch. {@code buildFindingsEn} dieselben Zeilen auf Englisch (TODO 81773d7b).
+ * Suggestion to capture a successful agentic run as a workflow. {@code buildFindings} are the
+ * findings of the build-error check from MEDIUM, HIGH first (TODO 326d5987) — empty if the suggestion is clean;
+ * German. {@code buildFindingsEn} the same lines in English (TODO 81773d7b).
  */
 public record WorkflowSuggestion(
         String suggestedName,
@@ -24,7 +24,7 @@ public record WorkflowSuggestion(
         if (buildFindingsEn == null) buildFindingsEn = List.of();
     }
 
-    /** Nur mit den deutschen Befundzeilen. */
+    /** Only with the German finding lines. */
     public WorkflowSuggestion(String suggestedName, String suggestedDescription, List<BlockDefinition> blocks,
                               String originalGoal, int agenticStepsAnalyzed, boolean available,
                               List<String> buildFindings) {
@@ -32,7 +32,7 @@ public record WorkflowSuggestion(
                 buildFindings, List.of());
     }
 
-    /** Ohne Befunde der Baufehler-Prüfung. */
+    /** Without findings of the build-error check. */
     public WorkflowSuggestion(String suggestedName, String suggestedDescription, List<BlockDefinition> blocks,
                               String originalGoal, int agenticStepsAnalyzed, boolean available) {
         this(suggestedName, suggestedDescription, blocks, originalGoal, agenticStepsAnalyzed, available,
@@ -43,12 +43,12 @@ public record WorkflowSuggestion(
         return new WorkflowSuggestion(null, null, List.of(), null, 0, false);
     }
 
-    /** Derselbe Vorschlag mit den (deutschen) Befunden der Baufehler-Prüfung. */
+    /** The same suggestion with the (German) findings of the build-error check. */
     public WorkflowSuggestion withBuildFindings(List<String> findings) {
         return withBuildFindings(findings, List.of());
     }
 
-    /** Derselbe Vorschlag mit den Befunden der Baufehler-Prüfung, deutsch und englisch. */
+    /** The same suggestion with the findings of the build-error check, German and English. */
     public WorkflowSuggestion withBuildFindings(List<String> findings, List<String> findingsEn) {
         return new WorkflowSuggestion(suggestedName, suggestedDescription, blocks, originalGoal,
                 agenticStepsAnalyzed, available, findings, findingsEn);

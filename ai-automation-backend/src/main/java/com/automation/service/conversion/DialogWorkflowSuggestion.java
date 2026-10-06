@@ -5,8 +5,8 @@ import com.automation.entity.BlockDefinition;
 import java.util.List;
 
 /**
- * Ergebnis der KI-Analyse einer Claude-Code-Dialog-Session.
- * Analoges Konzept zu WorkflowSuggestion, aber mit Dialog-spezifischen Feldern.
+ * Result of the AI analysis of a Claude Code dialog session.
+ * Similar concept to WorkflowSuggestion, but with dialog-specific fields.
  */
 public record DialogWorkflowSuggestion(
         String suggestedName,
@@ -15,20 +15,20 @@ public record DialogWorkflowSuggestion(
         String sessionId,
         String sourceFilePath,
         String projectPath,
-        double confidence,       // 0.0–1.0 (0.5 bei rule-based, KI liefert echten Wert)
+        double confidence,       // 0.0–1.0 (0.5 for rule-based, the AI supplies a real value)
         String patternType,      // "scripting" | "file_editing" | "research" | "mixed"
         String notAvailableReason,
         int toolCallsAnalyzed,
         boolean available,
-        List<String> buildFindings,  // Baufehler-Prüfung ab MEDIUM, HIGH zuerst (TODO 326d5987); leer = sauber; deutsch
-        List<String> buildFindingsEn // dieselben Zeilen auf Englisch (TODO 81773d7b)
+        List<String> buildFindings,  // build-error check from MEDIUM, HIGH first (TODO 326d5987); empty = clean; German
+        List<String> buildFindingsEn // same lines in English (TODO 81773d7b)
 ) {
     public DialogWorkflowSuggestion {
         if (buildFindings == null) buildFindings = List.of();
         if (buildFindingsEn == null) buildFindingsEn = List.of();
     }
 
-    /** Nur mit den deutschen Befundzeilen. */
+    /** Only with the German finding lines. */
     public DialogWorkflowSuggestion(String suggestedName, String suggestedDescription, List<BlockDefinition> blocks,
                                     String sessionId, String sourceFilePath, String projectPath, double confidence,
                                     String patternType, String notAvailableReason, int toolCallsAnalyzed,
@@ -37,7 +37,7 @@ public record DialogWorkflowSuggestion(
                 patternType, notAvailableReason, toolCallsAnalyzed, available, buildFindings, List.of());
     }
 
-    /** Ohne Befunde der Baufehler-Prüfung. */
+    /** Without findings of the build-error check. */
     public DialogWorkflowSuggestion(String suggestedName, String suggestedDescription, List<BlockDefinition> blocks,
                                     String sessionId, String sourceFilePath, String projectPath, double confidence,
                                     String patternType, String notAvailableReason, int toolCallsAnalyzed,

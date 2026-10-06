@@ -3,7 +3,7 @@ package com.automation.service.export.bpmn;
 import java.util.ArrayList;
 import java.util.List;
 
-/** Internes BPMN-Modell: semantische Knoten/Kanten inkl. Diagramm-Koordinaten. */
+/** Internal BPMN model: semantic nodes/edges including diagram coordinates. */
 class BpmnModel {
 
     enum Kind { START_EVENT, END_EVENT, TASK, SERVICE_TASK, SCRIPT_TASK, USER_TASK, EXCLUSIVE_GATEWAY, SUB_PROCESS, CALL_ACTIVITY }
@@ -13,12 +13,12 @@ class BpmnModel {
     final List<Node> nodes = new ArrayList<>();
     final List<Edge> edges = new ArrayList<>();
     /**
-     * Datenfluss: je erzeugendem Block ein Datenobjekt. Reihenfolge = die der ersten Verwendung in
-     * der nach (Ziel, Quelle) sortierten Referenzliste des {@code DataFlowReferenceScanner},
-     * nicht die Blockreihenfolge.
+     * Data flow: one data object per producing block. Order = that of first use in
+     * the reference list of the {@code DataFlowReferenceScanner}, sorted by (target, source),
+     * not the block order.
      */
     final List<DataObject> dataObjects = new ArrayList<>();
-    /** Alle Datenassoziationen in Renderreihenfolge — nur für die Diagramm-Kanten (DI). */
+    /** All data associations in render order — only for the diagram edges (DI). */
     final List<DataAssociation> dataAssociations = new ArrayList<>();
 
     static class Node {
@@ -27,19 +27,19 @@ class BpmnModel {
         String name;
         String documentation;
         String configJson;
-        String blockType;       // Original-Block-Typ (z. B. "shell", "conditional") für verlustfreien Reimport
-        String blockName;       // Original-Block-Name (nur wenn gesetzt) für verlustfreien Reimport
-        String script;          // nur SCRIPT_TASK
-        String scriptFormat;    // nur SCRIPT_TASK: null = bash
-        String calledElement;   // nur CALL_ACTIVITY
+        String blockType;       // original block type (e.g. "shell", "conditional") for lossless reimport
+        String blockName;       // original block name (only if set) for lossless reimport
+        String script;          // SCRIPT_TASK only
+        String scriptFormat;    // SCRIPT_TASK only: null = bash
+        String calledElement;   // CALL_ACTIVITY only
         String loop;            // null | "multiInstanceSequential" | "standardLoop"
-        String defaultFlowId;   // nur EXCLUSIVE_GATEWAY mit Default-Pfad
-        String warning;         // erzeugt XML-Kommentar (unbekannter Blocktyp)
-        final List<Node> children = new ArrayList<>();      // nur SUB_PROCESS
-        final List<Edge> childEdges = new ArrayList<>();    // nur SUB_PROCESS
+        String defaultFlowId;   // EXCLUSIVE_GATEWAY with default path only
+        String warning;         // produces an XML comment (unknown block type)
+        final List<Node> children = new ArrayList<>();      // SUB_PROCESS only
+        final List<Edge> childEdges = new ArrayList<>();    // SUB_PROCESS only
         final List<DataAssociation> dataInputs = new ArrayList<>();
         final List<DataAssociation> dataOutputs = new ArrayList<>();
-        String dataPropertyId;  // Ziel-Platzhalter der dataInputAssociation (nur wenn dataInputs nicht leer)
+        String dataPropertyId;  // target placeholder of the dataInputAssociation (only if dataInputs is not empty)
         double x, y, w, h;
 
         Node(String id, Kind kind) {
@@ -62,10 +62,10 @@ class BpmnModel {
         }
     }
 
-    /** Ausgabe eines Blocks als BPMN-Datenobjekt ({@code dataObject} + {@code dataObjectReference}). */
+    /** Output of a block as a BPMN data object ({@code dataObject} + {@code dataObjectReference}). */
     static class DataObject {
         final String id;            // dataObject
-        final String referenceId;   // dataObjectReference (Ziel/Quelle der Assoziationen)
+        final String referenceId;   // dataObjectReference (target/source of the associations)
         final String name;
         double x, y, w, h;
 
@@ -76,11 +76,11 @@ class BpmnModel {
         }
     }
 
-    /** Eine Datenassoziation zwischen einer Aktivität und einer Datenobjekt-Referenz. */
+    /** A data association between an activity and a data object reference. */
     static class DataAssociation {
         final String id;
         final String dataReferenceId;
-        final boolean input;        // true = dataInputAssociation (Aktivität konsumiert)
+        final boolean input;        // true = dataInputAssociation (activity consumes)
         final List<double[]> waypoints = new ArrayList<>();
 
         DataAssociation(String id, String dataReferenceId, boolean input) {
