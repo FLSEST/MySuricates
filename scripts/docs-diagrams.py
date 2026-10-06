@@ -695,10 +695,10 @@ def render_html(doc, note, lang):
 
 
 def shared_prefix(titles):
-    """Gemeinsames Namenspraefix der Seiten ("Produkt — "), sofern es eines gibt.
+    """Common name prefix of the pages ("Product — "), if there is one.
 
-    Im Verzeichnis steht es sonst in jeder Zeile. Gemessen statt fest
-    verdrahtet: heisst das Produkt eines Tages anders, wandert die Zeile mit.
+    Otherwise it stands in every line of the index. Measured instead of
+    hard-wired: if the product is called differently one day, the line follows.
     """
     if len(titles) < 2:
         return ""

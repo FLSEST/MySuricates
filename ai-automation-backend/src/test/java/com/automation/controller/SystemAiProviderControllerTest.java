@@ -279,7 +279,7 @@ class SystemAiProviderControllerTest {
                 .andExpect(jsonPath("$.providers[0].defaultProvider").value(true))
                 .andExpect(jsonPath("$.providers[1].state").value("LOGIN_MISSING"))
                 .andExpect(jsonPath("$.providers[1].login").value("codex login"))
-                // Felder ohne Wert kommen als null, sie fehlen nicht (38f30352)
+                // Fields without a value come as null, they are not left out (38f30352)
                 .andExpect(jsonPath("$", hasEntry("loginCommand", (Object) null)))
                 .andExpect(jsonPath("$.providers[1]", hasEntry("loginVia", (Object) null)))
                 .andExpect(jsonPath("$.providers[1]", hasEntry("loginNote", (Object) null)))

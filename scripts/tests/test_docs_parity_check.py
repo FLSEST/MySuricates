@@ -299,10 +299,10 @@ class SectionPairingTest(unittest.TestCase):
         self.assertEqual(self.align(de, en), (["## Eins"], []))
 
     def test_concept_page_prose_sections(self):
-        # Nachbau von docs/konzepte/*.md im damaligen Stand (mit Messabschnitt, den die Seiten seit
-        # TODO 1ab3ad21 nicht mehr haben): feste Gliederung, reine Prosa, ganz uebersetzte
-        # Ueberschriften. Fehlte "Vorteile", nannte die Pruefung "Nachteile und Kosten" -- der
-        # Betriebsbeleg teilt mit ihm die Zahl `263` und zog ihn zu sich (TODO 3fbff015).
+        # Replica of docs/konzepte/*.md as they were then (with a measurement section, which the pages
+        # no longer have since TODO 1ab3ad21): fixed outline, pure prose, fully translated
+        # headings. With "Vorteile" missing, the check named "Nachteile und Kosten" -- the
+        # Betriebsbeleg shares the number `263` with it and pulled it to itself (TODO 3fbff015).
         de = ("# Haertung\n\n## Wofür taugt das?\n" + "Ein Absatz ueber den Zweck. " * 28 + "\n\n"
               "## Vorteile\n" + "Ein Absatz ueber den Nutzen. " * 21 + "\n\n"
               "## Nachteile und Kosten\n" + "Ein Absatz ueber die Kosten. " * 20 + "Seit 263 Laeufen.\n\n"
@@ -396,7 +396,7 @@ class StockPairingTest(unittest.TestCase):
 REFERENCE = REPO / "scripts" / "docs-reference.py"
 _ref_spec = importlib.util.spec_from_file_location("docs_reference", REFERENCE)
 ref = importlib.util.module_from_spec(_ref_spec)
-sys.modules[_ref_spec.name] = ref  # dataclasses brauchen das Modul in sys.modules
+sys.modules[_ref_spec.name] = ref  # dataclasses need the module in sys.modules
 _ref_spec.loader.exec_module(ref)
 
 FIXTURE_CONTROLLER = """package com.automation.controller;
@@ -485,10 +485,10 @@ FIXTURE_SCHEMA = {
 
 
 class GeneratedReferenceTest(unittest.TestCase):
-    """scripts/docs-reference.py erzeugt API- und Block-Referenz aus dem Code (TODO 1ab3ad21).
+    """scripts/docs-reference.py generates the API and block reference from the code (TODO 1ab3ad21).
 
-    Kleine Fixtures statt des echten Repos: ein Controller, ein ErrorCode, ein Schema-Ausschnitt.
-    Die Vorlagen enthalten keine Links, damit das Doku-Gate auf der Fixture nur das Erzeugte sieht.
+    Small fixtures instead of the real repo: one controller, one ErrorCode, an excerpt of the schema.
+    The templates contain no links, so the docs gate sees only the generated part on the fixture.
     """
 
     def build(self, tmp) -> Path:
@@ -521,16 +521,16 @@ class GeneratedReferenceTest(unittest.TestCase):
             self.assertEqual(code, 0, err)
             page = (root / "docs" / "api-referenz.md").read_text(encoding="utf-8")
             self.assertTrue(page.startswith(ref.MARKER + "\n\n# API-Referenz\n\nEinleitung DE.\n"), page)
-            # Erster Satz des Javadoc; TODO-Kuerzel weg, "z. B." beendet keinen Satz, {@code} mit Klammern.
+            # First sentence of the Javadoc; TODO tag gone, "z. B." ends no sentence, {@code} with braces.
             self.assertIn("| `GET /api/v1/foos/{id}` | Liefert ein Foo, z. B. das unter `/{id}/bar` verlinkte."
                           " | `chains` |", page)
-            # Methoden-Annotation schlaegt Klassen-Annotation; ohne Javadoc bleibt der Zweck leer.
+            # Method annotation beats class annotation; without Javadoc the purpose stays empty.
             self.assertIn("| `POST /api/v1/foos` |  | `webhooks` |", page)
-            # produces ist kein Pfad (wie in api-endpoint-diff.sh).
+            # produces is not a path (as in api-endpoint-diff.sh).
             self.assertIn("| `GET /api/v1/foos/{id}/text` |  | `chains` |", page)
             self.assertNotIn("text/markdown", page)
             self.assertIn("## /api/v1/foos\n\nQuelle: `FooController` – Foos verwalten: anlegen und lesen.\n", page)
-            # Unbekannte HttpStatus-Konstante: Name statt geratener Zahl.
+            # Unknown HttpStatus constant: name instead of a guessed number.
             self.assertIn("| `RESOURCE_NOT_FOUND` | 404 | Resource not found |", page)
             self.assertIn("| `TEAPOT` | I_AM_A_TEAPOT | Short and stout |", page)
             en = (root / "docs" / "en" / "api-referenz.md").read_text(encoding="utf-8")
@@ -539,9 +539,9 @@ class GeneratedReferenceTest(unittest.TestCase):
             self.assertIn("## Error codes", en)
 
     def test_api_page_lists_the_rest_of_the_javadoc_as_notes(self):
-        # Was nach dem ersten Satz steht, gehoert nicht in die Tabelle, geht aber auch nicht verloren:
-        # Liste unter der Tabelle, ohne Block-Tags, Herkunftskuerzel und Inline-Tags; Endpunkte ohne
-        # weiteren Text fehlen in der Liste.
+        # What follows the first sentence does not belong in the table, but is not lost either:
+        # a list below the table, without block tags, origin tags and inline tags; endpoints without
+        # further text are missing from the list.
         with tempfile.TemporaryDirectory() as tmp:
             root = self.build(tmp)
             code, _, err = self.run_reference(root, "--write")
@@ -559,7 +559,7 @@ class GeneratedReferenceTest(unittest.TestCase):
             self.assertNotIn("Hinweise", en)
 
     def test_api_page_satisfies_the_endpoint_diff(self):
-        # api-endpoint-diff.sh sucht "METHODE /api/v1/..." in beiden Fassungen — die erzeugte Seite muss passen.
+        # api-endpoint-diff.sh looks for "METHOD /api/v1/..." in both versions — the generated page must match.
         with tempfile.TemporaryDirectory() as tmp:
             root = self.build(tmp)
             self.run_reference(root, "--write")
@@ -582,7 +582,7 @@ class GeneratedReferenceTest(unittest.TestCase):
                           " [KI-Felder](#ki-felder).", page)
             self.assertIn("| `command` | string | ja |  |  | Der Prompt. |", page)
             self.assertIn("| `timeout_seconds` | integer |  |  | ≥ 1 | Timeout. |", page)
-            # requiredOneOf, aufgeloester #-Verweis samt Altwert, onlyWith, maskierter Strich.
+            # requiredOneOf, resolved #-reference with its legacy value, onlyWith, escaped bar.
             self.assertIn("| `command` | string | einer von `command`, `workflow_id` |  |  | Befehl. |", page)
             self.assertIn("| `execution_mode` | string |  | `ai` | `ai`: KI. · `shell`: Shell. ·"
                           " alt, noch angenommen: `claude` | Modus. |", page)
@@ -646,13 +646,13 @@ class GeneratedReferenceTest(unittest.TestCase):
             self.assertIn("BEFUND: referenz-fehler docs/block-referenz.md: Quelle fehlt", out)
 
     def test_root_without_sources_and_pages_is_skipped(self):
-        # Die Fixtures der anderen Tests hier bauen kein Backend nach — dort prueft der Erzeuger nichts.
+        # The fixtures of the other tests here rebuild no backend — the generator checks nothing there.
         with tempfile.TemporaryDirectory() as tmp:
             code, out, err = self.run_reference(Path(tmp), "--check")
             self.assertEqual(code, 0, out + err)
 
     def test_templates_are_not_link_checked(self):
-        # Die Links einer Vorlage gelten am Ziel unter docs/, nicht unter scripts/docs-reference/.
+        # A template's links hold at the target under docs/, not under scripts/docs-reference/.
         with tempfile.TemporaryDirectory() as tmp:
             root = self.build(tmp)
             template = root / "scripts" / "docs-reference" / "api-referenz.de.md"
@@ -690,7 +690,7 @@ class FirstSentenceTest(unittest.TestCase):
 
 
 class DescribeTest(unittest.TestCase):
-    """Rest der Beschreibung nach dem ersten Satz — Quelle der Hinweise unter einer API-Tabelle."""
+    """Rest of the description after the first sentence — source of the notes below an API table."""
 
     def describe(self, *lines):
         return ref.describe(list(lines))

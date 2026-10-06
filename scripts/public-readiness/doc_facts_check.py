@@ -207,13 +207,13 @@ ISO_DATE = re.compile(r"\b\d{4}-\d{2}-\d{2}\b")
 README_SOURCE = "README.de.md"
 
 # ---------------------------------------------------------------------------
-# Technologietabelle: "| **React** | 19.2 | UI-Framework |"
+# Technology table: "| **React** | 19.2 | UI-Framework |"
 #
-# Gilt fuer JEDE gepruefte Datei — die einzige solche Tabelle stand in
-# docs/onboarding/README.md (entfallen im Doku-Umbau, TODO 1ab3ad21), eine
-# kuenftige soll aber genauso mitlaufen. Die Doku kuerzt, deshalb gilt die
-# genannte Version als richtig, wenn sie ein komponentenweises Praefix der
-# echten ist (19.2 zu 19.2.4 ja, 19.21 zu 19.2.4 nein).
+# Applies to EVERY checked file — the only such table was in
+# docs/onboarding/README.md (dropped in the docs rework, TODO 1ab3ad21), but a
+# future one should be covered just the same. The docs abbreviate, so the
+# stated version counts as correct if it is a component-wise prefix of the
+# real one (19.2 for 19.2.4 yes, 19.21 for 19.2.4 no).
 # ---------------------------------------------------------------------------
 VERSION_ROW = re.compile(r"^\|\s*\*\*([^*|]+)\*\*\s*\|([^|]*)\|")
 VERSION_NUMBER = re.compile(r"\d+(?:\.\d+)+")
@@ -256,10 +256,10 @@ FORBIDDEN_PATTERNS = [
     # docs/architektur.md nennt sie genau so als Beispiel.
     (re.compile(r"claude-(?:opus|sonnet|haiku|fable)-\d+-\d"),
      "datierte Modell-ID — in der Doku gelten die Aliase opus/sonnet/haiku/fable"),
-    # Das Produkt heisst MySuricates. "AutoPilot" ist nur der Name des Projekts, unter dem
-    # MySuricates seine eigenen TODOs fuehrt — bis e3101cd6
-    # stand er trotzdem als "AutoPilot — …" im Titel aller Diagramm-Seiten. Geprueft wird
-    # nur die Ueberschrift mit Gedankenstrich; der Projektname im Fliesstext bleibt frei.
+    # The product is called MySuricates. "AutoPilot" is only the name of the project under which
+    # MySuricates keeps its own TODOs — until e3101cd6 it still appeared as "AutoPilot — …" in
+    # the title of all diagram pages. Only the heading with a dash is checked; the project name
+    # in running text stays allowed.
     (re.compile(r"^#{1,6}\s+AutoPilot\s+[—–-]\s"),
      "alter Produktname im Seitentitel — das Produkt heisst MySuricates, AutoPilot nur das Projekt"),
 ]

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Deterministische Doku-Pruefung: tote Verweise und DE/EN-Gleichstand (TODO c58d7402).
 
-Drei Dinge, die eine Maschine besser prueft als ein Lesedurchgang:
+Four things a machine checks better than a read-through:
 
 1. **Tote Ziele** — jeder relative Markdown-Link in einer getrackten .md zeigt auf eine
    existierende Datei.
@@ -12,10 +12,10 @@ Drei Dinge, die eine Maschine besser prueft als ein Lesedurchgang:
    Ordner in `MIRRORED_SUBDIRS` (`docs/konzepte/x.md` <-> `docs/en/konzepte/x.md`). Weicht die
    Folge ab, paart `align_sections` die Abschnitte ueber ihren Inhalt und nennt genau die ohne
    Gegenstueck (TODO 2d553479).
-4. **Erzeugte Referenzen** — die Seiten, die `scripts/docs-reference.py` aus dem Code erzeugt
-   (API-Referenz, Block-Referenz), decken sich mit ihrer Quelle (`--check`, TODO 1ab3ad21). So
-   faellt ein neuer Endpunkt oder Config-Schluessel ohne neu erzeugte Seite ueberall auf, wo
-   dieses Gate laeuft — auch im Pre-Push.
+4. **Generated references** — the pages `scripts/docs-reference.py` generates from the code
+   (API reference, block reference) match their source (`--check`, TODO 1ab3ad21). So a new
+   endpoint or config key without a regenerated page shows up wherever this gate runs — in the
+   pre-push too.
 
 Was hier NICHT geprueft wird, weil es Urteil braucht: Aktualitaet gegenueber dem Code
 (dafuer doc-facts-check.sh) und Verstaendlichkeit fuer Fremde (dafuer der Workflow
@@ -25,8 +25,8 @@ Bekannte, ticketierte Luecken stehen in KNOWN_GAPS. Sie machen das Gate nicht ro
 *neue* Luecke schon. Ohne diese Liste stuende das Gate dauerhaft auf YELLOW und waere als
 Signal wertlos; genau der Fehler, den docs-check.sh bis 2026-09-20 hatte.
 
-Generierte Seiten (Punkt 4) werden zusaetzlich wie jede andere Seite auf Links und DE/EN-Gleichstand
-geprueft; ihre Vorlagen unter scripts/docs-reference/ dagegen nicht (siehe TEMPLATE_PREFIXES).
+Generated pages (point 4) are also checked for links and DE/EN parity like any other page; their
+templates under scripts/docs-reference/ are not (see TEMPLATE_PREFIXES).
 
 Run:  python3 scripts/public-readiness/docs_parity_check.py
       python3 scripts/public-readiness/docs_parity_check.py --root <dir>
@@ -50,18 +50,18 @@ from md_common import FENCE, headings, iter_links, slug, tracked_markdown  # noq
 # Unterordner von docs/, die wie docs/ selbst eins zu eins unter docs/en/ gespiegelt werden.
 # Bewusst eine Liste statt "was es unter docs/en/ gibt": sonst bliebe ein Ordner, dessen
 # englische Fassung ganz fehlt, unsichtbar — so blieb docs/konzepte/ unbemerkt (TODO b94beaed).
-MIRRORED_SUBDIRS: tuple[str, ...] = ("konzepte",)  # docs/onboarding/ entfiel im Doku-Umbau (TODO 1ab3ad21)
+MIRRORED_SUBDIRS: tuple[str, ...] = ("konzepte",)  # docs/onboarding/ dropped in the docs rework (TODO 1ab3ad21)
 
 # Bekannte, ticketierte Luecken. Format: Pfad -> Begruendung mit TODO-Kennung.
 # Zurzeit leer: die zehn Diagramm-Seiten, die hier standen, haben seit TODO 47bd4d27 ein
 # englisches Gegenstueck — erzeugt von scripts/docs-diagrams.py aus derselben Quelle.
 KNOWN_GAPS: dict[str, str] = {}
 
-# Vorlagen der erzeugten Referenzseiten (scripts/docs-reference/<seite>.<de|en>.md). Ihre relativen
-# Links gelten erst am Ziel unter docs/ bzw. docs/en/ und werden dort geprueft, nicht hier.
+# Templates of the generated reference pages (scripts/docs-reference/<page>.<de|en>.md). Their relative
+# links only hold at the target under docs/ or docs/en/ and are checked there, not here.
 TEMPLATE_PREFIXES: tuple[str, ...] = ("scripts/docs-reference/",)
 
-# Der Erzeuger der Referenzseiten; aufgerufen mit --root, damit Tests ihn auf Fixtures richten koennen.
+# The generator of the reference pages; called with --root so tests can point it at fixtures.
 REFERENCE_SCRIPT = Path(__file__).resolve().parents[1] / "docs-reference.py"
 
 # Einzelne Abschnitte ohne Gegenstueck. Format: "datei::ueberschrift" -> TODO-Kennung.
@@ -97,10 +97,10 @@ def check_links(root: Path, files: list[str]) -> tuple[list[str], int]:
 
 
 def check_generated(root: Path) -> list[str]:
-    """Erzeugte Referenzseiten, die nicht mehr zu ihrer Quelle passen (TODO 1ab3ad21).
+    """Generated reference pages that no longer match their source (TODO 1ab3ad21).
 
-    Fragt `scripts/docs-reference.py --check`. Ein Repo ohne die Quellen und ohne die Seiten
-    (Fixtures) prueft der Erzeuger selbst nicht — er meldet dann nichts.
+    Asks `scripts/docs-reference.py --check`. A repo without the sources and without the pages
+    (fixtures) is not checked by the generator itself — it then reports nothing.
     """
     if not REFERENCE_SCRIPT.is_file():
         return []

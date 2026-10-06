@@ -642,7 +642,7 @@ OUT=$(bash "$SCRIPT" --root "$FAKE" 2>&1); RC=$?
 check "Bezug ueber den Umbruch hinweg erkannt" \
   'grep -qE "^DRIFT docs/zahlen.md:3 zahl-ueber-ausgelieferte-definitionen.*achtmal" <<<"$OUT"'
 
-# Escape-Hatch: eine bewusst historische Zahl (etwa in einem datierten Fallbericht) bleibt moeglich.
+# Escape hatch: a deliberately historical number (say, in a dated case report) stays possible.
 cat > "$FAKE/docs/zahlen.md" <<'MD_EOF'
 # Zahlen
 In den ausgelieferten Definitionen kam diese Form achtmal vor. <!-- doc-facts-check: ignore -->

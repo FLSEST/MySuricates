@@ -72,7 +72,7 @@ echo "Fall 5: Pflichtdokument in docs/ fehlt -> YELLOW"
 rm "$FAKE/docs/baukasten.md"
 OUT="$(run_gate)"
 check "gate_status YELLOW"           'grep -q "^gate_status: YELLOW" <<< "$OUT"'
-check "docs/baukasten.md als missing" 'grep -q "^missing: docs/baukasten.md$" <<< "$OUT"'
+check "docs/baukasten.md reported as missing" 'grep -q "^missing: docs/baukasten.md$" <<< "$OUT"'
 
 echo "Fall 6: Schnellstart hinter zu viel Text -> YELLOW ohne todo_item (TODO 1b84ecab)"
 echo "# baukasten.md" > "$FAKE/docs/baukasten.md"

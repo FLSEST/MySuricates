@@ -1,46 +1,46 @@
 #!/usr/bin/env python3
-"""Erzeugt die Referenzseiten der Doku aus dem Code, statt sie von Hand zu pflegen (TODO 1ab3ad21).
+"""Generates the reference pages of the docs from the code instead of maintaining them by hand (TODO 1ab3ad21).
 
-Was entsteht, woraus
---------------------
-    docs/api-referenz.md   + docs/en/   aus den REST-Controllern
+What is generated, from what
+----------------------------
+    docs/api-referenz.md   + docs/en/   from the REST controllers
                                         (ai-automation-backend/src/main/java/com/automation/controller/**),
-                                        dem Enum ErrorCode und ModuleCatalog (Modulnamen)
-    docs/block-referenz.md + docs/en/   aus ai-automation-frontend/src/data/blockConfigSchema.json
+                                        the enum ErrorCode and ModuleCatalog (module names)
+    docs/block-referenz.md + docs/en/   from ai-automation-frontend/src/data/blockConfigSchema.json
 
-Jede Seite beginnt mit dem Kommentar MARKER und der von Hand gepflegten Einleitung aus
-scripts/docs-reference/<seite>.<de|en>.md (Titel, Lesehilfe, was der Code nicht hergibt). Alles
-danach ist erzeugt. Wer etwas aendern will, aendert die Quelle oder die Vorlage und ruft --write.
+Every page starts with the comment MARKER and the hand-maintained introduction from
+scripts/docs-reference/<page>.<de|en>.md (title, reading guide, what the code does not provide). Everything
+after it is generated. To change something, change the source or the template and run --write.
 
-API: je Bereich (erstes Pfadsegment nach /api/v1) ein Abschnitt mit der Tabelle Endpunkt | Zweck | Modul.
-  - Endpunkte erkennt das Skript wie scripts/public-readiness/api-endpoint-diff.sh: Klassen-@RequestMapping
-    als Basis, dazu @Get/Post/Put/Patch/DeleteMapping und @RequestMapping(method = ...), zeilenweise.
-    Beide Gates sehen so dieselbe Menge. Methode und Pfad stehen in EINER Zelle ("GET /api/v1/..."),
-    weil das Diff-Skript genau diese Schreibweise in der Doku sucht.
-  - Zweck ist der erste Satz des Javadoc der Handler-Methode. Fehlt das Javadoc, bleibt die Zelle leer —
-    erfunden wird nichts. Kuerzel wie "(TODO 1a2b3c4d)" fallen weg, {@code x} wird zu `x`.
-  - Hinweise: Was im Javadoc der Handler-Methode nach dem ersten Satz steht (bis zum ersten Block-Tag wie
-    @param/@return/@throws), erscheint unter der Tabelle des Bereichs als Liste "Hinweise" (EN "Notes"),
-    eine Zeile je Endpunkt: "- `METHODE /pfad` — Text". So bleiben Regeln (Statuscodes, Grenzen,
-    Nebenwirkungen) sichtbar, die nicht in den einen Satz der Tabelle passen.
-  - Modul: @RequiresModule an der Methode, sonst an der Klasse (dieselbe Reihenfolge wie
-    ModuleGuardInterceptor), sonst Kern.
-  - Verlinkbar ist ein Bereich ("api-referenz.md#apiv1schedules"), kein einzelner Endpunkt: Tabellenzeilen
-    haben keinen Anker.
+API: per area (first path segment after /api/v1) one section with the table endpoint | purpose | module.
+  - The script detects endpoints like scripts/public-readiness/api-endpoint-diff.sh: the class @RequestMapping
+    as base, plus @Get/Post/Put/Patch/DeleteMapping and @RequestMapping(method = ...), line by line.
+    So both gates see the same set. Method and path stand in ONE cell ("GET /api/v1/..."),
+    because the diff script looks for exactly this notation in the docs.
+  - Purpose is the first sentence of the handler method's Javadoc. Without Javadoc the cell stays empty —
+    nothing is made up. Tags like "(TODO 1a2b3c4d)" are dropped, {@code x} becomes `x`.
+  - Notes: what the handler method's Javadoc says after the first sentence (up to the first block tag such as
+    @param/@return/@throws) appears below the area's table as the list "Hinweise" (EN "Notes"),
+    one line per endpoint: "- `METHOD /path` — text". This keeps rules (status codes, limits,
+    side effects) visible that do not fit into the one sentence of the table.
+  - Module: @RequiresModule on the method, else on the class (the same order as
+    ModuleGuardInterceptor), else core.
+  - An area can be linked ("api-referenz.md#apiv1schedules"), a single endpoint cannot: table rows
+    have no anchor.
 
-Bloecke: die gemeinsamen Felder (on_failure, commonFields), die KI-Felder (ai) und je Block-Typ eine
-Tabelle Schluessel | Typ | Pflicht | Standard | Werte | Bedeutung; "#name" in einer Feldliste verweist
-auf sharedFields.
+Blocks: the common fields (on_failure, commonFields), the AI fields (ai) and per block type a
+table key | type | required | default | values | meaning; "#name" in a field list refers
+to sharedFields.
 
-Run:  python3 scripts/docs-reference.py --write     Seiten neu schreiben
-      python3 scripts/docs-reference.py --check     nur vergleichen, nichts schreiben
-      ... --root <dir>                              andere Repo-Wurzel (Tests)
-Exit: 0 = aktuell bzw. geschrieben, 1 = (--check) mindestens eine Seite veraltet,
-      2 = Quelle oder Vorlage fehlt, obwohl die Seite existiert
+Run:  python3 scripts/docs-reference.py --write     rewrite the pages
+      python3 scripts/docs-reference.py --check     compare only, write nothing
+      ... --root <dir>                              another repo root (tests)
+Exit: 0 = up to date or written, 1 = (--check) at least one page is stale,
+      2 = source or template missing although the page exists
 
-Eine Seite, von der weder Quelle noch Erzeugnis existiert, wird uebersprungen: So laeuft die Pruefung
-auch in Fixture-Verzeichnissen der Tests, die nur einen Teil des Repos nachbauen.
-Nur Python-Standardbibliothek.
+A page of which neither source nor output exists is skipped: that way the check also runs
+in the tests' fixture directories, which rebuild only part of the repo.
+Python standard library only.
 """
 from __future__ import annotations
 
@@ -62,11 +62,11 @@ TEMPLATE_DIR = "scripts/docs-reference"
 
 
 class SourceError(Exception):
-    """Eine Quelle ist da, aber nicht lesbar — oder fehlt, obwohl die Seite existiert."""
+    """A source exists but cannot be read — or is missing although the page exists."""
 
 
 # ---------------------------------------------------------------------------
-# Texte der erzeugten Teile, je Sprache. Alles Inhaltliche kommt aus dem Code.
+# Texts of the generated parts, per language. All content comes from the code.
 # ---------------------------------------------------------------------------
 TEXT = {
     "de": {
@@ -123,8 +123,8 @@ TEXT = {
     },
 }
 
-# Statuscodes der Konstanten von org.springframework.http.HttpStatus, die vorkommen koennen.
-# Eine unbekannte Konstante erscheint unter ihrem Namen statt als Zahl — nichts wird geraten.
+# Status codes of the org.springframework.http.HttpStatus constants that can occur.
+# An unknown constant appears under its name instead of as a number — nothing is guessed.
 HTTP_STATUS = {
     "OK": 200, "CREATED": 201, "ACCEPTED": 202, "NO_CONTENT": 204,
     "BAD_REQUEST": 400, "UNAUTHORIZED": 401, "PAYMENT_REQUIRED": 402, "FORBIDDEN": 403,
@@ -137,10 +137,10 @@ HTTP_STATUS = {
 
 
 # ---------------------------------------------------------------------------
-# Hilfen
+# Helpers
 # ---------------------------------------------------------------------------
 def cell(text: str) -> str:
-    """Text fuer eine Tabellenzelle: einzeilig, senkrechte Striche maskiert."""
+    """Text for a table cell: single line, vertical bars escaped."""
     return re.sub(r"\s+", " ", text).strip().replace("|", "\\|")
 
 
@@ -152,11 +152,11 @@ def read(path: str) -> str:
 # ---------------------------------------------------------------------------
 # Javadoc
 # ---------------------------------------------------------------------------
-# Abkuerzungen, deren Punkt keinen Satz beendet.
+# Abbreviations whose period does not end a sentence.
 ABBREVIATIONS = ("z. B.", "z.B.", "d. h.", "d.h.", "u. a.", "e.g.", "i.e.", "bzw.", "ca.", "vs.",
                  "etc.", "inkl.", "ggf.", "evtl.", "usw.", "max.", "min.", "Nr.", "resp.", "approx.")
-_HIDE = "\u2063"  # unsichtbares Trennzeichen, haelt Abkuerzungspunkte waehrend der Satzsuche fest
-# Herkunftskuerzel: "(TODO 1a2b3c4d)", "(TODO 1a2b3c4d Ziele Stufe 3)", "(c2cda5ed)", "– TODO 1a2b3c4d".
+_HIDE = "\u2063"  # invisible separator, holds abbreviation periods in place during the sentence search
+# Origin tags: "(TODO 1a2b3c4d)", "(TODO 1a2b3c4d Ziele Stufe 3)", "(c2cda5ed)", "– TODO 1a2b3c4d".
 _TODO_REF = re.compile(r"\s*\((?:TODO\s+)?[0-9a-f]{8}\b[^()]*\)|\s*[–—-]\s*TODO\s+[0-9a-f]{8}\b")
 _HTML_CODE = re.compile(r"<code>(.*?)</code>", re.S)
 _HTML_TAG = re.compile(r"</?[a-zA-Z][^>]*>")
@@ -165,7 +165,7 @@ _SENTENCE_END = re.compile(r"[.!?](?=\s|$)")
 
 
 def _inline_tags(text: str) -> str:
-    """{@code x} -> `x`, {@link A#b label} -> label bzw. `A#b`, {@literal x} -> x; Klammern balanciert."""
+    """{@code x} -> `x`, {@link A#b label} -> label or `A#b`, {@literal x} -> x; braces balanced."""
     out: list[str] = []
     i = 0
     while i < len(text):
@@ -197,7 +197,7 @@ def _inline_tags(text: str) -> str:
 
 
 def _plain(text: str) -> str:
-    """Javadoc-Text als einzeiliges Markdown: Inline-Tags, HTML, Entities und Herkunftskuerzel aufgeloest."""
+    """Javadoc text as single-line Markdown: inline tags, HTML, entities and origin tags resolved."""
     text = _inline_tags(text)
     text = _HTML_CODE.sub(lambda m: f"`{m.group(1)}`", text)
     text = _PARAGRAPH.sub(" ", text)
@@ -208,14 +208,15 @@ def _plain(text: str) -> str:
 
 
 def describe(javadoc_lines: list[str]) -> tuple[str, str]:
-    """(erster Satz, Rest) der Beschreibung eines Javadoc-Blocks (Zeilen ohne /** */ und Sternchen).
+    """(first sentence, rest) of the description of a Javadoc block (lines without /** */ and asterisks).
 
-    Die Beschreibung endet am ersten Block-Tag (@param, @return, @throws, ...). Der erste Satz endet am
-    ersten Satzzeichen vor Leerraum oder am ersten <p>; der Rest ist alles danach, ebenfalls einzeilig.
+    The description ends at the first block tag (@param, @return, @throws, ...). The first sentence ends at
+    the first punctuation mark before whitespace or at the first <p>; the rest is everything after it, also
+    on a single line.
     """
     text_lines: list[str] = []
     for line in javadoc_lines:
-        if line.startswith("@"):  # Block-Tag: dort endet die Beschreibung
+        if line.startswith("@"):  # block tag: the description ends here
             break
         text_lines.append(line)
     parts = _PARAGRAPH.split(" ".join(text_lines), maxsplit=1)
@@ -232,12 +233,12 @@ def describe(javadoc_lines: list[str]) -> tuple[str, str]:
 
 
 def first_sentence(javadoc_lines: list[str]) -> str:
-    """Erster Satz eines Javadoc-Blocks (Zeilen ohne /** */ und Sternchen)."""
+    """First sentence of a Javadoc block (lines without /** */ and asterisks)."""
     return describe(javadoc_lines)[0]
 
 
 def javadoc_above(lines: list[str], index: int) -> list[str] | None:
-    """Javadoc ueber der Annotationsgruppe, zu der Zeile `index` gehoert; None, wenn keins da ist."""
+    """Javadoc above the annotation group that line `index` belongs to; None if there is none."""
     j = index - 1
     while j >= 0 and (lines[j].strip().startswith("@") or not lines[j].strip()):
         j -= 1
@@ -246,7 +247,7 @@ def javadoc_above(lines: list[str], index: int) -> list[str] | None:
     end = j
     while j >= 0 and "/**" not in lines[j]:
         if "/*" in lines[j] and "/**" not in lines[j]:
-            return None  # gewoehnlicher Blockkommentar, kein Javadoc
+            return None  # ordinary block comment, not Javadoc
         j -= 1
     if j < 0:
         return None
@@ -260,7 +261,7 @@ def javadoc_above(lines: list[str], index: int) -> list[str] | None:
 
 
 # ---------------------------------------------------------------------------
-# Controller lesen (Erkennung wie api-endpoint-diff.sh)
+# Reading controllers (detection as in api-endpoint-diff.sh)
 # ---------------------------------------------------------------------------
 ANN_METHOD = {"Get": "GET", "Post": "POST", "Put": "PUT", "Patch": "PATCH", "Delete": "DELETE"}
 METHOD_ORDER = ("GET", "POST", "PUT", "PATCH", "DELETE")
@@ -271,7 +272,7 @@ REQUIRES_RE = re.compile(r"@RequiresModule\s*\(\s*(?:value\s*=\s*)?(?:ModuleCata
 
 
 def extract_path_literals(args: str) -> list[str]:
-    """Nur value/path liefert Pfade — nicht produces/consumes/headers/params (wie im Diff-Skript)."""
+    """Only value/path yields paths — not produces/consumes/headers/params (as in the diff script)."""
     if not args:
         return []
     m = re.search(r'\b(?:value|path)\s*=\s*(\{[^}]*\}|"[^"]*")', args)
@@ -287,7 +288,7 @@ def extract_path_literals(args: str) -> list[str]:
 
 
 def clean_path(p: str) -> str:
-    """Pfad wie im Code, Schraegstriche bereinigt; Pfadvariablen behalten ihren Namen."""
+    """Path as in the code, slashes cleaned up; path variables keep their name."""
     if not p:
         p = "/"
     if not p.startswith("/"):
@@ -316,7 +317,7 @@ class Controller:
 
 
 def module_keys(root: str) -> dict[str, str]:
-    """ModuleCatalog-Konstante -> Modulname (CHAINS -> chains)."""
+    """ModuleCatalog constant -> module name (CHAINS -> chains)."""
     path = os.path.join(root, MODULE_CATALOG)
     if not os.path.isfile(path):
         return {}
@@ -324,7 +325,7 @@ def module_keys(root: str) -> dict[str, str]:
 
 
 def extract_endpoints(root: str) -> tuple[list[Endpoint], dict[str, Controller]]:
-    """Alle Endpunkte und je Controller der erste Satz seines Klassen-Javadoc."""
+    """All endpoints and, per controller, the first sentence of its class Javadoc."""
     modules = module_keys(root)
     endpoints: list[Endpoint] = []
     controllers: dict[str, Controller] = {}
@@ -371,7 +372,7 @@ def extract_endpoints(root: str) -> tuple[list[Endpoint], dict[str, Controller]]
 
 
 def _method_module(lines: list[str], index: int) -> str | None:
-    """@RequiresModule in der Annotationsgruppe der Zeile `index` (darueber und darunter)."""
+    """@RequiresModule in the annotation group of line `index` (above and below)."""
     j = index
     while j >= 0 and (lines[j].strip().startswith("@") or not lines[j].strip()):
         r = REQUIRES_RE.search(lines[j])
@@ -454,7 +455,7 @@ def render_api(root: str, lang: str, intro: str) -> str:
 
 
 # ---------------------------------------------------------------------------
-# Block-Config
+# Block config
 # ---------------------------------------------------------------------------
 def _code(value) -> str:
     if isinstance(value, str):
@@ -552,7 +553,7 @@ def render_blocks(root: str, lang: str, intro: str) -> str:
 
 
 # ---------------------------------------------------------------------------
-# Seiten
+# Pages
 # ---------------------------------------------------------------------------
 @dataclass
 class Page:
@@ -574,7 +575,7 @@ PAGES = (
 
 
 def build(root: str) -> tuple[dict[str, str], list[str]]:
-    """Erzeugt alle Seiten: ({Zielpfad: Inhalt}, [Fehler]). Seiten ohne Quelle und ohne Erzeugnis entfallen."""
+    """Generates all pages: ({target path: content}, [errors]). Pages without source and output are left out."""
     result: dict[str, str] = {}
     errors: list[str] = []
     for page in PAGES:

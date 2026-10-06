@@ -147,12 +147,12 @@ PROVIDERS="$(fact_providers)"
 COMMITS="$(fact_commits)"
 
 # ---------------------------------------------------------------------------
-# Versionen von Technologietabellen ("| **React** | 19.2 |", heute keine in der Doku)
+# Versions in technology tables ("| **React** | 19.2 |", none in the docs today)
 #
-# Quelle ist pom.xml bzw. package.json. Die Doku kuerzt ("React 19.2" fuer
-# 19.2.4) — geprueft wird deshalb komponentenweise als Praefix, siehe
-# doc_facts_check.py. Fehlt eine Quelle, bricht der Lauf ab: eine leere Version
-# wuerde jede Tabellenzeile stumm durchwinken.
+# The source is pom.xml or package.json. The docs abbreviate ("React 19.2" for
+# 19.2.4) — so the check is a component-wise prefix match, see
+# doc_facts_check.py. If a source is missing, the run aborts: an empty version
+# would silently wave every table row through.
 # ---------------------------------------------------------------------------
 pom_property() {  # $1 = Name des Property-Tags
   sed -n "s|.*<$1>\([^<]*\)</$1>.*|\1|p" "$POM" 2>/dev/null | head -1
