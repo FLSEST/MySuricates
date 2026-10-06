@@ -42,13 +42,13 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 
 /**
- * Ziele anlegen, aendern, loeschen und lesen – samt Fortschritt aus den eingeordneten TODOs
- * (TODO dc0566f8). Zuordnen und Ordnen der TODOs liegt in {@link GoalMembershipService}, die
- * Einschaetzung eines einzelnen TODOs in {@link TodoPlanningService}.
+ * Create, change, delete and read goals - including progress from the assigned TODOs
+ * (TODO dc0566f8). Assigning and ordering the TODOs lives in {@link GoalMembershipService}, the
+ * assessment of a single TODO in {@link TodoPlanningService}.
  *
- * <p>Alles liest schlanke Projektionen ({@link GoalTodoRow}, {@link GoalStatusCounts},
- * {@link GoalProjectRow}) – ein Ziel mit 40 TODOs soll nicht 40 Beschreibungen durch die einzige
- * SQLite-Verbindung ziehen. Die Projekte eines Ziels (TODO c60bf914) pflegt {@link GoalProjectService}.
+ * <p>Everything reads slim projections ({@link GoalTodoRow}, {@link GoalStatusCounts},
+ * {@link GoalProjectRow}) - a goal with 40 TODOs should not pull 40 descriptions through the single
+ * SQLite connection. The projects of a goal (TODO c60bf914) are maintained by {@link GoalProjectService}.
  */
 @Service
 @RequiredArgsConstructor
@@ -60,7 +60,7 @@ public class GoalService {
 
     static final Comparator<GoalTodoRow> WORK_ORDER = workOrder(GoalTodoRow::goalRank, GoalTodoRow::priority, GoalTodoRow::createdAt);
 
-    /** Arbeitsreihenfolge fuer jede Zeilenart: Rang (ohne Rang zuletzt), dann Prioritaet, dann Alter. */
+    /** Working order for every row kind: rank (no rank last), then priority, then age. */
     static <T> Comparator<T> workOrder(Function<T, Integer> rank, Function<T, Todo.Priority> priority,
                                        Function<T, Instant> createdAt) {
         return Comparator.comparing(rank, Comparator.nullsLast(Comparator.<Integer>naturalOrder()))
@@ -79,9 +79,9 @@ public class GoalService {
     private final Clock clock;
 
     /**
-     * Ohne Statusfilter: aktive und erledigte Ziele, archivierte nur auf Nachfrage. Mit
-     * {@code projectId} nur die Ziele, denen dieses Projekt zugeordnet ist (TODO c60bf914). Je Ziel der
-     * naechste nicht erreichte Meilenstein – fuer alle Ziele aus einer Abfrage mit Paket-Zaehlern.
+     * Without status filter: active and completed goals, archived ones only on request. With
+     * {@code projectId} only the goals this project is assigned to (TODO c60bf914). Per goal the
+     * next unreached milestone - for all goals from one query with package counters.
      */
     @Transactional(readOnly = true)
     public List<GoalResponse> list(List<Goal.Status> statuses, String projectId) {
@@ -109,17 +109,17 @@ public class GoalService {
                 .toList();
     }
 
-    /** Ein Ziel mit Fortschritt und Waechter, ohne TODO-Liste (Antwort von {@code POST /goals/{id}/guard}). */
+    /** A goal with progress and guard, without TODO list (response of {@code POST /goals/{id}/guard}). */
     @Transactional(readOnly = true)
     public GoalResponse get(String id) {
         return detailOf(find(id)).goal();
     }
 
     /**
-     * Schreibend, weil das Lesen ein Arbeitspaket oder einen Meilenstein zum ersten Mal als
-     * abgeschlossen bzw. erreicht erkennen kann – dann wird {@code completedAt}/{@code reachedAt}
-     * gespeichert (TODO 259f4f66, c60bf914). Sonst schreibt es nichts. Ziel samt Paketen in einer
-     * Abfrage, der Rest in {@link GoalDetailAssembler}.
+     * Writing, because reading may recognise a work package or milestone as completed or
+     * reached for the first time - then {@code completedAt}/{@code reachedAt} is
+     * stored (TODO 259f4f66, c60bf914). Otherwise it writes nothing. Goal with packages in one
+     * query, the rest in {@link GoalDetailAssembler}.
      */
     @Transactional
     public GoalDetailResponse detail(String id) {
@@ -128,7 +128,7 @@ public class GoalService {
         return detailAssembler.detailOf(loaded.goal(), loaded.workPackages());
     }
 
-    /** Mit {@code projectIds} gleich samt Projekten in dieser Reihenfolge; ein unbekanntes Projekt ist ein 404. */
+    /** With {@code projectIds} directly with projects in this order; an unknown project is a 404. */
     @Transactional
     public GoalResponse create(CreateGoalRequest request) {
         List<String> projectIds = request.projectIds() == null ? List.of() : request.projectIds().stream()
@@ -170,7 +170,7 @@ public class GoalService {
         return detailOf(saved).goal();
     }
 
-    /** Loest die TODOs vom Ziel und loescht es; die TODOs bleiben erhalten. */
+    /** Detaches the TODOs from the goal and deletes it; the TODOs are kept. */
     @Transactional
     public void delete(String id) {
         Goal goal = find(id);
@@ -182,7 +182,7 @@ public class GoalService {
         return goalRepository.findById(id).orElseThrow(() -> new ResourceNotFoundException("Goal", id));
     }
 
-    /** Zielansicht nach einer Aenderung; die Pakete werden dafuer nachgeladen. */
+    /** Goal view after a change; the packages are reloaded for it. */
     GoalDetailResponse detailOf(Goal goal) {
         return detailAssembler.detailOf(goal, workPackageRepository.findByGoalId(goal.getId()));
     }
@@ -220,7 +220,7 @@ public class GoalService {
                 guard != null ? guard : GoalGuardResponse.NONE, projects != null ? projects : List.of(), nextMilestone);
     }
 
-    /** {@code 2026-10-15} oder ein ISO-Zeitpunkt; leer = kein Datum. */
+    /** {@code 2026-10-15} or an ISO timestamp; empty = no date. */
     static Instant parseDate(String value) {
         if (value == null || value.isBlank()) {
             return null;

@@ -34,7 +34,7 @@ import static com.automation.service.todo.AutoTodoService.TAG_AUTO_WORKFLOW;
 @Slf4j
 public class GranularTodoService {
 
-    /** So lang muss ein abgeschnittener Titel mindestens sein, um als Fragment zu zaehlen. */
+    /** Minimum length of a truncated title to count as a fragment. */
     private static final int PREFIX_MIN_LENGTH = 20;
 
     private final TodoRepository todoRepository;
@@ -91,10 +91,10 @@ public class GranularTodoService {
     }
 
     /**
-     * Ein Befund, zwei Zeilen: Wrapper-Bloecke (Komprimierung, Weiterreichen einer Ausgabe) kuerzen
-     * oder verstellen Titel, wodurch dieselbe Zeile ein zweites TODO erzeugte (TODO 8d02ed3f).
-     * Verglichen wird der normalisierte Titel; von zwei Dubletten gewinnt der laengere, weil der
-     * kuerzere in aller Regel der abgeschnittene ist.
+     * One finding, two lines: wrapper blocks (compression, passing on an output) shorten
+     * or distort titles, which made the same line produce a second TODO (TODO 8d02ed3f).
+     * The normalised title is compared; of two duplicates the longer one wins, because the
+     * shorter one is as a rule the truncated one.
      */
     private static List<Item> deduplicate(List<Item> items) {
         List<Item> kept = new ArrayList<>();
@@ -125,15 +125,15 @@ public class GranularTodoService {
     }
 
     /**
-     * Gleicher normalisierter Titel — oder der kuerzere ist nachweislich die abgeschnittene Fassung
-     * des laengeren. Nachweislich heisst: er endet auf „…"/„..." <em>und</em> ist mindestens
-     * {@link #PREFIX_MIN_LENGTH} Zeichen lang.
+     * Same normalised title - or the shorter one is demonstrably the truncated version
+     * of the longer one. Demonstrably means: it ends in "…"/"..." <em>and</em> is at least
+     * {@link #PREFIX_MIN_LENGTH} characters long.
      *
-     * <p>Beide Bedingungen schuetzen einen eigenstaendigen Befund davor, verworfen zu werden — die
-     * Regel loescht eine ganze Zeile samt Prioritaet, Tags und Beschreibung. „Fehler in Modul A
-     * beheben" ist ein Praefix von „Fehler in Modul A beheben, Teil 2", aber eben kein Fragment,
-     * sondern eine eigene Aufgabe; ohne das Kuerzungszeichen bleiben beide stehen. Und ein Titel,
-     * der schon nach wenigen Zeichen abbricht, taugt auch als Fragment nicht als Beweis.
+     * <p>Both conditions protect an independent finding from being discarded - the
+     * rule deletes a whole row including priority, tags and description. "Fix error in module A"
+     * is a prefix of "Fix error in module A, part 2", but not a fragment,
+     * rather a task of its own; without the truncation mark both stay. And a title
+     * that breaks off after only a few characters is not good as proof of a fragment either.
      */
     private static boolean isDuplicate(Item a, Item b) {
         String normalizedA = normalizeTitle(a.title());
@@ -150,7 +150,7 @@ public class GranularTodoService {
                 && longerTitle.startsWith(shorterTitle);
     }
 
-    /** Hat der Titel ein Kuerzungszeichen, ist er ein Fragment und keine eigene Aufgabe. */
+    /** If the title has a truncation mark, it is a fragment and not a task of its own. */
     private static boolean wasTruncated(String title) {
         String trimmed = title == null ? "" : title.trim();
         return trimmed.endsWith("…") || trimmed.endsWith("...");
@@ -212,7 +212,7 @@ public class GranularTodoService {
         });
     }
 
-    /** Schließt in einer Transaktion alle nicht mehr gemeldeten granularen TODOs, gesammelt per saveAll (TODO dfb3fee8). */
+    /** Closes, in one transaction, all granular TODOs no longer reported, collected via saveAll (TODO dfb3fee8). */
     private void closeStale(TransactionTemplate tx, String projectId, WorkflowRunCompletedEvent event, List<String> currentTitles) {
         tx.execute(status -> {
             List<Todo> open = todoRepository.findByProjectIdAndSourceAndReferenceTypeAndReferenceIdAndStatusNot(

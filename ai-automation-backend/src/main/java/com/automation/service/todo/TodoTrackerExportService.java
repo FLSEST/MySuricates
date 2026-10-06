@@ -21,9 +21,9 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Integrations-agnostischer Single-TODO-Export: legt aus einem TODO ein Item im externen
- * Tracker an (GitHub-Issue, Jira-Issue, Trello-Card, …) und verknüpft das TODO zurück.
- * Provider/Ziel kommen aus dem Request-Override oder aus project.config.taskExport.
+ * Integration-agnostic single-TODO export: creates from a TODO an item in the external
+ * tracker (GitHub issue, Jira issue, Trello card, …) and links the TODO back.
+ * Provider/target come from the request override or from project.config.taskExport.
  *
  * <p>Extracted from {@code TodoService} (Audit-TODO 671add26). Does <b>not</b> own todo CRUD;
  * it only reads the todo, talks to the tracker and writes the export link back.
@@ -86,8 +86,8 @@ public class TodoTrackerExportService {
         Todo todo = todoRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Todo", id));
 
-        // Idempotent: schon an einen Tracker exportiert -> bestehenden Export-Link zurueckgeben, kein Duplikat.
-        // (Bewusst NUR exported_*; referenceType bleibt fuer interne/Origin-Korrelation reserviert.)
+        // Idempotent: already exported to a tracker -> return the existing export link, no duplicate.
+        // (Deliberately ONLY exported_*; referenceType stays reserved for internal/origin correlation.)
         if (isNotBlank(todo.getExportedProvider()) && isNotBlank(todo.getExportedRef())) {
             return ExportPlan.alreadyExported(existingRef(todo));
         }

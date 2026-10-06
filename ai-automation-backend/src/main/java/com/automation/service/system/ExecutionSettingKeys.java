@@ -19,11 +19,11 @@ final class ExecutionSettingKeys {
     }
 
     /**
-     * Grenzen eines Schluessels. {@code decimal} entscheidet, ob ein Bruch erlaubt ist und wie die
-     * Fehlermeldung die Zahlen schreibt (ganzzahlig {@code 1 und 50}, Bruch {@code 0.05 und 0.9}).
+     * Bounds of a key. {@code decimal} decides whether a fraction is allowed and how the
+     * error message writes the numbers (integer {@code 1 und 50}, fraction {@code 0.05 und 0.9}).
      *
-     * <p>Ein gemeinsamer Typ statt zweier Maps (TODO 4218fcaa): ein neuer Schluessel wird nur an
-     * einer Stelle eingetragen, und beide Gate-Tests pruefen dieselbe Quelle.
+     * <p>One shared type instead of two maps (TODO 4218fcaa): a new key is entered in only
+     * one place, and both gate tests check the same source.
      */
     record Bound(double min, double max, boolean decimal) {
 
@@ -32,15 +32,15 @@ final class ExecutionSettingKeys {
             return new Bound(min, max, false);
         }
 
-        /** Schluessel, dessen Wert ein Bruch sein darf. */
+        /** Key whose value may be a fraction. */
         static Bound fraction(double min, double max) {
             return new Bound(min, max, true);
         }
 
         /**
-         * Parst den Wert im Zahlenformat des Schluessels.
+         * Parses the value in the number format of the key.
          *
-         * @throws IllegalArgumentException wenn der Wert keine passende Zahl ist
+         * @throws IllegalArgumentException if the value is not a matching number
          */
         double parse(String value) {
             try {
@@ -54,7 +54,7 @@ final class ExecutionSettingKeys {
             return value >= min && value <= max;
         }
 
-        /** Schreibt eine Zahl so, wie die Fehlermeldung dieses Schluessels sie zeigt. */
+        /** Writes a number the way the error message of this key shows it. */
         String format(double value) {
             return decimal ? String.valueOf(value) : String.valueOf((long) value);
         }
@@ -102,8 +102,8 @@ final class ExecutionSettingKeys {
             Map.entry("compress-ai-max-input-chars",       Bound.whole(1000, 400000)),
             Map.entry("todo-similarity-keyword-threshold", Bound.fraction(0.05, 0.9)),
             Map.entry("dashboard-report-assist-enabled", Bound.whole(0, 1)),
-            // Messkette (TODO fc0994d6): die Applier gab es schon, die Grenzen fehlten — damit
-            // war keiner der sieben Schluessel ueber die oeffentliche API erreichbar.
+            // Measurement chain (TODO fc0994d6): the appliers already existed, the bounds were missing - so
+            // none of the seven keys was reachable through the public API.
             Map.entry("request-metrics-enabled",                Bound.whole(0, 1)),
             Map.entry("request-metrics-retention-days",         Bound.whole(0, 730)),
             Map.entry("request-metrics-slow-request-ms",        Bound.whole(0, 600000)),
@@ -180,9 +180,9 @@ final class ExecutionSettingKeys {
     }
 
     /**
-     * Prueft einen Wert gegen die Grenzen seines Schluessels — ganzzahlig oder als Bruch.
+     * Checks a value against the bounds of its key - integer or fraction.
      *
-     * @throws IllegalArgumentException wenn der Wert keine Zahl ist oder ausserhalb der Grenzen liegt
+     * @throws IllegalArgumentException if the value is not a number or lies outside the bounds
      */
     static void validate(String key, String value) {
         checkedValue(key, value);

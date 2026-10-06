@@ -10,7 +10,7 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.function.Consumer;
 
-/** Zugriffs- und Mengengrenzen: API-Rate-Limit, Extra-Mounts, Aktionen des Assistenten. */
+/** Access and quantity limits: API rate limit, extra mounts, actions of the assistant. */
 @Component
 @Order(2)
 public class AccessLimitSettings implements RuntimeSettingsGroup {

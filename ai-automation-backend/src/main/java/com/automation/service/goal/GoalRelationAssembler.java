@@ -21,9 +21,9 @@ import java.util.Map;
 import java.util.Set;
 
 /**
- * Reine Zuordnung fuer die Relationskarte (TODO c6ea8f5c): aus einer {@link GoalRelationRow} und
- * den gebuendelt geladenen Nachschlagetabellen wird Herkunft, Bearbeitung und Ergebnis.
- * Kein Repository, keine Transaktion.
+ * Pure mapping for the relation map (TODO c6ea8f5c): from a {@link GoalRelationRow} and
+ * the bulk-loaded lookup tables, origin, processing and result are derived.
+ * No repository, no transaction.
  */
 final class GoalRelationAssembler {
 
@@ -32,7 +32,7 @@ final class GoalRelationAssembler {
     static final String REF_AUDIT_FINDING = "audit_finding";
     static final String REF_HEALTH_CHECK = "health_check";
 
-    /** Dieselbe Arbeitsreihenfolge wie die Zielansicht: Rang, dann Prioritaet, dann Alter. */
+    /** Same working order as the goal view: rank, then priority, then age. */
     static final Comparator<GoalRelationRow> WORK_ORDER = GoalService.workOrder(
             GoalRelationRow::goalRank, GoalRelationRow::priority, GoalRelationRow::createdAt);
 
@@ -53,7 +53,7 @@ final class GoalRelationAssembler {
                 originOf(row, lookups), workersOf(row, lookups), resultOf(row, lookups));
     }
 
-    /** Workflow, auf den die Referenz des TODOs zeigt ({@code workflow_run} traegt die Workflow-ID). */
+    /** Workflow the TODO's reference points to ({@code workflow_run} carries the workflow ID). */
     static String referencedWorkflowId(GoalRelationRow row) {
         return REF_WORKFLOW_RUN.equals(row.referenceType()) ? row.referenceId() : null;
     }
@@ -94,7 +94,7 @@ final class GoalRelationAssembler {
         return List.copyOf(ids);
     }
 
-    /** Fix-Workflow und jeder passende aktive Trigger; Workflows, die es nicht mehr gibt, fallen weg. */
+    /** Fix workflow and every matching active trigger; workflows that no longer exist are dropped. */
     static List<Worker> workersOf(GoalRelationRow row, Lookups lookups) {
         List<Worker> workers = new ArrayList<>();
         String linkedName = row.linkedWorkflowId() == null ? null : lookups.workflowNames().get(row.linkedWorkflowId());
@@ -116,9 +116,9 @@ final class GoalRelationAssembler {
     }
 
     /**
-     * {@code null}, solange nie ein Fix-Lauf gestartet wurde – auch wenn ein Fix-Workflow verknuepft
-     * ist: Das Verknuepfen setzt {@code IDLE} ({@code TodoService}), das ist noch kein Ergebnis
-     * (TODO 05d4bfe5). Ein geloeschter Lauf hinterlaesst {@code IDLE} mit Versuchen – die bleiben sichtbar.
+     * {@code null} as long as no fix run was ever started - even if a fix workflow is linked:
+     * linking sets {@code IDLE} ({@code TodoService}), which is not yet a result
+     * (TODO 05d4bfe5). A deleted run leaves {@code IDLE} with attempts - these stay visible.
      */
     static Result resultOf(GoalRelationRow row, Lookups lookups) {
         boolean neverStarted = row.lastFixRunId() == null && row.fixAttempts() == 0;

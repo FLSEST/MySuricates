@@ -29,12 +29,12 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
- * Meilensteine eines Ziels anlegen, aendern, loeschen und mit Zustand lesen (TODO c60bf914): ein
- * Termin fuers ganze Ziel, optional mit Arbeitspaketen desselben Ziels verknuepft. Mit Paketen ist er
- * erreicht, sobald alle abgeschlossen sind; ohne Pakete markiert ihn ein Mensch ({@code reached}).
+ * Create, change, delete and read the milestones of a goal with their state (TODO c60bf914): a
+ * date for the whole goal, optionally linked to work packages of the same goal. With packages it is
+ * reached as soon as all are completed; without packages a human marks it ({@code reached}).
  *
- * <p>Lesen ist schreibend transaktional: erkennt es ein Paket oder einen Meilenstein zum ersten Mal als
- * abgeschlossen bzw. erreicht, speichert es {@code completedAt}/{@code reachedAt}.
+ * <p>Reading is a transactional write: if it recognises a package or milestone as completed or reached
+ * for the first time, it stores {@code completedAt}/{@code reachedAt}.
  */
 @Service
 @RequiredArgsConstructor
@@ -49,7 +49,7 @@ public class GoalMilestoneService {
     private final TodoRepository todoRepository;
     private final Clock clock;
 
-    /** Nach Datum, dann Titel; drei Abfragen: Ziel samt Paketen, TODO-Zeilen, Meilensteine samt Verknuepfungen. */
+    /** By date, then title; three queries: goal with packages, TODO rows, milestones with their links. */
     @Transactional
     public List<GoalMilestoneResponse> list(String goalId) {
         return snapshot(goalId).milestones();
@@ -70,8 +70,8 @@ public class GoalMilestoneService {
     }
 
     /**
-     * {@code workPackageIds} ersetzt die verknuepften Pakete. {@code reached} markiert von Hand – nur
-     * ohne verknuepfte Pakete (nach dieser Aenderung), sonst 400: mit Paketen ergibt es sich aus ihnen.
+     * {@code workPackageIds} replaces the linked packages. {@code reached} marks by hand - only
+     * without linked packages (after this change), otherwise 400: with packages it follows from them.
      */
     @Transactional
     public GoalMilestoneResponse update(String goalId, String milestoneId, UpdateGoalMilestoneRequest request) {
@@ -132,7 +132,7 @@ public class GoalMilestoneService {
                 .map(GoalWorkPackageResponse::id).collect(Collectors.toSet());
     }
 
-    /** Die abgeschlossenen unter den genannten Paketen – eine Abfrage, nur wenn es welche gibt. */
+    /** The completed ones among the given packages - one query, only if there are any. */
     private Set<String> completedOf(List<String> workPackageIds) {
         if (workPackageIds.isEmpty()) {
             return Set.of();
@@ -146,7 +146,7 @@ public class GoalMilestoneService {
         return done;
     }
 
-    /** Die genannten Pakete ohne Doppelte; jedes muss zum Ziel gehoeren, sonst 400. */
+    /** The given packages without duplicates; each must belong to the goal, otherwise 400. */
     private List<String> packagesOfGoal(String goalId, List<String> requested) {
         if (requested == null || requested.isEmpty()) {
             return List.of();
@@ -165,7 +165,7 @@ public class GoalMilestoneService {
         return ids.stream().sorted().toList();
     }
 
-    /** Ein Meilenstein eines anderen Ziels ist hier so unbekannt wie ein fehlender: 404. */
+    /** A milestone of another goal is as unknown here as a missing one: 404. */
     private GoalMilestone find(String goalId, String milestoneId) {
         return milestoneRepository.findById(milestoneId)
                 .filter(m -> m.getGoalId().equals(goalId))

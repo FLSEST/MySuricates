@@ -30,16 +30,16 @@ public class ExecutionSettingsService {
     private final Map<String, Consumer<String>> appliers;
 
     /**
-     * Nur für den Wächter-Test (TODO fc0994d6): Ein Applier ohne Eintrag in
-     * {@link ExecutionSettingKeys#BOUNDS} ist über die öffentliche API unerreichbar, weil
-     * {@code validateAndApply} zuerst {@code resolve(key)} ruft — die sieben
-     * {@code request-metrics-*}-Schlüssel waren so monatelang tote Registrierungen.
+     * Only for the guard test (TODO fc0994d6): an applier without an entry in
+     * {@link ExecutionSettingKeys#BOUNDS} is unreachable through the public API, because
+     * {@code validateAndApply} calls {@code resolve(key)} first - the seven
+     * {@code request-metrics-*} keys were dead registrations for months because of this.
      */
     Set<String> applierKeys() {
         return appliers.keySet();
     }
 
-    /** {@code groups} in {@code @Order}-Reihenfolge, wie Spring sie injiziert. */
+    /** {@code groups} in {@code @Order} order, as Spring injects them. */
     public ExecutionSettingsService(AppSettingsRepository appSettingsRepository, List<RuntimeSettingsGroup> groups) {
         this.appSettingsRepository = appSettingsRepository;
         this.groups = List.copyOf(groups);
@@ -89,7 +89,7 @@ public class ExecutionSettingsService {
         log.info("Execution setting updated: {} = {}", key, value);
     }
 
-    /** Löst den Schlüssel auf, prüft den Wert und fragt jede Gruppe, ob er gesetzt werden darf. */
+    /** Resolves the key, checks the value and asks every group whether it may be set. */
     private String check(String key, String value) {
         String canonical = ExecutionSettingKeys.resolve(key);
         ExecutionSettingKeys.validate(canonical, value);
@@ -104,9 +104,9 @@ public class ExecutionSettingsService {
     }
 
     /**
-     * Ein einzelner unbrauchbarer DB-Wert darf den Start nicht kippen: {@link #init} laeuft in
-     * {@code @PostConstruct}, eine Exception hier waere ein Startabbruch. Deshalb umschliesst der
-     * Fang auch das Anwenden selbst, nicht nur die Pruefung.
+     * A single unusable DB value must not topple the startup: {@link #init} runs in
+     * {@code @PostConstruct}, an exception here would abort the startup. Therefore the
+     * catch also wraps the applying itself, not only the check.
      */
     private void applyIfPresent(String key, Consumer<String> applier) {
         appSettingsRepository.get(key).filter(v -> !v.isBlank()).ifPresent(v -> {

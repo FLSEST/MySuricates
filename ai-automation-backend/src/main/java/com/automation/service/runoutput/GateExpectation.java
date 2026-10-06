@@ -8,24 +8,24 @@ import java.util.Map;
 import java.util.regex.Pattern;
 
 /**
- * Sagt, ob eine Workflow-Definition ein Gate-Urteil <b>bestellt</b> — ob also irgendein Block
- * seinen Ausführenden anweist, einen {@code gate_status}-Marker zu schreiben.
+ * Says whether a workflow definition <b>orders</b> a gate verdict - i.e. whether any block
+ * instructs its executor to write a {@code gate_status} marker.
  *
- * <p>Der Sinn: Ohne diese Frage ist ein Prüf-Workflow, dessen KI-Schritt still fehlschlägt, von
- * einem Workflow ohne Gate nicht zu unterscheiden — beide laufen technisch durch und werden
- * GREEN (TODO 63ecc124). Gates bleiben freiwillig; erwartet wird ein Urteil nur dort, wo die
- * Definition selbst danach fragt. Kein neues Feld, keine Migration, keine Nachpflege an
- * bestehenden Workflows.
+ * <p>The point: without this question a check workflow whose AI step fails silently cannot be told
+ * from a workflow without a gate - both run through technically and become
+ * GREEN (TODO 63ecc124). Gates stay voluntary; a verdict is only expected where the
+ * definition itself asks for it. No new field, no migration, no follow-up maintenance of
+ * existing workflows.
  *
- * <p>Gesucht wird derselbe Schlüssel, den {@link GateStatusOutputParser} aus der Ausgabe liest,
- * in allen Config-Werten — auch in verschachtelten Blöcken (foreach, switch, retry …), weil die
- * Anweisung dort genauso stehen kann.
+ * <p>The same key that {@link GateStatusOutputParser} reads from the output is searched for
+ * in all config values - also in nested blocks (foreach, switch, retry …), because the
+ * instruction can be there just as well.
  */
 public final class GateExpectation {
 
     private GateExpectation() {}
 
-    /** Wie im Parser: {@code gate_status} und {@code gate-status}, Groß-/Kleinschreibung egal. */
+    /** As in the parser: {@code gate_status} and {@code gate-status}, case-insensitive. */
     private static final Pattern ORDERS_GATE = Pattern.compile("gate[_-]status", Pattern.CASE_INSENSITIVE);
 
     /** Schutz vor pathologisch tiefen Configs; echte Definitionen bleiben weit darunter. */

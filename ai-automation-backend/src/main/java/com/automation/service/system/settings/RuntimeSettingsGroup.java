@@ -4,24 +4,24 @@ import java.util.Map;
 import java.util.function.Consumer;
 
 /**
- * Ein Themenblock laufzeit-aenderbarer Einstellungen. {@code ExecutionSettingsService} sammelt alle
- * Gruppen (Reihenfolge ueber {@code @Order}) und behaelt nur Persistieren, Validieren und
- * Zusammenfuehren — eine neue Einstellung aendert ihre Gruppe, nicht den Service.
+ * A topic block of runtime-changeable settings. {@code ExecutionSettingsService} collects all
+ * groups (order via {@code @Order}) and keeps only persisting, validating and
+ * merging - a new setting changes its group, not the service.
  *
- * <p>Schluessel und Grenzen stehen weiter zentral in {@code ExecutionSettingKeys}; der Service
- * prueft jeden Wert, bevor eine Gruppe ihn sieht.
+ * <p>Keys and bounds remain central in {@code ExecutionSettingKeys}; the service
+ * checks every value before a group sees it.
  */
 public interface RuntimeSettingsGroup {
 
-    /** Kanonischer Schluessel → Setter, in der Reihenfolge, in der DB-Werte beim Start greifen. */
+    /** Canonical key → setter, in the order in which DB values take effect at startup. */
     Map<String, Consumer<String>> appliers();
 
-    /** Traegt die aktuellen Werte (camelCase-Schluessel, wie die Einstellungsseite sie liest) ein. */
+    /** Enters the current values (camelCase keys, as the settings page reads them). */
     void currentValues(Map<String, Object> out);
 
     /**
-     * Darf dieser (bereits validierte) Wert gesetzt werden? Laeuft fuer einen ganzen Batch, bevor
-     * irgendein Wert angewendet wird; wirft bei Verbot.
+     * May this (already validated) value be set? Runs for a whole batch before
+     * any value is applied; throws on prohibition.
      */
     default void guard(String key, String value) {
     }

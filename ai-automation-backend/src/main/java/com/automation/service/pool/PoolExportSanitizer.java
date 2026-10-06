@@ -10,42 +10,42 @@ import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 /**
- * Entfernt Instanz-Bindungen aus einer Pool-JSON, bevor sie geschrieben wird.
+ * Removes instance bindings from a pool JSON before it is written.
  *
- * <p>Der Export hat die Personendaten und Instanz-UUIDs in die getrackten Pool-Dateien gebracht,
- * weil er den Workflow eins zu eins übernommen hat. Diese Klasse ist die Gegenprobe zum
- * Hygiene-Gate ({@code scripts/ci/pool-neutrality.sh}): was das Gate im Bestand beanstandet,
- * entsteht hier gar nicht erst.
+ * <p>The export brought personal data and instance UUIDs into the tracked pool files,
+ * because it took over the workflow one to one. This class is the counter-check to the
+ * hygiene gate ({@code scripts/ci/pool-neutrality.sh}): what the gate objects to in the existing files
+ * is not produced here in the first place.
  *
- * <p>Zwei Regeln, bewusst eng gefasst:
+ * <p>Two rules, deliberately narrow:
  * <ol>
- *   <li><b>Instanz-Referenzschlüssel</b> ({@code projectId}, {@code workflowId}, {@code runId} …)
- *       fallen weg — es sei denn, ihr Wert ist leer oder eine Template-Variable
- *       ({@code {{ project_id }}}). Ein Platzhalter ist die portable Parametrisierung und bleibt.</li>
- *   <li><b>UUID-Werte</b> fallen weg, egal unter welchem Schlüssel. Steht die UUID in einem
- *       längeren Text (Prompt), wird nur die UUID durch {@link #REDACTED_UUID} ersetzt, damit der
- *       Text nicht zerfällt.</li>
+ *   <li><b>Instance reference keys</b> ({@code projectId}, {@code workflowId}, {@code runId} …)
+ *       are dropped - unless their value is empty or a template variable
+ *       ({@code {{ project_id }}}). A placeholder is the portable parametrisation and stays.</li>
+ *   <li><b>UUID values</b> are dropped, regardless of the key. If the UUID sits in a
+ *       longer text (prompt), only the UUID is replaced by {@link #REDACTED_UUID}, so that the
+ *       text does not fall apart.</li>
  * </ol>
  *
- * <p>Nicht wiederverwendbar: eine Instanz sammelt die Fundstellen eines Laufs in
+ * <p>Not reusable: an instance collects the findings of one run in
  * {@link #removedPaths()}.
  */
 public class PoolExportSanitizer {
 
-    /** Platzhalter für eine UUID, die mitten in einem Text stand. */
+    /** Placeholder for a UUID that stood in the middle of a text. */
     public static final String REDACTED_UUID = "REDACTED-UUID";
 
     private static final Pattern UUID = Pattern.compile(
             "[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}");
 
-    /** Template-Variable wie {@code {{ project_id }}} — eine Parametrisierung, kein Instanzwert. */
+    /** Template variable like {@code {{ project_id }}} - a parametrisation, not an instance value. */
     private static final Pattern PLACEHOLDER = Pattern.compile("\\{\\{[^}]*}}");
 
     /**
-     * Die Instanz-Referenzschlüssel in camelCase — die eine Quelle für Export und Hygiene-Gate.
-     * {@code PoolSanitizerKeysTest} erzeugt daraus {@code scripts/lib/pool-sanitizer.generated.sh},
-     * das {@code scripts/ci/pool-neutrality.sh} liest (TODO 96640e6f). Verglichen wird normalisiert
-     * (ohne {@code _}/{@code -}, klein), {@code project_id} zählt also mit.
+     * The instance reference keys in camelCase - the single source for export and hygiene gate.
+     * {@code PoolSanitizerKeysTest} generates {@code scripts/lib/pool-sanitizer.generated.sh} from it,
+     * which {@code scripts/ci/pool-neutrality.sh} reads (TODO 96640e6f). Comparison is normalised
+     * (without {@code _}/{@code -}, lower case), so {@code project_id} counts too.
      */
     private static final List<String> INSTANCE_REFERENCE_KEYS = List.of(
             "projectId", "workflowId", "runId", "scheduleId", "chainId",
@@ -54,19 +54,19 @@ public class PoolExportSanitizer {
     private static final Set<String> NORMALIZED_INSTANCE_REFERENCE_KEYS =
             INSTANCE_REFERENCE_KEYS.stream().map(PoolExportSanitizer::normalize).collect(Collectors.toSet());
 
-    /** Instanz-Referenzschlüssel in camelCase, in Deklarationsreihenfolge. */
+    /** Instance reference keys in camelCase, in declaration order. */
     public static List<String> instanceReferenceKeys() {
         return INSTANCE_REFERENCE_KEYS;
     }
 
     private final List<String> removedPaths = new ArrayList<>();
 
-    /** Pfade der entfernten oder ersetzten Stellen, z. B. {@code blocks[0].config.projectId}. */
+    /** Paths of the removed or replaced places, e.g. {@code blocks[0].config.projectId}. */
     public List<String> removedPaths() {
         return List.copyOf(removedPaths);
     }
 
-    /** Liefert eine bereinigte Kopie des Knotens. */
+    /** Returns a sanitised copy of the node. */
     public Object scrub(Object node) {
         return scrub("", node);
     }
@@ -95,8 +95,8 @@ public class PoolExportSanitizer {
             for (int i = 0; i < list.size(); i++) {
                 String childPath = path + "[" + i + "]";
                 Object value = scrub(childPath, list.get(i));
-                // Ein Element, das nur eine UUID ist (z. B. in skillIds), fällt ganz weg —
-                // ein null an seiner Stelle wäre für den Leser ein kaputter Eintrag.
+                // An element that is only a UUID (e.g. in skillIds) is dropped entirely -
+                // a null in its place would look like a broken entry to the reader.
                 if (value == DROP) {
                     removedPaths.add(childPath);
                     continue;
@@ -131,6 +131,6 @@ public class PoolExportSanitizer {
         return !s.isBlank() && !PLACEHOLDER.matcher(s).find();
     }
 
-    /** Marker für „dieser Wert fällt weg“ — {@code null} wäre von einem echten null nicht zu trennen. */
+    /** Marker for "this value is dropped" - {@code null} could not be told apart from a real null. */
     private static final Object DROP = new Object();
 }

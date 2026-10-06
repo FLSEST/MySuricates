@@ -49,9 +49,9 @@ public class TodoResponseAssembler {
     }
 
     public List<TodoResponse> toResponses(List<Todo> todos) {
-        // Nur ID und Name: findAllById laedt ganze Projekte bzw. Workflows samt Projekt, und die
-        // Container-Beziehung des Projekts (nullable one-to-one, nicht als Proxy moeglich) kostet je
-        // Projekt eine Abfrage mehr – 30 Statements fuer eine grosse Seite (TODO 08224ed6).
+        // Only ID and name: findAllById loads whole projects or workflows including project, and the
+        // container relation of the project (nullable one-to-one, not possible as a proxy) costs one
+        // more query per project - 30 statements for a large page (TODO 08224ed6).
         Map<String, String> projectNames = namesFor(todos, Todo::getProjectId,
                 ids -> idToName(projectRepository.findIdAndNameByIdIn(ids)));
         Map<String, String> workflowNames = namesFor(todos, Todo::getLinkedWorkflowId,
@@ -103,15 +103,15 @@ public class TodoResponseAssembler {
     }
 
     /**
-     * Ziel und Einschaetzung gehoeren zum Modul {@code goals}: ist es aus, bleibt {@code planning} leer
-     * und kein Zieltitel wird nachgeschlagen – die Daten bleiben erhalten und sind nach dem
-     * Wiedereinschalten wieder da (TODO c60bf914). Je Aufruf geprueft, kein Start-Snapshot.
+     * Goal and assessment belong to module {@code goals}: if it is off, {@code planning} stays empty
+     * and no goal title is looked up - the data is kept and is back after
+     * switching on again (TODO c60bf914). Checked per call, no startup snapshot.
      */
     private boolean goalsEnabled() {
         return modules.isEnabled(ModuleCatalog.GOALS);
     }
 
-    /** Null, solange weder Ziel noch Einschaetzung noch offene Frage gesetzt sind (TODO dc0566f8). */
+    /** Null as long as neither goal nor assessment nor open question is set (TODO dc0566f8). */
     static TodoPlanningResponse planningOf(Todo todo, String goalTitle) {
         if (todo.getGoalId() == null && todo.getComplexity() == null && todo.getSuggestedEffort() == null
                 && todo.getRatingNote() == null && todo.getOpenQuestion() == null && todo.getWorkPackageId() == null

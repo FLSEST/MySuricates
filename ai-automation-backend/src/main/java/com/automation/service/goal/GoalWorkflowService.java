@@ -23,14 +23,14 @@ import java.util.List;
 import java.util.Optional;
 
 /**
- * Workflows am Ziel oder an einem Arbeitspaket (TODO 52bc1e8c Ziele Stufe 3): anhaengen, Rolle
- * aendern, loesen und lesen. Gestartet wird ueber den vorhandenen Weg {@code POST /workflows/{id}/execute}
- * mit {@code goal_id} im Kontext, der Stand kommt aus {@code /dashboard/workflow-results} – hier gibt es
- * keinen eigenen Start- oder Lesepfad.
+ * Workflows on the goal or on a work package (TODO 52bc1e8c goals stage 3): attach, change
+ * role, detach and read. Starting goes through the existing path {@code POST /workflows/{id}/execute}
+ * with {@code goal_id} in the context, the state comes from {@code /dashboard/workflow-results} - there is
+ * no separate start or read path here.
  *
- * <p>Nutzt nur Repositories (und den Waechter-Nachschlag desselben Pakets). Ein eingeschalteter
- * Ziel-Waechter steht als synthetischer erster Eintrag {@code "guard"} in der Liste; er ist nicht
- * loesbar, sein Schalter verwaltet ihn.
+ * <p>Uses only repositories (and the guard lookup of the same package). An enabled
+ * goal guard appears as a synthetic first entry {@code "guard"} in the list; it cannot be
+ * detached, its switch manages it.
  */
 @Service
 @RequiredArgsConstructor
@@ -54,8 +54,8 @@ public class GoalWorkflowService {
     private final GoalGuardLookup guardLookup;
 
     /**
-     * Der Waechter zuerst (wenn eingeschaltet), dann die Zuordnungen am Ziel, dann die an Arbeitspaketen
-     * in Paket-Reihenfolge, je nach Workflow-Name. Weich geloeschte Workflows fehlen.
+     * The guard first (if enabled), then the assignments on the goal, then those on work packages
+     * in package order, by workflow name. Soft-deleted workflows are missing.
      */
     @Transactional(readOnly = true)
     public List<GoalWorkflowResponse> list(String goalId) {
@@ -71,8 +71,8 @@ public class GoalWorkflowService {
     }
 
     /**
-     * Haengt den Workflow an. Paket nicht aus diesem Ziel → 400, Workflow unbekannt oder geloescht → 404,
-     * dieselbe Zuordnung schon da → 409.
+     * Attaches the workflow. Package not from this goal → 400, workflow unknown or deleted → 404,
+     * same assignment already present → 409.
      */
     @Transactional
     public GoalWorkflowResponse attach(String goalId, AttachGoalWorkflowRequest request) {
@@ -96,7 +96,7 @@ public class GoalWorkflowService {
         return toResponse(saved, workflow);
     }
 
-    /** Neue Rolle; der Waechter-Eintrag ist nicht aenderbar (400), eine fremde Zuordnung unbekannt (404). */
+    /** New role; the guard entry cannot be changed (400), a foreign assignment is unknown (404). */
     @Transactional
     public GoalWorkflowResponse updateRole(String goalId, String attachmentId, String role) {
         GoalWorkflow attachment = find(goalId, attachmentId);
@@ -107,7 +107,7 @@ public class GoalWorkflowService {
         return toResponse(saved, workflow);
     }
 
-    /** Loest die Zuordnung; der Workflow selbst bleibt. Der Waechter geht ueber seinen Schalter (400). */
+    /** Detaches the assignment; the workflow itself stays. The guard goes through its switch (400). */
     @Transactional
     public void detach(String goalId, String attachmentId) {
         goalWorkflowRepository.delete(find(goalId, attachmentId));

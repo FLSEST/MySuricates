@@ -66,7 +66,7 @@ public class HousekeepingSettings implements RuntimeSettingsGroup {
         out.put("todoSimilarityKeywordThreshold", todoSimilarityConfig.getKeywordThreshold());
     }
 
-    /** 8dbd7e10: ein geleakter Key darf ueber eine kuerzere Retention keine Runs loeschen. */
+    /** 8dbd7e10: a leaked key must not delete runs via a shorter retention. */
     @Override
     public void guard(String key, String value) {
         if (RUN_RETENTION_DAYS.equals(key)) {

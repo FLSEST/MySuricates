@@ -15,9 +15,9 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
- * Zaehler und Verweise je Projekt eines Ziels, rein aus bereits geladenen Zeilen (TODO dc0566f8,
- * c60bf914): {@code byProject} aus den TODOs, {@code projects} aus den ausdruecklich zugeordneten
- * Projekten. Aus {@link GoalService} herausgezogen, damit der bei seinen Aufgaben bleibt.
+ * Counters and references per project of a goal, purely from already loaded rows (TODO dc0566f8,
+ * c60bf914): {@code byProject} from the TODOs, {@code projects} from the explicitly assigned
+ * projects. Extracted from {@link GoalService} so that it stays with its own tasks.
  */
 final class GoalProjectSummaries {
 
@@ -26,7 +26,7 @@ final class GoalProjectSummaries {
     private GoalProjectSummaries() {
     }
 
-    /** Die Zielprojekte mit Zaehlern aus den nicht archivierten TODOs des Ziels in diesem Projekt. */
+    /** The goal projects with counters from the non-archived TODOs of the goal in this project. */
     static List<GoalDetailResponse.ProjectSummary> projects(List<GoalProjectRow> projects, List<GoalTodoRow> rows) {
         Map<String, long[]> counts = new HashMap<>();
         for (GoalTodoRow row : rows) {
@@ -56,7 +56,7 @@ final class GoalProjectSummaries {
                 Collectors.mapping(p -> new GoalResponse.ProjectRef(p.projectId(), p.projectName()), Collectors.toList())));
     }
 
-    /** Fortschritt je Projekt aus den TODOs (ohne ARCHIVED); TODOs ohne Projekt unter {@code null}. */
+    /** Progress per project from the TODOs (without ARCHIVED); TODOs without a project under {@code null}. */
     static List<GoalDetailResponse.ProjectProgress> byProject(List<GoalTodoRow> rows, Map<String, String> names) {
         Map<String, long[]> totals = new LinkedHashMap<>();
         for (GoalTodoRow row : rows) {

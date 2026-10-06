@@ -38,18 +38,18 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 
 /**
- * Der Ziel-Waechter (TODO 259f4f66): je Ziel ein Workflow aus der mitgelieferten Vorlage
- * {@code goal-guard} mit taeglichem Zeitplan. Einschalten legt beim ersten Mal beides an und merkt
- * sich den Workflow am Ziel; spaeter wird nur der Zeitplan wieder aktiv. Ausschalten pausiert den
- * Zeitplan, der Workflow bleibt.
+ * The goal guard (TODO 259f4f66): per goal a workflow from the bundled template
+ * {@code goal-guard} with a daily schedule. Enabling creates both the first time and remembers
+ * the workflow on the goal; afterwards only the schedule becomes active again. Disabling pauses the
+ * schedule, the workflow stays.
  *
- * <p>Der Workflow entsteht ueber {@link WorkflowService} (Versionszeile mit
- * {@link ChangeSource#GOAL_GUARD}), der Zeitplan ueber {@link SchedulerService}. Beides schnelle
- * DB-Schritte in einer Transaktion – kein KI-, CLI- oder HTTP-Aufruf.
+ * <p>The workflow is created via {@link WorkflowService} (version row with
+ * {@link ChangeSource#GOAL_GUARD}), the schedule via {@link SchedulerService}. Both quick
+ * DB steps in one transaction - no AI, CLI or HTTP call.
  *
- * <p>Eigenes Paket, weil der Waechter auf {@code service.workflow} zugreift, das seinerseits
- * {@code service.goal} fuer die Kontextvariable {@code goal_status} braucht – so bleibt es eine
- * Richtung ({@code PackageCycleRatchetTest}).
+ * <p>Own package, because the guard accesses {@code service.workflow}, which in turn
+ * needs {@code service.goal} for the context variable {@code goal_status} - this way it remains one
+ * direction ({@code PackageCycleRatchetTest}).
  */
 @Service
 @RequiredArgsConstructor
@@ -83,7 +83,7 @@ public class GoalGuardService {
         return goalService.get(goal.getId());
     }
 
-    /** Pausiert den Waechter eines Ziels, das geloescht wird; sein Workflow bleibt. */
+    /** Pauses the guard of a goal that is being deleted; its workflow stays. */
     @Transactional
     public void pauseForDeletedGoal(String goalId) {
         goalRepository.findById(goalId).ifPresent(this::pause);
@@ -123,7 +123,7 @@ public class GoalGuardService {
                 .forEach(schedule -> schedulerService.disable(schedule.getId()));
     }
 
-    /** Der gemerkte Workflow, solange er nicht (soft-)geloescht ist. */
+    /** The remembered workflow, as long as it is not (soft-)deleted. */
     private Optional<Workflow> existingWorkflow(Goal goal) {
         return goal.getGuardWorkflowId() == null ? Optional.empty()
                 : workflowRepository.findById(goal.getGuardWorkflowId());
@@ -155,9 +155,9 @@ public class GoalGuardService {
     }
 
     /**
-     * Das genannte Projekt; sonst das erste nicht archivierte Zielprojekt (TODO c60bf914); sonst das
-     * mit den meisten (nicht archivierten) TODOs des Ziels, sonst das aelteste aktive Projekt. Jeder
-     * Workflow gehoert zu einem Projekt.
+     * The named project; otherwise the first non-archived goal project (TODO c60bf914); otherwise the one
+     * with the most (non-archived) TODOs of the goal, otherwise the oldest active project. Every
+     * workflow belongs to a project.
      */
     private Project project(Goal goal, String projectId) {
         if (projectId != null) {

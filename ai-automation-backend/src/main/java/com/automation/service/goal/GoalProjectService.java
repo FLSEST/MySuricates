@@ -22,8 +22,8 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 
 /**
- * Die Projekte eines Ziels (TODO c60bf914): zuordnen, entfernen, ordnen. Dass ein TODO aus einem
- * neuen Projekt sein Projekt automatisch mitbringt, erledigen die Schreibwege der TODOs selbst
+ * The projects of a goal (TODO c60bf914): assign, remove, order. That a TODO from a
+ * new project brings its project along automatically is handled by the TODOs' own write paths
  * ({@link GoalMembershipService}, {@link TodoPlanningService}, {@code TodoGoalConsistency}).
  */
 @Service
@@ -37,7 +37,7 @@ public class GoalProjectService {
     private final ProjectRepository projectRepository;
     private final Clock clock;
 
-    /** Haengt das Projekt ans Ende der Zielprojekte; schon zugeordnet = nichts passiert. */
+    /** Appends the project to the end of the goal projects; already assigned = nothing happens. */
     @Transactional
     public GoalDetailResponse add(String goalId, String projectId) {
         Goal goal = goalService.find(goalId);
@@ -50,10 +50,10 @@ public class GoalProjectService {
     }
 
     /**
-     * Loest das Projekt vom Ziel. Haengen daran im Ziel noch Arbeitspakete oder TODOs, ist das ohne
-     * {@code cascade} ein Konflikt (409, die Meldung nennt die Anzahlen). Mit {@code cascade} werden
-     * die Arbeitspakete des Projekts in diesem Ziel geloescht (samt ihren Meilenstein-Verknuepfungen)
-     * und seine TODOs vom Ziel geloest – die TODOs selbst bleiben.
+     * Detaches the project from the goal. If work packages or TODOs in the goal still hang on it, this is
+     * a conflict without {@code cascade} (409, the message names the counts). With {@code cascade}, the
+     * work packages of the project in this goal are deleted (with their milestone links)
+     * and its TODOs are detached from the goal - the TODOs themselves stay.
      */
     @Transactional
     public void remove(String goalId, String projectId, boolean cascade) {
@@ -78,8 +78,8 @@ public class GoalProjectService {
     }
 
     /**
-     * Neue Reihenfolge: die genannten Projekte in dieser Folge vorn, nicht genannte Zielprojekte in
-     * ihrer bisherigen Folge dahinter. Ein Projekt, das dem Ziel nicht zugeordnet ist, ist ein 400.
+     * New order: the named projects first in that sequence, unnamed goal projects behind them in
+     * their previous sequence. A project that is not assigned to the goal is a 400.
      */
     @Transactional
     public GoalDetailResponse reorder(String goalId, List<String> projectIds) {

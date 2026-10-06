@@ -35,10 +35,10 @@ public class GateStatusResolver {
                         : null;
                 return new GateResult(status, category, description);
             } catch (IllegalArgumentException invalid) {
-                // Ein unlesbarer Wert ist ein Befund, kein Nichts (TODO 63ecc124): vorher fiel er
-                // stumm auf die Ableitung durch und wurde bei COMPLETED zu GREEN. Jetzt bleibt er
-                // sichtbar. Ein aus dem Laufstatus ohnehin strengeres Urteil (FAILED -> RED) behält
-                // aber Vorrang — der unlesbare Wert darf ein Urteil nur verschärfen, nie mildern.
+                // An unreadable value is a finding, not nothing (TODO 63ecc124): before, it fell
+                // silently through to the derivation and became GREEN on COMPLETED. Now it stays
+                // visible. A verdict that is stricter anyway from the run status (FAILED -> RED) keeps
+                // precedence, though - the unreadable value may only tighten a verdict, never soften it.
                 log.warn("Run {} reported an unreadable gate_status '{}'", event.getRunId(), explicitGate);
                 GateResult derived = deriveFromRunStatus(event);
                 if (derived != null && derived.status() == GateStatus.GREEN) {

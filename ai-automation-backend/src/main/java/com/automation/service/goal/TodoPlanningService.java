@@ -82,9 +82,9 @@ public class TodoPlanningService {
     }
 
     /**
-     * Entscheidung festhalten (TODO 68a5e24e): Text, Zeitpunkt, wer ({@code ratedBy}, sonst USER) – und
-     * die offene Frage ist damit beantwortet. {@code ""} ({@code null} nach {@link #text}) nimmt die
-     * Entscheidung zurueck. Eine spaetere neue Frage laesst sie stehen; der Zustand ist dann QUESTION.
+     * Record the decision (TODO 68a5e24e): text, time, who ({@code ratedBy}, otherwise USER) - and
+     * the open question is thereby answered. {@code ""} ({@code null} after {@link #text}) withdraws
+     * the decision. A later new question leaves it in place; the state is then QUESTION.
      */
     private static void applyDecision(Todo todo, String decision, Todo.RatedBy ratedBy) {
         if (decision == null) {
@@ -104,8 +104,8 @@ public class TodoPlanningService {
     }
 
     /**
-     * Ziel setzen oder loesen. Ist das Projekt des TODOs dem Ziel noch nicht zugeordnet, kommt es dazu
-     * (TODO c60bf914) – Kandidatenliste, Plugin-Triage und Planungsfeld arbeiten projektuebergreifend.
+     * Set or detach the goal. If the TODO's project is not yet assigned to the goal, it is added
+     * (TODO c60bf914) - candidate list, plugin triage and planning field work across projects.
      */
     private void applyGoal(Todo todo, String goalId) {
         if (goalId.isEmpty()) {
@@ -128,10 +128,10 @@ public class TodoPlanningService {
     }
 
     /**
-     * Arbeitspaket zuordnen (TODO c60bf914, bis V92 „Meilenstein“): nur eins des eigenen Ziels – sonst
-     * 400, damit ein TODO nie auf ein Paket zeigt, dessen Ziel es nicht zaehlt – und des eigenen
-     * Projekts; ein TODO ohne Projekt passt in kein Paket mit Projekt. Altdaten mit Abweichung bleiben
-     * lesbar – geprueft wird nur beim Schreiben. {@code ""} loest die Zuordnung.
+     * Assign a work package (TODO c60bf914, until V92 "milestone"): only one of the own goal - otherwise
+     * 400, so that a TODO never points to a package whose goal does not count it - and of the own
+     * project; a TODO without a project fits no package with a project. Legacy data with a deviation stays
+     * readable - it is only checked on write. {@code ""} detaches the assignment.
      */
     private void applyWorkPackage(Todo todo, String workPackageId) {
         if (workPackageId.isEmpty()) {

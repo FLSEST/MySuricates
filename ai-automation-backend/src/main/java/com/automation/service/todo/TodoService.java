@@ -53,12 +53,12 @@ public class TodoService {
         return findAll(page, size, projectId, status, priority, source, tag, q, null);
     }
 
-    /** Wie oben, zusaetzlich gefiltert auf ein Ziel (TODO dc0566f8). */
+    /** As above, additionally filtered to a goal (TODO dc0566f8). */
     @Transactional(readOnly = true)
     public PageResponse<TodoResponse> findAll(int page, int size, String projectId, List<String> status, String priority,
                                               String source, String tag, String q, String goalId) {
         if (goalId != null && !goalId.isBlank() && !modules.isEnabled(ModuleCatalog.GOALS)) {
-            // Ein stilles Ignorieren gaebe einem Aufrufer, der „die TODOs dieses Ziels“ will, die ganze Liste.
+            // Silently ignoring would give a caller who wants "the TODOs of this goal" the whole list.
             throw new IllegalArgumentException(ModuleCatalog.GOALS.disabledMessage("Filter goalId"));
         }
         // The order (priority rank, then newest) sits in the specification — an unsorted
@@ -140,7 +140,7 @@ public class TodoService {
             todo.setDueDate(request.dueDate().isBlank() ? null : Instant.parse(request.dueDate()));
         }
 
-        // Ein Wechsel auf DONE meldet das TODO beim save selbst (Todo.Completed) — der Audit-Befund folgt dort.
+        // A change to DONE reports the TODO itself on save (Todo.Completed) - the audit finding follows there.
         Todo saved = todoRepository.save(todo);
         log.info("Updated todo: {} ({})", saved.getTitle(), saved.getId());
         return saved;
@@ -159,7 +159,7 @@ public class TodoService {
         if (request.sessionId() != null) {
             todo.setSessionId(request.sessionId());
         }
-        // Ein Wechsel auf DONE meldet das TODO beim save selbst (Todo.Completed) — der Audit-Befund folgt dort.
+        // A change to DONE reports the TODO itself on save (Todo.Completed) - the audit finding follows there.
         Todo saved = todoRepository.save(todo);
         log.info("Updated todo status: {} → {} ({})", todo.getTitle(), request.status(), todo.getId());
         return saved;
@@ -194,8 +194,8 @@ public class TodoService {
         if (ids == null || ids.isEmpty()) {
             return 0;
         }
-        // Das UPDATE laedt keine Entities: Wer dabei auf DONE wechselt, meldet sich nicht selbst
-        // (Todo.Completed) — also hier gesammelt, damit verknuepfte Audit-Befunde folgen (ab1ed481).
+        // The UPDATE loads no entities: anyone switching to DONE this way does not report themselves
+        // (Todo.Completed) - so collected here so that linked audit findings follow (ab1ed481).
         List<String> completing = status == Todo.Status.DONE
                 ? todoRepository.findIdsNotInStatus(ids, Todo.Status.DONE) : List.of();
         int updated = todoRepository.bulkSetStatus(ids, status, Instant.now());
@@ -216,14 +216,14 @@ public class TodoService {
      * {@link #validateLinkedWorkflowId(String)} for the {@code project_id → projects(id)} FK.
      */
     /**
-     * Nimmt die UUID einer Agenten-Sitzung an — auch wenn ein ganzer Resume-Befehl kommt.
+     * Accepts the UUID of an agent session - even if a whole resume command arrives.
      *
-     * <p>Ein Agent schickt erfahrungsgemaess das, was er auch in die Beschreibung schreibt:
-     * {@code claude --resume 4fde1b91-…} oder die UUID in Backticks. Beides hier zu akzeptieren
-     * kostet drei Zeilen und verhindert, dass das Feld mit Befehlstext statt einer Kennung
-     * gefuellt wird — ein Feld, das man erst reinigen muss, ist so unzuverlaessig wie die
-     * Fliesstext-Konvention, die es ersetzt (TODO 3497533c). Was nicht wie eine UUID aussieht,
-     * wird verworfen, nicht halb uebernommen.
+     * <p>An agent experience-wise sends what it also writes into the description:
+     * {@code claude --resume 4fde1b91-…} or the UUID in backticks. Accepting both here
+     * costs three lines and prevents the field from being filled with command text instead of an identifier
+     * - a field that first has to be cleaned is as unreliable as the
+     * free-text convention it replaces (TODO 3497533c). Anything that does not look like a UUID
+     * is discarded, not half adopted.
      */
     static String normalizeSessionRef(String raw) {
         if (raw == null || raw.isBlank()) {

@@ -18,7 +18,7 @@ record DashboardOverview(long totalWorkflows, long totalRuns, long successfulRun
 
     static DashboardOverview load(WorkflowRunRepository runs, WorkflowRepository workflows,
                                   String projectId, Instant todayStart) {
-        // Die Run-Zaehler kommen aus EINER Abfrage statt aus fuenf count-Aufrufen (TODO 2ccb9e40).
+        // The run counters come from ONE query instead of five count calls (TODO 2ccb9e40).
         if (projectId == null || projectId.isBlank()) {
             return of(workflows.count(), runs.countOverview(todayStart), runs.findTopWorkflows());
         }

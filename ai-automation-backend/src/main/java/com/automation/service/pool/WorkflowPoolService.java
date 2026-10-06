@@ -197,12 +197,12 @@ public class WorkflowPoolService {
     }
 
     /**
-     * Schreibt einen Workflow als Pool-Definition.
+     * Writes a workflow as a pool definition.
      *
-     * @param scope {@code repo}, {@code portable} oder {@code external}; ohne Angabe gilt {@code portable}
-     *              (siehe {@link PoolScope}). Der Wert ist ein Pool-Metadatum, kein Feld der
-     *              Workflow-Definition.
-     * @throws IllegalArgumentException bei einem unbekannten {@code scope}
+     * @param scope {@code repo}, {@code portable} or {@code external}; without a value {@code portable} applies
+     *              (see {@link PoolScope}). The value is pool metadata, not a field of the
+     *              workflow definition.
+     * @throws IllegalArgumentException for an unknown {@code scope}
      */
     public ExportToPoolResponse exportToPool(String workflowId, ExportToPoolRequest request, String scope)
             throws IOException {

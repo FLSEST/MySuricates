@@ -25,27 +25,27 @@ import java.util.Set;
 import java.util.function.Function;
 
 /**
- * Die Kontextvariablen eines Ziels (TODO 259f4f66), nur wenn der Lauf {@code goal_id} traegt:
- * {@code goal_status} – ein sanierter Block wie {@code open_todos} – und fertige Einzelwerte fuer
- * die Dashboard-Kachel des Ziel-Waechters ({@code goal_guard_*}). Seit TODO c60bf914 meldet er
- * Meilensteine (Termine des Ziels) und Arbeitspakete (Basis: ihr Ende) getrennt; die Variablennamen
- * sind geblieben.
+ * The context variables of a goal (TODO 259f4f66), only if the run carries {@code goal_id}:
+ * {@code goal_status} - a sanitised block like {@code open_todos} - and ready-made single values for
+ * the dashboard tile of the goal guard ({@code goal_guard_*}). Since TODO c60bf914 it reports
+ * milestones (dates of the goal) and work packages (basis: their end) separately; the variable names
+ * stayed the same.
  *
- * <p>Titel von Ziel, Meilensteinen, Arbeitspaketen und TODOs koennen aus fremden Quellen stammen
- * (importierte Issues, Webhooks, KI-Ausgaben). Jeder Titel wird deshalb wie in {@code open_todos} auf
- * eine Zeile gebracht, gekuerzt und von Plattform-Markern und Blockgrenzen befreit
- * ({@link UntrustedText#inline}); die Kachelwerte zusaetzlich von Steuer- und Formatzeichen, die der
- * Dashboard-Vertrag ablehnt, und auf seine Laengen gekuerzt.
+ * <p>Titles of goal, milestones, work packages and TODOs may come from foreign sources
+ * (imported issues, webhooks, AI outputs). Every title is therefore reduced to one line as in {@code open_todos},
+ * shortened and stripped of platform markers and block boundaries
+ * ({@link UntrustedText#inline}); the tile values additionally of control and format characters that the
+ * dashboard contract rejects, and shortened to its lengths.
  *
- * <p>Ampel: Rot, wenn ein aktives TODO, ein Meilenstein oder ein Arbeitspaket ueberfaellig ist oder das
- * Zieldatum mit offener Arbeit vorbei ist; Gelb, wenn etwas davon in hoechstens drei Tagen faellig
- * wird; sonst Gruen.
+ * <p>Traffic light: red if an active TODO, a milestone or a work package is overdue or the
+ * goal date has passed with open work; yellow if any of them is due in at most three days;
+ * otherwise green.
  */
 @Component
 @RequiredArgsConstructor
 public class GoalStatusContext implements GoalContextSource {
 
-    /** Zeilen je Liste im Block; der Rest wird als Anzahl genannt. */
+    /** Lines per list in the block; the rest is given as a count. */
     static final int MAX_LINES = 20;
     static final int MAX_TITLE = 80;
     static final int MAX_ITEM = 200;
@@ -59,7 +59,7 @@ public class GoalStatusContext implements GoalContextSource {
     private final GoalMilestoneService milestoneService;
     private final Clock clock;
 
-    /** Name → Wert fuer das Ziel; wirft, wenn es das Ziel nicht gibt. */
+    /** Name → value for the goal; throws if the goal does not exist. */
     @Override
     public Map<String, String> variables(String goalId, String locale) {
         return render(milestoneService.snapshot(goalId), locale, clock.instant(), clock.getZone());
@@ -203,7 +203,7 @@ public class GoalStatusContext implements GoalContextSource {
         return instant == null ? "" : LocalDate.ofInstant(instant, zone).toString();
     }
 
-    /** Ein Kachelwert: ohne Zeichen, die der Dashboard-Vertrag ablehnt, und in seiner Laenge. */
+    /** A tile value: without characters the dashboard contract rejects, and within its length. */
     static String tile(String text, int max) {
         StringBuilder out = new StringBuilder();
         text.codePoints().filter(cp -> !Character.isISOControl(cp) && !FATAL_TYPES.contains(Character.getType(cp)))
@@ -219,7 +219,7 @@ public class GoalStatusContext implements GoalContextSource {
         return clean.substring(0, end).strip() + "…";
     }
 
-    /** Beschriftungen in der Sprache des Waechters ({@code goal_locale}); ohne Angabe Deutsch. */
+    /** Labels in the language of the guard ({@code goal_locale}); German if not specified. */
     record Labels(String header, String goal, String target, String none, String progress, String done, String counts,
                   String milestones, String workPackages, String noneLine, String overdueTodos, String dueSoonTodos,
                   String due, String more, String overdue, String dueSoon, String milestoneOverdue, String milestoneSoon,

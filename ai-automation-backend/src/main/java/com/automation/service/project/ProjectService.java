@@ -46,10 +46,10 @@ public class ProjectService {
     }
 
     /**
-     * Die Liste fuer {@code GET /api/v1/projects} — mit mitgeholtem Container.
+     * The list for {@code GET /api/v1/projects} - with the container fetched along.
      *
-     * <p>Bewusst nicht {@code findByArchivedAtIsNull()}: Die nullable
-     * {@code @OneToOne(mappedBy = "project")} wuerde sonst je Projekt eine eigene Abfrage kosten
+     * <p>Deliberately not {@code findByArchivedAtIsNull()}: the nullable
+     * {@code @OneToOne(mappedBy = "project")} would otherwise cost one query of its own per project
      * (TODO 6d0ab09f).
      */
     @Transactional(readOnly = true)
