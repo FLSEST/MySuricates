@@ -176,8 +176,9 @@ Der Installer fragt nach dem Weg – eine Instanz im Container (empfohlen), dire
 gestuft Dev · Test · Prod – und nach den Modulen, installiert fehlende Werkzeuge nach Rückfrage und
 startet die Instanz. Am Ende nennt er ihre Adresse: Sie lauscht nur auf `127.0.0.1`, auf Port 9090 oder
 dem nächsten freien; gestuft bekommt jede Stufe ihren eigenen Port. Den API-Key zeigt
-`scripts/instance.sh key --name main`. Schritt für Schritt, auch unter Windows über WSL2:
-[Getting Started](docs/GETTING-STARTED.md).
+`scripts/instance.sh key --name main`. Schritt für Schritt: [Getting Started](docs/GETTING-STARTED.md) –
+dort auch der Stand für macOS (vorbereitet) und Windows über WSL2, beide noch nicht auf echter Hardware
+durchgespielt.
 
 **KI-Blöcke** brauchen mindestens eine angemeldete Kommandozeile – `claude`, `codex` oder `pi`. Der
 Installer zeigt, welche er findet, verlangt aber keine; ohne sie laufen nur die deterministischen Blöcke.
