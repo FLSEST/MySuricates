@@ -116,7 +116,7 @@
               "promptContains": [
                 "<audit_findings>\n",
                 "\nAudit scenario.findings-context: OPEN 2 · AWAITING_VERIFICATION 0 · ACCEPTED_RISK 0 · DISMISSED 0\n",
-                "\nOPEN | MEDIUM | missing-path-test | ChainExecutor | Kette ohne Pfad-Test\nOPEN | LOW | missing-path-test | ApprovalBlockExecutor | Freigabe ohne Pfad-Test\n</audit_findings>"
+                "\nOPEN | MEDIUM | missing-path-test | ChainExecutor | Kette ohne Pfad-Test | Beleg: (keiner)\nOPEN | LOW | missing-path-test | ApprovalBlockExecutor | Freigabe ohne Pfad-Test | Beleg: (keiner)\n</audit_findings>"
               ],
               "promptNotContains": ["{{ audit_findings }}"]
             }
