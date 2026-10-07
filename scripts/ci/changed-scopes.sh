@@ -1,63 +1,63 @@
 #!/usr/bin/env bash
 #
-# Welche CI-Suiten braucht eine Aenderung? (TODO fb82de25)
+# Which CI suites does a change need? (TODO fb82de25)
 #
-# Gibt zwei Zeilen fuer $GITHUB_OUTPUT aus:
+# Prints two lines for $GITHUB_OUTPUT:
 #   backend=true|false
 #   frontend=true|false
-# Begruendungen gehen nach stderr, damit ein Ueberspringen im Log hoerbar ist.
+# Reasons go to stderr so that a skip is audible in the log.
 #
-# Grundsatz: Eine Luecke in den Listen darf hoechstens einen unnoetigen Lauf kosten, nie einen
-# fehlenden. Deshalb wird das Backend UMGEKEHRT gefiltert — es laeuft immer, ausser *jede*
-# geaenderte Datei steht nachweislich ausserhalb seiner Reichweite —, und jeder Zweifel
-# (keine Basis, leere Liste, git-Fehler) ergibt fuer beide Suiten true.
+# Principle: a gap in the lists may cost at most an unnecessary run, never a
+# missing one. Therefore the backend is filtered the OTHER WAY AROUND — it always runs, unless *every*
+# changed file is demonstrably outside its reach —, and any doubt
+# (no base, empty list, git error) yields true for both suites.
 #
-# Backend-Tests lesen auch Dateien ausserhalb von ai-automation-backend/ (Stand 2026-09-29,
-# per grep nach "../" in src/test und pom.xml):
-#   - docs/**                                 pom kopiert Doku nach resources/docs; DocsConfigTest,
+# Backend tests also read files outside ai-automation-backend/ (as of 2026-09-29,
+# via grep for "../" in src/test and pom.xml):
+#   - docs/**                                 pom copies docs to resources/docs; DocsConfigTest,
 #                                             DataModelConfigKeysGateTest (docs/datenmodell.md, en/)
-#   - workflow-pool/**                        Pool-/Hygiene-/Analyzer-Gates (PoolFileParserTest,
+#   - workflow-pool/**                        pool/hygiene/analyzer gates (PoolFileParserTest,
 #                                             TemplateHygieneGateTest, LocalizedDefinitionGateTest …)
-#   - ai-automation-frontend/src/data/**      pom kopiert blockConfigSchema.json; ModuleCatalogTextsTest,
+#   - ai-automation-frontend/src/data/**      pom copies blockConfigSchema.json; ModuleCatalogTextsTest,
 #                                             EditorDefaultConfigTest (blockDefaultConfig.json)
-#   - ai-automation-frontend/src/i18n/**      ProviderCatalogTest liest src/i18n/<lang>.ts
+#   - ai-automation-frontend/src/i18n/**      ProviderCatalogTest reads src/i18n/<lang>.ts
 #   - scripts/lib/**                          *.generated.sh, i18n/<lang>.sh, hygiene-rules.sh
 #   - deploy/Dockerfile                       ProviderCatalogTest
-#   - CLAUDE.md (Wurzel)                      BlockSpecsTest
-# Die Ausnahmeliste unten nennt deshalb nur, was sicher NICHT dazugehoert: der Rest des
-# Frontends und Markdown ausserhalb von docs/, ai-automation-backend/ und workflow-pool/
-# (ausser CLAUDE.md). Alles andere — auch jeder neue Ordner — startet das Backend.
+#   - CLAUDE.md (root)                        BlockSpecsTest
+# The exception list below therefore names only what definitely does NOT belong: the rest of the
+# frontend and Markdown outside docs/, ai-automation-backend/ and workflow-pool/
+# (except CLAUDE.md). Everything else — including any new folder — starts the backend.
 #
-# Das Frontend laeuft, wenn sich etwas unter ai-automation-frontend/ aendert, und zusaetzlich bei
-# den Definitionen, die blockConfigSchema.test.ts gegen den Editor-Katalog prueft:
+# The frontend runs when anything under ai-automation-frontend/ changes, and additionally for
+# the definitions that blockConfigSchema.test.ts checks against the editor catalog:
 #   - ai-automation-backend/src/main/resources/templates/**   (builtin/, blueprints/)
 #   - workflow-pool/**
-# Aendert sich die CI-Definition oder dieses Skript, laufen beide Suiten.
+# If the CI definition or this script changes, both suites run.
 #
-# Dieselbe Einordnung nutzt das Pre-Push-Gate fuer seine Bauprüfung (scripts/ci/pre-push-checks.sh,
-# check_build, TODO c60eb0e2) — eine Aenderung hier wirkt lokal und in der CI gleich.
+# The pre-push gate uses the same classification for its build check (scripts/ci/pre-push-checks.sh,
+# check_build, TODO c60eb0e2) — a change here takes effect locally and in CI alike.
 #
-# Aufrufe:
-#   bash scripts/ci/changed-scopes.sh --files  < liste      Dateiliste von stdin (je Zeile ein Pfad)
-#   BASE=<sha> HEAD=<sha> bash scripts/ci/changed-scopes.sh  Liste aus git diff --no-renames BASE...HEAD
-# In der CI setzt GitHub zusaetzlich GITHUB_EVENT_NAME und GITHUB_REF_TYPE:
-#   schedule, workflow_dispatch und Tags laufen immer voll; ebenso eine leere oder Null-Basis
-#   und eine Basis, die nicht im Checkout liegt (Force-Push).
-# Exit: immer 0 — ein Fehler hier darf keine Suite abschalten, er schaltet beide ein.
+# Invocations:
+#   bash scripts/ci/changed-scopes.sh --files  < list      file list from stdin (one path per line)
+#   BASE=<sha> HEAD=<sha> bash scripts/ci/changed-scopes.sh  list from git diff --no-renames BASE...HEAD
+# In CI, GitHub additionally sets GITHUB_EVENT_NAME and GITHUB_REF_TYPE:
+#   schedule, workflow_dispatch and tags always run in full; so does an empty or zero base
+#   and a base that is not in the checkout (force push).
+# Exit: always 0 — an error here must not switch off a suite, it switches both on.
 #
 set -uo pipefail
 
 ZERO="0000000000000000000000000000000000000000"
 
-all_true() {  # $1 = Grund
+all_true() {  # $1 = reason
   echo "changed-scopes: $1 — beide Suiten laufen" >&2
   echo "backend=true"
   echo "frontend=true"
   exit 0
 }
 
-# Reicht die Datei nachweislich nicht ins Backend hinein? (siehe Kopf)
-backend_irrelevant() {  # $1 = Pfad relativ zur Repo-Wurzel
+# Is the file demonstrably out of reach of the backend? (see header)
+backend_irrelevant() {  # $1 = path relative to the repo root
   case "$1" in
     ai-automation-frontend/src/data/*|ai-automation-frontend/src/i18n/*) return 1 ;;
     ai-automation-frontend/*) return 0 ;;
@@ -67,7 +67,7 @@ backend_irrelevant() {  # $1 = Pfad relativ zur Repo-Wurzel
   return 1
 }
 
-frontend_relevant() {  # $1 = Pfad
+frontend_relevant() {  # $1 = path
   case "$1" in
     ai-automation-frontend/*) return 0 ;;
     ai-automation-backend/src/main/resources/templates/*) return 0 ;;
@@ -76,8 +76,8 @@ frontend_relevant() {  # $1 = Pfad
   return 1
 }
 
-# Aenderung an der CI selbst: beide Suiten, damit der neue Filter/Job einmal voll durchlaeuft.
-ci_definition() {  # $1 = Pfad
+# Change to the CI itself: both suites, so that the new filter/job runs in full once.
+ci_definition() {  # $1 = path
   case "$1" in
     .github/workflows/ci.yml|scripts/ci/changed-scopes.sh) return 0 ;;
   esac
@@ -100,8 +100,8 @@ else
   { [ -z "$BASE" ] || [ "$BASE" = "$ZERO" ]; } && all_true "keine Vergleichsbasis (neuer Ref oder kein Push-/PR-Ereignis)"
   git cat-file -e "${BASE}^{commit}" 2>/dev/null || all_true "Basis ${BASE} liegt nicht im Checkout (Force-Push?)"
   git cat-file -e "${HEAD}^{commit}" 2>/dev/null || all_true "Kopf ${HEAD} liegt nicht im Checkout"
-  # --no-renames: eine verschobene Datei nennt alten UND neuen Pfad — ein Umzug aus dem Backend
-  # heraus soll das Backend nicht ueberspringen. Drei Punkte: ab der Merge-Basis.
+  # --no-renames: a moved file names the old AND the new path — a move out of the backend
+  # must not make the backend skip. Three dots: from the merge base.
   FILES="$(git -c core.quotePath=false diff --no-renames --name-only "${BASE}...${HEAD}" 2>/dev/null)" \
     || all_true "git diff ${BASE}...${HEAD} fehlgeschlagen"
 fi

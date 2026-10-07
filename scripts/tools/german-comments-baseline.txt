@@ -1,7 +1,6 @@
 # German comment lines per file (ceiling) - scripts/tools/german_comments.py ratchet.
 # Only ever lowered: run "german_comments.py ratchet --update" after translating comments.
 # Never raise a ceiling - write the comment in English instead (TODO 9468432d).
-72 .github/workflows/ci.yml
 1 ai-automation-backend/src/main/java/com/automation/dto/bundle/ProjectBundle.java
 1 ai-automation-backend/src/main/java/com/automation/service/ai/PiAiProvider.java
 1 ai-automation-backend/src/main/java/com/automation/service/assistant/AssistantFetchPolicy.java
@@ -61,11 +60,7 @@
 1 ai-automation-frontend/src/utils/homeCommand/query.test.ts
 3 ai-automation-frontend/src/utils/homeCommand/query.ts
 1 ai-automation-frontend/src/utils/homeCommand/rank.test.ts
-20 scripts/ci/changed-scopes.sh
-45 scripts/ci/pre-push-checks.sh
-71 scripts/ci/public-hygiene.sh
 2 scripts/installer-probe.sh
-100 scripts/lib/hygiene-rules.sh
 1 scripts/lib/tui.sh
 3 scripts/public-readiness/doc_facts_check.py
 1 scripts/public-readiness/docs_parity_check.py

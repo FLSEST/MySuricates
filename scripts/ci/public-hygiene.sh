@@ -2,27 +2,27 @@
 #
 # Public-Hygiene-Gate
 #
-# Prüft, was in ein öffentliches Repository geriete. Regeln und Pfadlisten stehen
-# in scripts/lib/hygiene-rules.sh und werden von diesem Skript und vom
-# pre-commit-Hook gemeinsam gelesen.
+# Checks what would end up in a public repository. Rules and path lists live
+# in scripts/lib/hygiene-rules.sh and are read by this script and by the
+# pre-commit hook together.
 #
 # Modi:
-#   --tracked    (Default) getrackter Bestand. Das ist die Release-Frage. Fehler.
-#   --worktree   zusätzlich der Arbeitsbaum: Dateien, die weder getrackt noch
-#                ignoriert sind. Warnung, kein Fehler — lokal will man das sehen,
-#                aber nicht blockiert werden.
-#   --staged     nur gestagte Änderungen. Für den pre-commit-Hook. Fehler.
-#   --range A..B nur die Änderungen eines Commit-Bereichs, dieselben Checks wie
-#                --staged. Für das Pre-Push-Gate (scripts/ci/pre-push-checks.sh). Fehler.
+#   --tracked    (default) tracked files. This is the release question. Error.
+#   --worktree   additionally the working tree: files that are neither tracked nor
+#                ignored. Warning, not an error — locally you want to see this,
+#                but not be blocked.
+#   --staged     staged changes only. For the pre-commit hook. Error.
+#   --range A..B only the changes of a commit range, the same checks as
+#                --staged. For the pre-push gate (scripts/ci/pre-push-checks.sh). Error.
 #
 # Usage:  bash scripts/ci/public-hygiene.sh [--tracked|--worktree|--staged|--range A..B]
-# Exit:   0 = sauber (bzw. nur Warnungen), 1 = Verstöße
+# Exit:   0 = clean (or warnings only), 1 = violations
 #
 set -uo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-# Repo-Wurzel aus dem Skriptpfad, nicht aus git: in Worktrees exportiert git GIT_DIR an
-# Hooks, und `git -C scripts/ci rev-parse --show-toplevel` liefert dann scripts/ci.
+# Repo root from the script path, not from git: in worktrees git exports GIT_DIR to
+# hooks, and `git -C scripts/ci rev-parse --show-toplevel` then returns scripts/ci.
 REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 cd "$REPO_ROOT"
 
@@ -51,17 +51,17 @@ case "${1:-}" in
   *) echo "Unbekannter Modus: $1" >&2; exit 2 ;;
 esac
 
-# Quelle der Aenderungs-Checks: der Index (pre-commit) oder ein Commit-Bereich (pre-push).
-# Beide Modi stellen dieselbe Frage — was kommt NEU dazu? — nur an einer anderen Stelle.
+# Source of the change checks: the index (pre-commit) or a commit range (pre-push).
+# Both modes ask the same question — what is NEW? — just at a different point.
 if [ "$MODE" = "range" ]; then DIFF_SRC=("$RANGE"); else DIFF_SRC=(--cached); fi
 
 FAIL=0
 WARN=0
 COUNT=0
 
-# In der CI als Annotation, sonst lesbar.
+# In CI as an annotation, otherwise human-readable.
 annotate() {
-  # $1=datei, $2=zeile, $3=meldung
+  # $1=file, $2=line, $3=message
   if [ -n "${GITHUB_ACTIONS:-}" ]; then
     echo "::error file=${1},line=${2}::${3}"
   else
@@ -81,12 +81,12 @@ warn() {
 }
 
 # ---------------------------------------------------------------------------
-# Check 1 — getrackte Dateien, die eigentlich ignoriert sind
+# Check 1 — tracked files that should actually be ignored
 #
-# Früher stand hier eine handgepflegte Liste von zehn Verzeichnisnamen. Die Frage
-# lässt sich vollständig stellen: git kennt die getrackten Dateien, die unter eine
-# Ignore-Regel fallen. Damit ist jede künftige Ignore-Regel automatisch mit
-# abgedeckt, ohne dass jemand die Liste nachzieht.
+# This used to be a hand-maintained list of ten directory names. The question
+# can be asked completely: git knows the tracked files that fall under an
+# ignore rule. That way every future ignore rule is covered automatically,
+# without anyone having to update the list.
 # ---------------------------------------------------------------------------
 check_tracked_but_ignored() {
   local f
@@ -98,7 +98,7 @@ check_tracked_but_ignored() {
 }
 
 # ---------------------------------------------------------------------------
-# Check 2 — verbotene Literale
+# Check 2 — forbidden literals
 # ---------------------------------------------------------------------------
 check_patterns_tracked() {
   local entry pat desc file line
@@ -113,11 +113,11 @@ check_patterns_tracked() {
   done
 }
 
-# Hinzugefuegte Zeilen der Aenderungsquelle als "datei<TAB>inhalt", einmal je Lauf. Ein
-# Push-Bereich kann zehntausende Zeilen haben — eine Bash-Schleife je Zeile und Muster
-# brauchte dafuer Minuten, ein grep je Muster braucht Sekundenbruchteile.
-# Setzt ADDED_LINES_FILE — bewusst keine Kommandosubstitution: in deren Subshell
-# feuerte der EXIT-Trap und loeschte die Datei, bevor ein grep sie lesen konnte.
+# Added lines of the change source as "file<TAB>content", once per run. A
+# push range can have tens of thousands of lines — a bash loop per line and pattern
+# took minutes for that, one grep per pattern takes fractions of a second.
+# Sets ADDED_LINES_FILE — deliberately no command substitution: in its subshell
+# the EXIT trap fired and deleted the file before a grep could read it.
 ADDED_LINES_FILE=""
 ensure_added_lines_file() {
   [ -n "$ADDED_LINES_FILE" ] && return 0
@@ -143,10 +143,10 @@ check_patterns_staged() {
   done
 }
 
-# Private Begriffe in hinzugefuegten Zeilen (--staged/--range). Der Bestandslauf
-# (check_private_terms) beantwortet die Release-Frage; hier geht es darum, dass kein
-# neuer Treffer dazukommt — beim Commit und noch einmal vor dem Push. Ein schwacher
-# Begriff (Praefix low:, siehe hygiene_private_terms_load) warnt nur, wie im Bestand.
+# Private terms in added lines (--staged/--range). The full-inventory run
+# (check_private_terms) answers the release question; here the point is that no
+# new hit is added — at commit time and once more before the push. A weak
+# term (prefix low:, see hygiene_private_terms_load) only warns, as in the inventory.
 check_private_terms_diff() {
   local list i file
   if ! list="$(hygiene_private_terms_path "$REPO_ROOT")"; then
@@ -170,7 +170,7 @@ check_private_terms_diff() {
   done
 }
 
-# Gestagte Dateien, die unter eine Ignore-Regel fallen oder wie eine Sicherung aussehen.
+# Staged files that fall under an ignore rule or look like a backup.
 check_staged_files() {
   local f g
   while IFS= read -r f; do
@@ -188,7 +188,7 @@ check_staged_files() {
 }
 
 # ---------------------------------------------------------------------------
-# Check 3 — Pool-Neutralität (eigenes Skript, auch vom Built-in-Template genutzt)
+# Check 3 — pool neutrality (separate script, also used by the built-in template)
 # ---------------------------------------------------------------------------
 check_pool() {
   local out rc reported=0
@@ -201,9 +201,9 @@ check_pool() {
       *.json) annotate "$file" 1 "[$tag] $desc"; reported=1 ;;
     esac
   done < <(printf '%s\n' "$out")
-  # Ein Abbruch des Unterskripts (exit 2 "Regeldatei fehlt", Python-Traceback, fehlendes
-  # python3) liefert keine TAB-Zeilen mit .json — frueher fiel er hier lautlos weg und das
-  # Gate meldete "OK". Ein Lauf ohne verwertbare Befundzeilen ist deshalb selbst ein Fehler.
+  # An abort of the sub-script (exit 2 "Regeldatei fehlt", Python traceback, missing
+  # python3) yields no TAB lines with .json — it used to vanish silently here and the
+  # gate reported "OK". A run without usable finding lines is therefore an error itself.
   if [ "$reported" -eq 0 ]; then
     annotate "scripts/ci/pool-neutrality.sh" 1 \
       "Pool-Neutralitaet abgebrochen (exit ${rc}) ohne verwertbare Befundzeilen: $(printf '%s' "$out" | tr '\n' ' ')"
@@ -211,7 +211,7 @@ check_pool() {
 }
 
 # ---------------------------------------------------------------------------
-# Check 4 — Repo-Gewicht
+# Check 4 — repository weight
 # ---------------------------------------------------------------------------
 check_weight() {
   python3 - "$HYGIENE_MAX_BLOB_BYTES" "$HYGIENE_DUP_MIN_BYTES" <<'PY'
@@ -247,7 +247,7 @@ PY
 }
 
 # ---------------------------------------------------------------------------
-# Check 5 — weder getrackt noch ignoriert (nur --worktree)
+# Check 5 — neither tracked nor ignored (--worktree only)
 # ---------------------------------------------------------------------------
 check_worktree_strays() {
   local f g
@@ -265,15 +265,15 @@ check_worktree_strays() {
 
 
 # ---------------------------------------------------------------------------
-# Check 6 — .gitignore verraet keine privaten Dateinamen
+# Check 6 — .gitignore does not reveal private file names
 #
-# .gitignore ist getrackt und geht mit der Veroeffentlichung mit. Was dort steht,
-# wird oeffentlich — auch in Kommentaren. Private Definitionen gehoeren deshalb
-# nach .git/info/exclude, das lokal bleibt.
+# .gitignore is tracked and is published along with the repository. Whatever is in it
+# becomes public — comments included. Private definitions therefore belong in
+# .git/info/exclude, which stays local.
 #
-# Diese Pruefung nimmt jeden Eintrag aus .git/info/exclude und schaut, ob sein
-# Dateiname irgendwo in .gitignore auftaucht. In der CI gibt es die exclude-Datei
-# nicht; dann faellt die Pruefung still aus.
+# This check takes every entry from .git/info/exclude and looks whether its
+# file name appears anywhere in .gitignore. CI has no exclude file;
+# the check is then silently skipped.
 # ---------------------------------------------------------------------------
 check_gitignore_leaks() {
   local exclude=".git/info/exclude"
@@ -283,7 +283,7 @@ check_gitignore_leaks() {
   while IFS= read -r entry; do
     case "$entry" in ''|'#'*) continue ;; esac
     base="$(basename "${entry%/}")"
-    # Muster wie *.bak oder sehr kurze Namen taugen nicht als Signal.
+    # Patterns like *.bak or very short names are no good as a signal.
     case "$base" in *'*'*|*'?'*|*'['*) continue ;; esac
     [ "${#base}" -lt 6 ] && continue
     hygiene_gitignore_leak_is_generic "$base" && continue
@@ -293,27 +293,27 @@ check_gitignore_leaks() {
 }
 
 # ---------------------------------------------------------------------------
-# Check 7 — SECURITY.md: vorhanden, kein privater Kontakt, echter Meldeweg
+# Check 7 — SECURITY.md: present, no private contact, real reporting channel
 #
-# Was ein Besucher als Meldeweg fuer Sicherheitsluecken vorfindet, soll GitHubs
-# private Sicherheitshinweise sein, keine Mailadresse — sonst entsteht wieder
-# eine Personendaten-Frage. Nur getrackter Bestand, siehe hygiene-rules.sh.
+# What a visitor finds as the reporting channel for vulnerabilities should be GitHub's
+# private security advisories, not an email address — otherwise a personal-data
+# question arises again. Tracked files only, see hygiene-rules.sh.
 # ---------------------------------------------------------------------------
 check_security_md() {
   local f="$HYGIENE_SECURITY_FILE"
   local content
   if [ "$MODE" = "worktree" ]; then
-    # --worktree beschreibt bewusst auch Ungetracktes (siehe check_worktree_strays) — hier
-    # ist die Arbeitskopie die richtige Quelle.
+    # --worktree deliberately describes untracked files too (see check_worktree_strays) — here
+    # the working copy is the right source.
     if [ ! -f "$f" ]; then
       annotate "$f" 1 "Datei fehlt — kein dokumentierter Meldeweg fuer Sicherheitsluecken"
       return
     fi
     content="$(cat -- "$f" 2>/dev/null)"
   else
-    # --tracked ist die Release-Frage: was landet im Repository. Eine Datei, die nur auf
-    # Platte liegt (noch nicht "git add"ed), zaehlt dafuer nicht — sonst meldet das Gate
-    # OK, obwohl SECURITY.md gar nicht getrackt ist.
+    # --tracked is the release question: what lands in the repository. A file that only
+    # sits on disk (not yet "git add"ed) does not count for that — otherwise the gate reports
+    # OK although SECURITY.md is not tracked at all.
     if ! git ls-files --error-unmatch -- "$f" >/dev/null 2>&1; then
       annotate "$f" 1 "ist nicht getrackt — kein dokumentierter Meldeweg fuer Sicherheitsluecken im Bestand"
       return
@@ -338,20 +338,20 @@ check_security_md() {
 }
 
 # ---------------------------------------------------------------------------
-# Check 8 — Symlinks, die aus dem Repository hinausfuehren
+# Check 8 — symlinks that lead out of the repository
 #
-# git grep liest keine Symlink-Blobs; ein getrackter Link mit absolutem Ziel
-# (z. B. unter dem Entwickler-Home) rutscht an Check 2 vorbei. Ausserdem zeigt
-# so ein Link in jedem Clone, Worktree und Run-Snapshot auf den Original-
-# Checkout statt in den eigenen Baum. Erlaubt sind nur relative Ziele, die
-# innerhalb des Repositories bleiben.
-# Ausgabe: LINK<TAB>pfad<TAB>ziel — je Verstoss eine Zeile.
+# git grep does not read symlink blobs; a tracked link with an absolute target
+# (e.g. under the developer home) slips past check 2. Also, such a link
+# points in every clone, worktree and run snapshot to the original
+# checkout instead of into its own tree. Only relative targets that stay
+# inside the repository are allowed.
+# Output: LINK<TAB>path<TAB>target — one line per violation.
 # ---------------------------------------------------------------------------
 check_symlinks() {
   python3 - "$MODE" "$RANGE" <<'PY'
 import subprocess, sys, posixpath
 mode, rng = sys.argv[1], sys.argv[2]
-links = []  # (pfad, blob-referenz)
+links = []  # (path, blob reference)
 if mode in ("staged", "range"):
     src = [rng] if mode == "range" else ['--cached']
     raw = subprocess.run(['git', 'diff', *src, '--raw', '--diff-filter=AM', '-z'],
@@ -380,20 +380,20 @@ PY
 }
 
 # ---------------------------------------------------------------------------
-# Check 9 — Pool-Dateien im Index gegen die private Ausschlussliste
+# Check 9 — pool files in the index against the private exclusion list
 #
-# Die persoenlichen Definitionen haelt .git/info/exclude aus dem Bestand. Das
-# gilt aber nur lokal: exclude wird nicht geklont, und in einem frischen Clone
-# holt ein pauschales "git add -A" die Dateien zurueck. Hier faellt das auf —
-# in allen drei Modi, denn git ls-files liest den Index und sieht damit auch
-# gestagte Dateien vor dem Commit.
+# .git/info/exclude keeps the personal definitions out of the repository. This
+# only holds locally, though: exclude is not cloned, and in a fresh clone
+# a blanket "git add -A" brings the files back. This is caught here —
+# in all three modes, because git ls-files reads the index and so also sees
+# staged files before the commit.
 #
-# Die Liste selbst liegt nicht im Repository — sie waere sonst genau die
-# Klartext-Namensliste, die exclude vermeiden soll. Klone und Worktrees finden
-# sie ueber die Ausweichorte aus hygiene_private_list_path. Fehlt sie, ist das kein
-# Fehler, sondern ein hoerbar uebersprungener Check (Vorlage: die .example-Datei).
-# Gewertet werden nur Treffer unter workflow-pool/, auch wenn ein Muster breiter
-# gefasst ist: die Regel beantwortet die Pool-Frage, keine andere.
+# The list itself is not in the repository — it would otherwise be exactly the
+# plain-text name list that exclude is meant to avoid. Clones and worktrees find
+# it via the fallback locations from hygiene_private_list_path. If it is missing, that is no
+# error but an audibly skipped check (template: the .example file).
+# Only hits under workflow-pool/ count, even if a pattern is broader:
+# the rule answers the pool question, no other.
 # ---------------------------------------------------------------------------
 check_private_pool_list() {
   local list label
@@ -403,25 +403,25 @@ check_private_pool_list() {
          "die private Liste geprueft (uebersprungen; Vorlage: ${HYGIENE_PRIVATE_LIST_FILE}.example)"
     return 0
   fi
-  # Annotationen nennen die Datei, die wirklich gelesen wurde — im Repo relativ.
+  # Annotations name the file that was actually read — relative within the repo.
   label="${list#"$REPO_ROOT/"}"
   local pattern f out rc lineno=0
-  # "|| [ -n "$pattern" ]" nimmt die letzte Zeile mit, wenn die Datei ohne
-  # Zeilenumbruch endet — sonst ist eine einzeilige Liste ein lautloser No-op.
+  # "|| [ -n "$pattern" ]" picks up the last line when the file ends without
+  # a newline — otherwise a one-line list is a silent no-op.
   while IFS= read -r pattern || [ -n "$pattern" ]; do
     lineno=$((lineno + 1))
     pattern="${pattern%%#*}"
     pattern="${pattern#"${pattern%%[![:space:]]*}"}"
     pattern="${pattern%"${pattern##*[![:space:]]}"}"
     [ -z "$pattern" ] && continue
-    # Die Muster stammen aus .git/info/exclude und sind dort oft mit fuehrendem
-    # "/" auf die Repo-Wurzel verankert. Als Pathspec bricht git daran ab
-    # ("Invalid path '/workflow-pool'"), deshalb hier abstreifen.
+    # The patterns come from .git/info/exclude and are often anchored there with a leading
+    # "/" to the repo root. As a pathspec git chokes on that
+    # ("Invalid path '/workflow-pool'"), so strip it here.
     pattern="${pattern#/}"
     out="$(git ls-files -- "$pattern" 2>&1)"
     rc=$?
-    # Ein Muster, das git nicht aufloesen kann, ist ein Fehler und kein Grund,
-    # stillschweigend nichts zu pruefen: frueher verschluckte "|| true" den Fall.
+    # A pattern that git cannot resolve is an error and no reason
+    # to silently check nothing: "|| true" used to swallow this case.
     if [ "$rc" -ne 0 ]; then
       annotate "$label" "$lineno" \
         "Muster '${pattern}' ist keine gueltige Pfadangabe (git ls-files exit ${rc}): $(printf '%s' "$out" | tr '\n' ' ')"
@@ -438,16 +438,16 @@ check_private_pool_list() {
 }
 
 # ---------------------------------------------------------------------------
-# Check 10 — Begriffe aus der privaten Begriffsliste im getrackten Bestand
+# Check 10 — terms from the private term list in the tracked files
 #
-# Namen privater Projekte, Arbeitgeber oder Personen lassen sich nicht als
-# Literal in hygiene-rules.sh fuehren, ohne sie damit zu veroeffentlichen. Die
-# Liste liegt deshalb ausserhalb des Repositorys (hygiene_private_terms_path).
-# Hier der Bestand (--tracked/--worktree): die Frage ist der Zustand vor der
-# Veroeffentlichung. Hinzugefuegte Zeilen prueft check_private_terms_diff (--staged/
-# --range). Die Meldung nennt die Listenzeile, nicht den Begriff — die Ausgabe
-# wandert in den Evidenz-Bericht und ins Audit. Ein schwacher Begriff (Praefix low:)
-# ist eine Warnung "privater Begriff, schwach": sichtbar, aber kein Verstoss.
+# Names of private projects, employers or people cannot be kept as a
+# literal in hygiene-rules.sh without publishing them thereby. The
+# list therefore lives outside the repository (hygiene_private_terms_path).
+# Here the inventory (--tracked/--worktree): the question is the state before
+# publication. Added lines are checked by check_private_terms_diff (--staged/
+# --range). The message names the list line, not the term — the output
+# goes into the evidence report and the audit. A weak term (prefix low:)
+# is a warning "privater Begriff, schwach": visible, but not a violation.
 # ---------------------------------------------------------------------------
 check_private_terms() {
   local list i file line
@@ -471,7 +471,7 @@ check_private_terms() {
   done
 }
 
-# Verstoesse aus check_symlinks als Fehler melden.
+# Report violations from check_symlinks as errors.
 report_symlinks() {
   local kind path target
   while IFS=$'\t' read -r kind path target; do
@@ -481,7 +481,7 @@ report_symlinks() {
 }
 
 # ---------------------------------------------------------------------------
-# Lauf
+# Run
 # ---------------------------------------------------------------------------
 echo "Public-Hygiene-Gate (${MODE})"
 
@@ -489,9 +489,9 @@ if [ "$MODE" = "staged" ] || [ "$MODE" = "range" ]; then
   check_staged_files
   check_patterns_staged
   check_private_terms_diff
-  # Der Pre-Commit-Moment ist genau das Szenario: ein pauschales "git add -A" hat
-  # die privaten Definitionen gerade in den Index geholt. git ls-files liest den
-  # Index, die Pruefung sieht sie also schon vor dem Commit.
+  # The pre-commit moment is exactly this scenario: a blanket "git add -A" has just
+  # pulled the private definitions into the index. git ls-files reads the
+  # index, so the check sees them before the commit.
   check_private_pool_list
   report_symlinks
 else

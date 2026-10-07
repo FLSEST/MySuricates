@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 #
-# Commit-Nachricht und Autor-Adresse pruefen, bevor der Commit entsteht — dieselben Regeln,
-# die das Pre-Push-Gate spaeter auf den ganzen Push-Bereich anwendet. Hier ist der Befund
-# billig (Nachricht aendern), beim Push nur noch per amend oder rebase zu heilen.
+# Check commit message and author address before the commit is created — the same rules
+# the pre-push gate later applies to the whole push range. Here the finding is
+# cheap (change the message), at push time it can only be fixed by amend or rebase.
 #
-# Regeln: scripts/lib/hygiene-rules.sh — Logik: scripts/ci/pre-push-checks.sh
-# Bypass: git commit --no-verify — kein Bypass per Reflex.
+# Rules: scripts/lib/hygiene-rules.sh — logic: scripts/ci/pre-push-checks.sh
+# Bypass: git commit --no-verify — no bypass by reflex.
 #
 set -uo pipefail
 

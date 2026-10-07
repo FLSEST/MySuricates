@@ -1,14 +1,14 @@
 #!/usr/bin/env bash
 #
-# Pre-Push-Gate — prueft die Commits, die gleich das Repository verlassen:
-# Autor-Adresse, Commit-Nachrichten, neu hinzugekommene Inhalte, Doku-Gates, Bauprüfung.
-# Die Refs kommen von git auf stdin und werden unveraendert weitergereicht.
+# Pre-push gate — checks the commits that are about to leave the repository:
+# author address, commit messages, newly added content, doc gates, build check.
+# The refs come from git on stdin and are passed on unchanged.
 #
-# Regeln: scripts/lib/hygiene-rules.sh — Logik: scripts/ci/pre-push-checks.sh
-# Auslassen (wird gemeldet): MYSURICATES_PREPUSH_SKIP=tree,build git push
-# Geaenderte Ausnahmedateien (.gitleaksignore, Hygiene-Regeln, Gate, Hooks, ci.yml) nach Pruefung
-# fuer genau diesen Stand freigeben: MYSURICATES_PREPUSH_ALLOW_RULES=<sha> git push
-# Bypass: git push --no-verify — kein Bypass per Reflex.
+# Rules: scripts/lib/hygiene-rules.sh — logic: scripts/ci/pre-push-checks.sh
+# Skipping (is reported): MYSURICATES_PREPUSH_SKIP=tree,build git push
+# Changed exception files (.gitleaksignore, hygiene rules, gate, hooks, ci.yml): after review,
+# release for exactly this state: MYSURICATES_PREPUSH_ALLOW_RULES=<sha> git push
+# Bypass: git push --no-verify — no bypass by reflex.
 #
 set -uo pipefail
 

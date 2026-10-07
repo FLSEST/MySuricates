@@ -1,22 +1,22 @@
 #!/usr/bin/env bash
 #
-# Gemeinsame Regelbasis für das Hygiene-Gate.
+# Shared rule base for the hygiene gate.
 #
-# Wird von scripts/ci/public-hygiene.sh (CI und lokal) und von
-# scripts/git-hooks/pre-commit (gestagte Änderungen) gelesen. Vorher standen
-# Muster- und Pfadlisten wortgleich in beiden Dateien — eine Ergänzung an einer
-# Stelle fehlte damit an der anderen.
+# Read by scripts/ci/public-hygiene.sh (CI and local) and by
+# scripts/git-hooks/pre-commit (staged changes). Previously the pattern and path
+# lists were duplicated verbatim in both files — an addition in one place was
+# then missing in the other.
 #
-# Diese Datei definiert nur Daten und kleine Helfer, sie führt nichts aus.
+# This file only defines data and small helpers, it executes nothing.
 #
 # shellcheck shell=bash
 
 # ---------------------------------------------------------------------------
-# Verbotene Literale in getrackten Dateien
+# Forbidden literals in tracked files
 #
-# Format: "muster|beschreibung". Bewusst Literale, keine Regex: sie werden mit
-# git grep -F bzw. einem Bash-Substring-Vergleich gesucht, damit Hook und CI
-# dieselbe Semantik haben.
+# Format: "pattern|description". Deliberately literals, not regexes: they are searched with
+# git grep -F or a Bash substring comparison so that hook and CI
+# have the same semantics.
 # ---------------------------------------------------------------------------
 HYGIENE_PATTERNS=(
   "/home/flo|absolute developer path"
@@ -27,7 +27,7 @@ HYGIENE_PATTERNS=(
 )
 
 # ---------------------------------------------------------------------------
-# Dateien, die die Muster legitim als Zeichenketten enthalten
+# Files that legitimately contain the patterns as strings
 # ---------------------------------------------------------------------------
 HYGIENE_SELF_EXCLUDE=(
   "scripts/lib/hygiene-rules.sh"
@@ -38,18 +38,18 @@ HYGIENE_SELF_EXCLUDE=(
 )
 
 # ---------------------------------------------------------------------------
-# Sicherungsdateien, die weder getrackt noch ignoriert sein dürfen
+# Backup files that must be neither tracked nor ignored
 #
-# Eine solche Datei ist lokal nur eine Warnung, beim Stagen ein Fehler: genau so
-# wäre workflow-pool/job-shortlist-template.html.bak-<zeitstempel> beinahe in
-# einen Release-Commit geraten.
+# Locally such a file is only a warning, when staging it is an error: this is exactly how
+# workflow-pool/job-shortlist-template.html.bak-<timestamp> almost ended up in
+# a release commit.
 # ---------------------------------------------------------------------------
 # Commit-Metadaten (Pre-Push-Gate, scripts/ci/pre-push-checks.sh; TODOs 7030f362, 5e0edb7c):
-# Autor und Committer tragen nur die GitHub-noreply-Form, nie eine private Adresse.
-# Die Adresse selbst steht nirgends im Repository — nur ihre Form.
+# Author and committer carry only the GitHub noreply form, never a private address.
+# The address itself appears nowhere in the repository — only its form.
 HYGIENE_COMMIT_EMAIL_REGEX='@users\.noreply\.github\.com$'
-# Trailer, deren Adressen in der Commit-Nachricht erlaubt sind (KI-Urheberschaft, Sign-off).
-# Alle anderen Zeilen einer Nachricht duerfen keine Mailadresse enthalten.
+# Trailers whose addresses are allowed in the commit message (AI authorship, sign-off).
+# All other lines of a message must not contain an email address.
 HYGIENE_COMMIT_TRAILER_REGEX='^(Co-Authored-By|Co-authored-by|Generated-By|Signed-off-by|Reviewed-by): '
 # Subject line of new commits (TODO 7ce5c71a): at most HYGIENE_SUBJECT_MAX characters. The commit-msg hook
 # always checks; push range and CI only check commits whose author date is not before HYGIENE_SUBJECT_SINCE
@@ -65,69 +65,69 @@ HYGIENE_BACKUP_GLOBS=(
 )
 
 # ---------------------------------------------------------------------------
-# Repo-Gewicht
+# Repo weight
 # ---------------------------------------------------------------------------
-# Ab dieser Größe gilt ein getrackter Blob als erklärungsbedürftig.
+# From this size a tracked blob needs an explanation.
 HYGIENE_MAX_BLOB_BYTES=${HYGIENE_MAX_BLOB_BYTES:-5242880}   # 5 MiB
-# Ab dieser Größe zählt ein doppelt getrackter Blob als Dublette.
+# From this size a doubly tracked blob counts as a duplicate.
 HYGIENE_DUP_MIN_BYTES=${HYGIENE_DUP_MIN_BYTES:-262144}      # 256 KiB
 
 # ---------------------------------------------------------------------------
-# SECURITY.md — Pflichtdatei mit einem echten Meldeweg
+# SECURITY.md — mandatory file with a real reporting channel
 #
-# Nur im getrackten Bestand geprueft (--tracked/--worktree), nicht bei --staged:
-# jeder Commit einzeln zu blockieren waere zu aufdringlich fuer eine Datei, die
-# sich selten aendert. Die Release-Frage ist "ist der Zustand am Ende richtig?".
+# Checked only in the tracked tree (--tracked/--worktree), not with --staged:
+# blocking every single commit would be too intrusive for a file that
+# rarely changes. The release question is "is the final state correct?".
 # ---------------------------------------------------------------------------
 HYGIENE_SECURITY_FILE="SECURITY.md"
 HYGIENE_SECURITY_EMAIL_REGEX='[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[a-z]{2,}'
-# Mindestens einer dieser Begriffe muss vorkommen (Meldeweg erkennbar).
+# At least one of these terms must occur (reporting channel recognizable).
 HYGIENE_SECURITY_REQUIRED_TERMS=(
   "Private vulnerability reporting"
   "Security Advisories"
 )
 
 # ---------------------------------------------------------------------------
-# Kuratierungsregeln für den öffentlichen Workflow-Pool (TODO 523702f4)
+# Curation rules for the public workflow pool (TODO 523702f4)
 #
-# Der Plan steht in docs/workflow-pool-kuratierung.md; die Werte hier sind seine
-# maschinell prüfbare Seite. Gelesen von scripts/ci/pool-neutrality.sh.
+# The plan is in docs/workflow-pool-kuratierung.md; the values here are its
+# machine-checkable side. Read by scripts/ci/pool-neutrality.sh.
 # ---------------------------------------------------------------------------
 
-# Erlaubte Werte des Pflichtfelds "scope".
-#   repo     — greift auf die Struktur dieses Repositories zu
-#   portable — über project_path (o. ä.) parametrisiert, läuft in jedem Projekt
-#   external — braucht ein Werkzeug außerhalb dieses Repositories und des gewählten
-#              Projekts; die Voraussetzung steht in der Beschreibung
+# Allowed values of the mandatory field "scope".
+#   repo     — accesses the structure of this repository
+#   portable — parameterized via project_path (or similar), runs in any project
+#   external — needs a tool outside this repository and the chosen
+#              project; the prerequisite is stated in the description
 HYGIENE_POOL_SCOPES=("repo" "portable" "external")
 
-# Registrierte Blocktypen. Quelle: BlockTypesIndexSection.BLOCK_TYPES im Backend
-# (dort selbst gegen die BlockExecutor-Klassen gepinnt, BlockTypeListsGuardTest).
-# scripts/tests/test-public-hygiene.sh vergleicht beide Listen — driftet eine,
-# fällt es dort auf.
-# HYGIENE_POOL_BLOCK_TYPES steht nicht hier, sondern kommt aus der generierten
-# Datei daneben (Quelle: BlockTypesIndexSection.BLOCK_TYPES im Backend, erzeugt
-# von BlockTypesGateListTest). Vorher war die Liste handgepflegt und wurde erst
-# nachtraeglich von Check 13 der Hygiene-Tests verglichen — ein neuer Blocktyp
-# fiel also erst auf, wenn jemand diese Tests laufen liess (TODO bdc784e1).
-# Eingelesen wird sie unten zusammen mit pool-sanitizer.generated.sh.
+# Registered block types. Source: BlockTypesIndexSection.BLOCK_TYPES in the backend
+# (itself pinned there against the BlockExecutor classes, BlockTypeListsGuardTest).
+# scripts/tests/test-public-hygiene.sh compares both lists — if one drifts,
+# it is noticed there.
+# HYGIENE_POOL_BLOCK_TYPES is not defined here but comes from the generated
+# file next to it (source: BlockTypesIndexSection.BLOCK_TYPES in the backend, generated
+# by BlockTypesGateListTest). Previously the list was maintained by hand and only
+# compared afterwards by check 13 of the hygiene tests — a new block type
+# was therefore only noticed when someone ran those tests (TODO bdc784e1).
+# It is read in below together with pool-sanitizer.generated.sh.
 
-# Kennzeichen, an denen ein Eintrag an DIESES Repository gebunden ist. In einem
-# Eintrag mit scope: portable sind sie ein Befund — wer ihn in sein eigenes
-# Projekt installiert, läuft sonst ins Leere.
+# Markers that bind an entry to THIS repository. In an
+# entry with scope: portable they are a finding — whoever installs it into their own
+# project would otherwise run into nothing.
 HYGIENE_POOL_REPO_MARKERS=(
   "ai-automation-backend" "ai-automation-frontend" "scripts/" "mvnw" "workflow-pool/"
 )
 
-# Schlüssel, die eine laufende Instanz bezeichnen. Als Feld der Definition, im
-# defaultContext oder in den Metadaten sind sie ein Befund — es sei denn, der
-# Wert ist leer oder eine Template-Variable ({{ project_id }}), denn das ist
-# gerade die portable Parametrisierung.
+# Keys that identify a running instance. As a field of the definition, in the
+# defaultContext or in the metadata they are a finding — unless the
+# value is empty or a template variable ({{ project_id }}), because that is
+# exactly the portable parameterization.
 #
-# HYGIENE_POOL_INSTANCE_KEYS steht nicht hier, sondern kommt aus der generierten
-# Datei daneben: Quelle ist PoolExportSanitizer im Backend, das dieselben
-# Schlüssel beim Export entfernt. Vorher waren es zwei Listen ohne Kopplung —
-# driftete eine, merkte es niemand (TODO 96640e6f).
+# HYGIENE_POOL_INSTANCE_KEYS is not defined here but comes from the generated
+# file next to it: the source is PoolExportSanitizer in the backend, which removes the same
+# keys on export. Previously there were two uncoupled lists —
+# if one drifted, nobody noticed (TODO 96640e6f).
 HYGIENE_RULES_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 if [ -f "$HYGIENE_RULES_DIR/pool-sanitizer.generated.sh" ]; then
   # shellcheck source=pool-sanitizer.generated.sh
@@ -146,65 +146,65 @@ else
 fi
 
 # ---------------------------------------------------------------------------
-# Kriterium „Definition ruft die eigene REST-API oder liest Zugangsdaten"
+# Criterion "definition calls its own REST API or reads credentials"
 # (TODO 1ccdc6d5)
 #
-# Die Hausregel lautet: Workflow-Blöcke rufen weder die eigene REST-API noch die
-# Datenbank auf — alles, was sie brauchen, injiziert der WorkflowExecutor als
-# Kontextvariable ({{ open_todos }}, {{ previous_report }}, …). In einer
-# mitveröffentlichten Definition kommt ein zweites Problem dazu: ein Prompt, der
-# erklärt, wie man sich den API-Key aus app_settings holt, ist eine Anleitung
-# zum Auslesen von Zugangsdaten — jeder Leser installiert sie mit.
+# The house rule: workflow blocks call neither their own REST API nor the
+# database — everything they need is injected by the WorkflowExecutor as a
+# context variable ({{ open_todos }}, {{ previous_report }}, …). In a
+# co-published definition a second problem arises: a prompt that
+# explains how to fetch the API key from app_settings is a guide
+# to reading credentials — every reader installs it along with the rest.
 # ---------------------------------------------------------------------------
 
-# Zugangsdaten: keine Ausnahme, das Vorkommen allein ist der Befund. Dazu die Schlüsseldatei der
-# Instanz im Datenordner (DataHome, auch ohne curl danach: wer sie liest, hält den Key im Klartext,
-# TODO ee8bb93d) — derselbe Pfad, den der Analyzer als self-api-call meldet (SelfAccessRules.KEY_FILE).
-# ")/api-key" fängt den Datenordner aus einer Befehlsersetzung ($(data_home …)/api-key, lib/data-home.sh).
-# Kopien wie api-key.bak oder api-key-backup treffen bewusst mit: Sie enthalten denselben Schlüssel.
+# Credentials: no exception, the occurrence alone is the finding. Plus the key file of the
+# instance in the data folder (DataHome, even without curl afterwards: whoever reads it holds the key in plain text,
+# TODO ee8bb93d) — the same path the analyzer reports as self-api-call (SelfAccessRules.KEY_FILE).
+# ")/api-key" catches the data folder from a command substitution ($(data_home …)/api-key, lib/data-home.sh).
+# Copies such as api-key.bak or api-key-backup deliberately match too: they contain the same key.
 HYGIENE_POOL_CREDENTIAL_MARKERS=("X-API-Key" "app_settings" ".mysuricates/api-key" ".autotrigger/api-key"
   "AUTOMATION_DATA_HOME/api-key" "AUTOMATION_DATA_HOME}/api-key" ")/api-key")
 
-# Eigene REST-API. Das Präfix allein genügt nicht als Befund: mocking-gap-audit
-# führt "/api/v1/" als Suchmuster in einer Liste von Netzwerk-Kennzeichen, und
-# das ist kein Aufruf. Gemeldet wird erst die Kombination aus Pfad und Aufruf.
-# /actuator/ gehoert dazu: ausser /actuator/health verlangt dort alles den Key (security/PublicPaths,
-# TODO 7721d8cb — /actuator/metrics lieferte system-performance-analysis still 403).
+# Own REST API. The prefix alone is not enough for a finding: mocking-gap-audit
+# lists "/api/v1/" as a search pattern in a list of network markers, and
+# that is not a call. Only the combination of path and call is reported.
+# /actuator/ belongs here: apart from /actuator/health everything there requires the key (security/PublicPaths,
+# TODO 7721d8cb — /actuator/metrics silently returned 403 to system-performance-analysis).
 HYGIENE_POOL_API_PREFIXES=("/api/v1/" "/actuator/")
 HYGIENE_POOL_API_CALLERS=("curl" "wget" "requests." "urllib" "fetch(" "http.client")
 
-# Ohne API-Key erreichbar (security/PublicPaths) und deshalb als Lebenszeichen-Sonde
-# erlaubt — mysuricates-performance-audit misst damit die Antwortzeit und liest aus
-# /api/v1/system/jvm-memory die drei Heap-Zahlen (c2cda5ed; /actuator/metrics braucht den Key).
-# Im Shell-Code eines Pool-Blocks ist jeder andere konkrete /api/v1/-Pfad ein Befund, auch ohne
-# Aufruf in der Naehe; verglichen wird exakt wie im Filter (28007626).
-# Dieselbe Liste fuehrt der Workflow-Analyzer fuer Live-Definitionen (SelfAccessRules.KEY_FREE_PROBES,
-# Regel self-api-call, d0348479); SelfAccessRulesTest haelt beide gleich und prueft, dass jede
-# Sonde in PublicPaths oeffentlich ist.
+# Reachable without an API key (security/PublicPaths) and therefore allowed as a liveness probe
+# — mysuricates-performance-audit uses it to measure response time and reads the
+# three heap figures from /api/v1/system/jvm-memory (c2cda5ed; /actuator/metrics needs the key).
+# In the shell code of a pool block, every other concrete /api/v1/ path is a finding, even without
+# a call nearby; compared exactly as in the filter (28007626).
+# The workflow analyzer keeps the same list for live definitions (SelfAccessRules.KEY_FREE_PROBES,
+# rule self-api-call, d0348479); SelfAccessRulesTest keeps both equal and checks that every
+# probe is public in PublicPaths.
 HYGIENE_POOL_API_ALLOWED=(
   "/api/v1/system/health" "/api/v1/system/info" "/api/v1/system/auth-status"
   "/api/v1/system/jvm-memory" "/actuator/health"
 )
 
-# Direkter Datenbankzugriff. Die Datei anzusehen (stat, du) bleibt erlaubt —
-# gemeint ist das Lesen des Inhalts, das an Hibernate und pool-size=1 vorbeigeht.
+# Direct database access. Looking at the file (stat, du) remains allowed —
+# what is meant is reading the content, which bypasses Hibernate and pool-size=1.
 HYGIENE_POOL_DB_FILES=("automation.db")
 HYGIENE_POOL_DB_ACCESS=("sqlite3" "SELECT " "INSERT INTO" "UPDATE " "DELETE FROM" ".tables" ".schema")
 
 # ---------------------------------------------------------------------------
-# Generische Build-Namen: in .git/info/exclude UND .gitignore erlaubt
+# Generic build names: allowed in .git/info/exclude AND .gitignore
 #
-# check_gitignore_leaks (public-hygiene.sh) meldet sonst jeden Namen aus der
-# lokalen exclude-Datei, der auch in .gitignore auftaucht, als Leck. Diese
-# Namen sind zu generisch, um etwas Persoenliches zu verraten — jedes
-# Node/Java/Python-Projekt erzeugt sie. Die Regel bleibt fuer alles andere in
-# Kraft, insbesondere workflow-pool/* (siehe TODO 819b387e).
+# check_gitignore_leaks (public-hygiene.sh) would otherwise report every name from the
+# local exclude file that also appears in .gitignore as a leak. These
+# names are too generic to reveal anything personal — every
+# Node/Java/Python project produces them. The rule remains in force for everything else,
+# in particular workflow-pool/* (see TODO 819b387e).
 # ---------------------------------------------------------------------------
 HYGIENE_GITIGNORE_LEAK_ALLOWED_NAMES=(
   "node_modules" "target" "dist" "build" ".venv" "__pycache__" "*.log"
 )
 
-# hygiene_gitignore_leak_is_generic <basisname>
+# hygiene_gitignore_leak_is_generic <basename>
 hygiene_gitignore_leak_is_generic() {
   local base="$1" n
   for n in "${HYGIENE_GITIGNORE_LEAK_ALLOWED_NAMES[@]}"; do
@@ -214,34 +214,34 @@ hygiene_gitignore_leak_is_generic() {
 }
 
 # ---------------------------------------------------------------------------
-# Allowlist: bewusste Ausnahmen, nur Pfade mit Begründung
+# Allowlist: deliberate exceptions, only paths with a justification
 #
-# Absichtlich ohne Musterliterale — die Allowlist selbst soll nichts preisgeben.
+# Deliberately without pattern literals — the allowlist itself should reveal nothing.
 # ---------------------------------------------------------------------------
 HYGIENE_ALLOWLIST_FILE="scripts/ci/hygiene-allowlist.txt"
 
 # ---------------------------------------------------------------------------
-# Private Ausschlussliste für den Workflow-Pool (TODO 0640f29b)
+# Private exclusion list for the workflow pool (TODO 0640f29b)
 #
-# Die persönlichen Pool-Definitionen bleiben über .git/info/exclude aus dem
-# Bestand — dort steht keine Klartext-Namensliste im öffentlichen Repository.
-# exclude wird aber nicht geklont und gilt in keinem Worktree: ein pauschales
-# "git add -A" holt die Dateien zurück, ohne dass etwas anschlägt. Diese Liste
-# ist die durchsetzbare Hälfte davon; sie liegt selbst nicht im Repository
-# (auch sie steht in .git/info/exclude). Fehlt sie, wird der Check hörbar
-# übersprungen statt still zu bestehen. Vorlage: die .example-Datei daneben.
+# The personal pool definitions are kept out of the tracked tree via .git/info/exclude —
+# there is no plain-text name list in the public repository.
+# But exclude is not cloned and does not apply in any worktree: a blanket
+# "git add -A" brings the files back without anything triggering. This list
+# is the enforceable half of it; it is itself not in the repository
+# (it too is in .git/info/exclude). If it is missing, the check is audibly
+# skipped instead of silently passing. Template: the .example file next to it.
 #
-# Weil sie untrackt ist, fehlt sie in jedem Klon und jedem Worktree — auch im
-# isolierten Run-Workspace, in dem der Evidenz-Workflow das Gate fährt (TODO
-# 6e601c77, Private Hygiene-Liste fehlt). Deshalb gibt es zwei Ausweichorte
-# ausserhalb des Repositorys: $HYGIENE_PRIVATE_LIST und die Nutzerkonfiguration.
+# Because it is untracked, it is missing in every clone and every worktree — also in the
+# isolated run workspace in which the evidence workflow runs the gate (TODO
+# 6e601c77, private hygiene list missing). Hence there are two fallback locations
+# outside the repository: $HYGIENE_PRIVATE_LIST and the user configuration.
 # ---------------------------------------------------------------------------
 HYGIENE_PRIVATE_LIST_FILE="scripts/ci/hygiene-private.txt"
 
-# hygiene_private_list_path <repo-root> — gibt den Pfad der ersten vorhandenen
-# Liste aus (Repo-Datei, dann $HYGIENE_PRIVATE_LIST, dann
-# ${XDG_CONFIG_HOME:-$HOME/.config}/mysuricates/hygiene-private.txt); Exit 1,
-# wenn keine da ist.
+# hygiene_private_list_path <repo-root> — prints the path of the first existing
+# list (repo file, then $HYGIENE_PRIVATE_LIST, then
+# ${XDG_CONFIG_HOME:-$HOME/.config}/mysuricates/hygiene-private.txt); exit 1
+# if none exists.
 hygiene_private_list_path() {
   local root="$1" c
   for c in "$root/$HYGIENE_PRIVATE_LIST_FILE" \
@@ -253,28 +253,28 @@ hygiene_private_list_path() {
 }
 
 # ---------------------------------------------------------------------------
-# Private Begriffsliste (TODO 1b84ecab)
+# Private term list (TODO 1b84ecab)
 #
-# Die verbotenen Literale oben stehen im Klartext im Repository — fuer Namen
-# privater Projekte, Arbeitgeber oder Personen taugt das nicht: die Liste waere
-# selbst die Preisgabe. Diese Liste liegt deshalb wie die private Pool-Liste
-# ausserhalb des Bestands und wird ueber dieselben Ausweichorte gefunden. Fehlt
-# sie (CI, fremder Clone), wird der Check hoerbar uebersprungen.
+# The forbidden literals above stand in plain text in the repository — that is no good for names
+# of private projects, employers or persons: the list would itself be the
+# disclosure. Therefore this list, like the private pool list, lives
+# outside the tracked tree and is found via the same fallback locations. If it is missing
+# (CI, foreign clone), the check is audibly skipped.
 #
-# Format: ein Begriff je Zeile, Kommentare mit #. Gesucht wird woertlich und ohne
-# Ruecksicht auf Gross-/Kleinschreibung. Meldungen nennen den Begriff nicht,
-# nur seine Zeilennummer in der Liste — die Ausgabe landet im Evidenz-Bericht.
+# Format: one term per line, comments with #. Searched literally and without
+# regard to case. Messages do not name the term,
+# only its line number in the list — the output ends up in the evidence report.
 #
-# Praefix "low:" (TODO 2542ef85): "low: <begriff>" markiert einen schwachen
-# Begriff. Er bleibt auf der Liste, ein Treffer ist aber nur eine Warnung
-# ("privater Begriff, schwach") — kein Verstoss, kein Exit 1, weder im Bestand
-# noch beim Commit oder Push; der Evidenz-Workflow wertet ihn als LOW. Gedacht
-# fuer Begriffe, die sichtbar bleiben sollen, aber keinen Release aufhalten.
+# Prefix "low:" (TODO 2542ef85): "low: <term>" marks a weak
+# term. It stays on the list, but a hit is only a warning
+# ("private term, weak") — no violation, no exit 1, neither in the tracked tree
+# nor on commit or push; the evidence workflow rates it as LOW. Meant
+# for terms that should stay visible but not hold up a release.
 # ---------------------------------------------------------------------------
 HYGIENE_PRIVATE_TERMS_FILE="scripts/ci/hygiene-private-terms.txt"
 
-# hygiene_private_terms_path <repo-root> — wie hygiene_private_list_path, fuer
-# die Begriffsliste ($HYGIENE_PRIVATE_TERMS, dann die Nutzerkonfiguration).
+# hygiene_private_terms_path <repo-root> — like hygiene_private_list_path, for
+# the term list ($HYGIENE_PRIVATE_TERMS, then the user configuration).
 hygiene_private_terms_path() {
   local root="$1" c
   for c in "$root/$HYGIENE_PRIVATE_TERMS_FILE" \
@@ -285,22 +285,22 @@ hygiene_private_terms_path() {
   return 1
 }
 
-# hygiene_private_terms_load <liste> — der einzige Parser der Begriffsliste. Fuellt
-# drei parallele Arrays:
-#   HYGIENE_TERMS       Begriff (getrimmt, ohne Kommentar und ohne Praefix)
-#   HYGIENE_TERM_LINES  Zeilennummer in der Liste — Meldungen nennen nur sie
-#   HYGIENE_TERM_WEAK   1 = schwach (Praefix low:), 0 = normal
-# public-hygiene.sh (Bestand und hinzugefuegte Zeilen) und pre-push-checks.sh
-# (Commit-Nachrichten) lesen die Liste nur hierueber. Vorher hatte jede Pruefung
-# ihre eigene Schleife — eine Formatregel an einer Stelle fehlte an der anderen,
-# und ein "low:"-Eintrag waere dort als woertlicher Begriff stumm ins Leere gelaufen.
+# hygiene_private_terms_load <list> — the only parser of the term list. Fills
+# three parallel arrays:
+#   HYGIENE_TERMS       term (trimmed, without comment and without prefix)
+#   HYGIENE_TERM_LINES  line number in the list — messages name only it
+#   HYGIENE_TERM_WEAK   1 = weak (prefix low:), 0 = normal
+# public-hygiene.sh (tracked tree and added lines) and pre-push-checks.sh
+# (commit messages) read the list only through this. Previously each check had
+# its own loop — a format rule in one place was missing in the other,
+# and a "low:" entry would have silently run into nothing there as a literal term.
 HYGIENE_TERMS=()
 HYGIENE_TERM_LINES=()
 HYGIENE_TERM_WEAK=()
 hygiene_private_terms_load() {
   local list="$1" term lineno=0 weak
   HYGIENE_TERMS=(); HYGIENE_TERM_LINES=(); HYGIENE_TERM_WEAK=()
-  # "|| [ -n "$term" ]" nimmt die letzte Zeile mit, wenn die Datei ohne Umbruch endet.
+  # "|| [ -n "$term" ]" picks up the last line if the file ends without a line break.
   while IFS= read -r term || [ -n "$term" ]; do
     lineno=$((lineno + 1))
     term="${term%%#*}"
@@ -321,13 +321,13 @@ hygiene_private_terms_load() {
   done < "$list"
 }
 
-# Liest die Allowlist als Pfadliste (Kommentare und Leerzeilen fallen weg).
+# Reads the allowlist as a path list (comments and blank lines are dropped).
 hygiene_allowlist_paths() {
   [ -f "$HYGIENE_ALLOWLIST_FILE" ] || return 0
   sed -e 's/#.*//' -e 's/[[:space:]]*$//' "$HYGIENE_ALLOWLIST_FILE" | grep -v '^$' || true
 }
 
-# hygiene_is_allowlisted <pfad>
+# hygiene_is_allowlisted <path>
 hygiene_is_allowlisted() {
   local p="$1" entry
   while IFS= read -r entry; do
@@ -337,7 +337,7 @@ hygiene_is_allowlisted() {
   return 1
 }
 
-# hygiene_is_self_excluded <pfad>
+# hygiene_is_self_excluded <path>
 hygiene_is_self_excluded() {
   local p="$1" e
   for e in "${HYGIENE_SELF_EXCLUDE[@]}"; do
@@ -346,6 +346,6 @@ hygiene_is_self_excluded() {
   return 1
 }
 
-# hygiene_pattern_of <eintrag> / hygiene_desc_of <eintrag>
+# hygiene_pattern_of <entry> / hygiene_desc_of <entry>
 hygiene_pattern_of() { echo "${1%%|*}"; }
 hygiene_desc_of()    { echo "${1##*|}"; }

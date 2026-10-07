@@ -2,47 +2,47 @@
 #
 # Pre-Push-Gate
 #
-# Was sich vor einem Push lokal pruefen laesst — deterministisch, ohne Urteil, in Sekunden
-# bis zu einer Minute:
-#   1. Commit-Metadaten des Push-Bereichs: Autor und Committer tragen nur die
-#      GitHub-noreply-Form; die Nachricht enthaelt keine verbotenen Literale, keine privaten
-#      Begriffe (schwache, Praefix low:, nur als Warnung) und keine Mailadresse ausserhalb
-#      eines Trailers. The subject of new commits has at most 72 characters (TODO 7ce5c71a).
-#   2. Hygiene-Gate auf den Push-Bereich (public-hygiene.sh --range): was NEU dazukommt.
-#   3. Bestands-Gates der CI, die vom Code abhaengen: Doku-Zahlen, Doku-Verweise mit
-#      DE/EN-Gleichstand, Diagramm-Drift.
-#   4. gitleaks auf den Bereich — nur wenn installiert, sonst hoerbar uebersprungen.
-#      Es wird nichts nachinstalliert.
-#   4b. Ausnahmedateien im Bereich: Wer .gitleaksignore, die Hygiene-Regeln, das Gate selbst oder
-#      die Hooks im selben Push aendert, lockert womoeglich genau die Pruefung, die ihn gleich
-#      durchwinkt. Das blockiert, bis ein Mensch es fuer genau diesen Stand freigibt
-#      (MYSURICATES_PREPUSH_ALLOW_RULES=<sha des gepushten Stands>); die CI meldet es nur.
-#   5. Bauprüfung nach Scope (dieselbe Einordnung wie die CI, scripts/ci/changed-scopes.sh):
-#      Frontend-Suite betroffen -> tsc + lint; Backend-Suite betroffen -> mvn test-compile.
+# What can be checked locally before a push — deterministic, without judgement, in seconds
+# up to a minute:
+#   1. Commit metadata of the push range: author and committer carry only the
+#      GitHub noreply form; the message contains no forbidden literals, no private
+#      terms (weak ones, prefix low:, only as a warning) and no mail address outside
+#      a trailer. The subject of new commits has at most 72 characters (TODO 7ce5c71a).
+#   2. Hygiene gate on the push range (public-hygiene.sh --range): what is NEWLY added.
+#   3. Existing CI gates that depend on the code: doc numbers, doc references with
+#      DE/EN parity, diagram drift.
+#   4. gitleaks on the range — only if installed, otherwise audibly skipped.
+#      Nothing is installed.
+#   4b. Exception files in the range: whoever changes .gitleaksignore, the hygiene rules, the gate itself or
+#      the hooks in the same push may be loosening exactly the check that is about to wave them
+#      through. That blocks until a human releases it for exactly this state
+#      (MYSURICATES_PREPUSH_ALLOW_RULES=<sha of the pushed state>); the CI only reports it.
+#   5. Build check by scope (same classification as the CI, scripts/ci/changed-scopes.sh):
+#      frontend suite affected -> tsc + lint; backend suite affected -> mvn test-compile.
 #
-# Nicht hier: die volle Testsuite (CI und die Commit-Regel in CLAUDE.md), der getrackte
-# Bestand (public-hygiene.sh --tracked in der CI und in der Kette „Public Readiness") und
-# alles, was ein Urteil braucht.
+# Not here: the full test suite (CI and the commit rule in CLAUDE.md), the tracked
+# inventory (public-hygiene.sh --tracked in the CI and in the "Public Readiness" chain) and
+# everything that needs a judgement.
 #
-# Aufrufer: scripts/git-hooks/pre-push (--hook, Refs auf stdin), scripts/git-hooks/commit-msg
-# (--message-file), CI (--tree und --range), von Hand (--range A..B).
+# Callers: scripts/git-hooks/pre-push (--hook, refs on stdin), scripts/git-hooks/commit-msg
+# (--message-file), CI (--tree and --range), by hand (--range A..B).
 #
-# Usage: bash scripts/ci/pre-push-checks.sh --hook | --range A..B | --tree | --message-file <datei>
+# Usage: bash scripts/ci/pre-push-checks.sh --hook | --range A..B | --tree | --message-file <file>
 #                                           [--skip-tree] [--skip-build] [--rules-report-only]
-#        --rules-report-only  geaenderte Ausnahmedateien nur melden (Warnung + Job-Summary), nicht
-#                             blockieren — fuer die CI, in der kein Mensch eine Freigabe setzen kann.
-# Env:   MYSURICATES_PREPUSH_SKIP=tree,build — fuer die Hooks, die keine Argumente nehmen.
-#        Jede Auslassung wird gemeldet; ein Gate, das nicht misst, ist nicht gruen.
-#        MYSURICATES_PREPUSH_ALLOW_RULES=<sha>[,<sha>…] — Freigabe geaenderter Ausnahmedateien,
-#        gilt nur fuer den Bereich, dessen Spitze mit diesem Hash beginnt (mind. 7 Zeichen).
-#        Bewusst nicht ueber MYSURICATES_PREPUSH_SKIP abdeckbar.
-# Exit:  0 = sauber, 1 = Verstoss oder Fehlschlag, 2 = Gate nicht lauffaehig
+#        --rules-report-only  only report changed exception files (warning + job summary), do not
+#                             block — for the CI, where no human can set a release.
+# Env:   MYSURICATES_PREPUSH_SKIP=tree,build — for the hooks, which take no arguments.
+#        Every omission is reported; a gate that does not measure is not green.
+#        MYSURICATES_PREPUSH_ALLOW_RULES=<sha>[,<sha>…] — release of changed exception files,
+#        applies only to the range whose tip starts with this hash (at least 7 characters).
+#        Deliberately not coverable via MYSURICATES_PREPUSH_SKIP.
+# Exit:  0 = clean, 1 = violation or failure, 2 = gate not runnable
 #
 set -uo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-# Repo-Wurzel aus dem Skriptpfad, nicht aus git: in Worktrees exportiert git GIT_DIR an
-# Hooks (siehe public-hygiene.sh).
+# Repo root from the script path, not from git: in worktrees git exports GIT_DIR to
+# hooks (see public-hygiene.sh).
 REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 cd "$REPO_ROOT"
 
@@ -83,17 +83,17 @@ COUNT=0
 WARN=0
 ZERO="0000000000000000000000000000000000000000"
 
-# Welche Befundarten der Lauf hatte — der Schlusshinweis nennt je Art den passenden Weg.
-# Jede Pruefung setzt KIND, bevor sie fail() rufen kann.
+# Which kinds of findings the run had — the final hint names the matching way out for each kind.
+# Every check sets KIND before it can call fail().
 KIND="meta"
 FAIL_KINDS=","
-fail() {  # $1 = meldung
+fail() {  # $1 = message
   case "$FAIL_KINDS" in *",${KIND},"*) ;; *) FAIL_KINDS="${FAIL_KINDS}${KIND}," ;; esac
   if [ -n "${GITHUB_ACTIONS:-}" ]; then echo "::error::${1}"; else echo "  ✗ ${1}" >&2; fi
   FAIL=1
   COUNT=$((COUNT + 1))
 }
-# Sichtbar, aber kein Verstoss — etwa ein schwacher privater Begriff (Praefix low:).
+# Visible, but not a violation — e.g. a weak private term (prefix low:).
 warn() {  # $1 = meldung
   if [ -n "${GITHUB_ACTIONS:-}" ]; then echo "::warning::${1}"; else echo "  ! ${1}" >&2; fi
   WARN=$((WARN + 1))
@@ -102,14 +102,14 @@ note() { echo "  – $1"; }
 step() { echo "▶ $1"; }
 
 # ---------------------------------------------------------------------------
-# Private Begriffsliste — einmal laden (Parser: hygiene_private_terms_load, derselbe wie im
-# Hygiene-Gate), Meldungen nennen die Listenzeile, nie den Begriff.
+# Private term list — load once (parser: hygiene_private_terms_load, the same as in the
+# hygiene gate), messages name the list line, never the term.
 # ---------------------------------------------------------------------------
 TERMS_LOADED=0
 TERMS_LC=()
-# Kleinschreibung: ab Bash 4 per Parameter-Expansion (faltet im UTF-8-Locale auch Umlaute, wie
-# bisher). Bash 3.2 (macOS) kennt sie nicht — dort python3, sonst awk (mawk/BSD-awk falten nur
-# ASCII). Die Expansion wird erst zur Laufzeit ausgewertet, Bash 3.2 erreicht diesen Zweig nie.
+# Lowercasing: from Bash 4 via parameter expansion (also folds umlauts in a UTF-8 locale, as
+# before). Bash 3.2 (macOS) does not have it — there python3, otherwise awk (mawk/BSD awk fold only
+# ASCII). The expansion is only evaluated at runtime, Bash 3.2 never reaches this branch.
 if [ "${BASH_VERSINFO[0]}" -ge 4 ]; then
   lower_stream() { local l; while IFS= read -r l || [ -n "$l" ]; do printf '%s\n' "${l,,}"; done; }
 elif command -v python3 >/dev/null 2>&1; then
@@ -132,20 +132,20 @@ load_private_terms() {
 }
 
 # ---------------------------------------------------------------------------
-# 1 — Commit-Metadaten
+# 1 — Commit metadata
 # ---------------------------------------------------------------------------
-check_email() {  # $1 = label, $2 = rolle, $3 = adresse
+check_email() {  # $1 = label, $2 = role, $3 = address
   [[ "$3" =~ $HYGIENE_COMMIT_EMAIL_REGEX ]] && return 0
   fail "${1}: ${2}-Adresse ist keine GitHub-noreply-Adresse — git config user.email '<id>+<login>@users.noreply.github.com', dann git commit --amend --reset-author"
 }
 
-check_message() {  # $1 = label, $2 = nachricht (mehrzeilig)
+check_message() {  # $1 = label, $2 = message (multi-line)
   local label="$1" line content lc i lc_term entry pat desc
   load_private_terms
-  # Originalzeile (fd 3) und kleingeschriebene Zeile (fd 4) parallel, gefaltet einmal je Nachricht.
+  # Original line (fd 3) and lowercased line (fd 4) in parallel, folded once per message.
   while IFS= read -r line <&3 && IFS= read -r lc <&4; do
     [[ "$line" =~ $HYGIENE_COMMIT_TRAILER_REGEX ]] && continue
-    case "$line" in '#'*) continue ;; esac   # Kommentarzeilen der Commit-Vorlage
+    case "$line" in '#'*) continue ;; esac   # comment lines of the commit template
     for entry in "${HYGIENE_PATTERNS[@]}"; do
       pat="$(hygiene_pattern_of "$entry")"
       desc="$(hygiene_desc_of "$entry")"
@@ -182,7 +182,7 @@ check_subject() {  # $1 = label, $2 = message (multi-line)
   fail "${1}: Betreff hat ${#subject} Zeichen (hoechstens ${HYGIENE_SUBJECT_MAX}) — das TODO gehoert als Trailer 'Todo: <uuid> (<Titel>)' ans Ende, Einzelheiten in den Body"
 }
 
-check_commits() {  # $@ = rev-list-Argumente
+check_commits() {  # $@ = rev-list arguments
   KIND="meta"
   local c short ae ce at body n=0
   while IFS= read -r c; do
@@ -202,7 +202,7 @@ check_commits() {  # $@ = rev-list-Argumente
 }
 
 # ---------------------------------------------------------------------------
-# 2 — Hygiene auf den Bereich, 4 — gitleaks, 5 — Bauprüfung
+# 2 — Hygiene on the range, 4 — gitleaks, 5 — build check
 # ---------------------------------------------------------------------------
 check_hygiene_range() {  # $1 = A..B
   KIND="hygiene"
@@ -214,8 +214,8 @@ check_hygiene_range() {  # $1 = A..B
   out="$(bash "$HYGIENE_GATE" --range "$1" 2>&1)"; rc=$?
   case "$rc" in
     0)
-      # Warnungen (etwa ein schwacher privater Begriff) blockieren nicht, sollen aber nicht
-      # im OK verschwinden — sonst sieht sie vor dem Push niemand.
+      # Warnings (e.g. a weak private term) do not block, but should not
+      # disappear in the OK — otherwise nobody sees them before the push.
       warns="$(printf '%s\n' "$out" | grep -E '^(  ! |::warning)' || true)"
       if [ -n "$warns" ]; then
         n="$(printf '%s\n' "$warns" | grep -c .)"
@@ -238,7 +238,7 @@ check_gitleaks() {  # $1 = A..B
     note "gitleaks ist nicht installiert — Secret-Scan des Bereichs uebersprungen (die CI scannt mit gitleaks-action)"
     return 0
   fi
-  # 8.19+ heisst der Unterbefehl "git", aeltere Versionen kennen nur "detect".
+  # From 8.19 the subcommand is called "git", older versions only know "detect".
   out="$(gitleaks git --no-banner --redact --log-opts="$1" . 2>&1)"; rc=$?
   if [ "$rc" -gt 1 ]; then
     out="$(gitleaks detect --no-banner --redact --source . --log-opts="$1" 2>&1)"; rc=$?
@@ -251,21 +251,21 @@ check_gitleaks() {  # $1 = A..B
 }
 
 # ---------------------------------------------------------------------------
-# 4b — Ausnahmedateien im Bereich (TODO e8257473)
+# 4b — Exception files in the range (TODO e8257473)
 #
-# Gate und CI lesen ihre Ausnahmen aus dem Repo selbst. Am 2026-09-30 gab ein Push
-# gitleaks-Fehlalarme per .gitleaksignore frei — abgesprochen, aber der zweite Push lief ohne
-# jeden Hinweis glatt durch. Eine Aenderung an diesen Dateien ist deshalb kein Verstoss, aber
-# eine Entscheidung, die ein Mensch fuer genau diesen Stand trifft. Der Schalter nimmt den
-# Hash der Bereichsspitze, nicht nur "1": ein dauerhaft exportiertes Env deckt so keinen
-# spaeteren Push mit neuen Lockerungen.
+# Gate and CI read their exceptions from the repo itself. On 2026-09-30 a push released
+# gitleaks false alarms via .gitleaksignore — agreed upon, but the second push went through smoothly
+# without any hint. A change to these files is therefore not a violation, but
+# a decision a human makes for exactly this state. The switch takes the
+# hash of the range tip, not just "1": a permanently exported env thus does not cover a
+# later push with new loosenings.
 # ---------------------------------------------------------------------------
 is_rule_file() {  # $1 = Pfad
   case "$1" in
     .gitleaksignore|.gitleaks.toml) return 0 ;;
     scripts/lib/hygiene-rules.sh) return 0 ;;
     scripts/ci/pre-push-checks.sh|scripts/ci/public-hygiene.sh) return 0 ;;
-    # Fuehrt die Liste der Pfade, die Backend-/Frontend-Bau und -Tests auslassen — lokal wie in der CI.
+    # Heads the list of paths that backend/frontend build and tests leave out — locally as in the CI.
     scripts/ci/changed-scopes.sh) return 0 ;;
     scripts/git-hooks/*) return 0 ;;
     .github/workflows/ci.yml) return 0 ;;
@@ -287,7 +287,7 @@ rules_allowed_for() {  # $1 = voller Hash der Bereichsspitze
 check_rule_files() {  # $1 = A..B
   KIND="rules"
   local f files=() tip short stat changed
-  # Ein Fehler hier ist kein "unveraendert": dann wuesste das Gate nicht, was es durchlaesst.
+  # An error here is not "unchanged": then the gate would not know what it lets through.
   if ! changed="$(git -c core.quotePath=false diff --no-renames --name-only "$1" 2>/dev/null)"; then
     echo "Pre-Push-Gate: git diff ${1} fehlgeschlagen — geaenderte Ausnahmedateien nicht bestimmbar" >&2
     exit 2
@@ -329,11 +329,11 @@ check_rule_files() {  # $1 = A..B
   fail "Bereich ${1} aendert Ausnahmedateien (${files[*]}) — nach Pruefung des Diffs freigeben: MYSURICATES_PREPUSH_ALLOW_RULES=${short} git push"
 }
 
-# Welche Suite eine Aenderung braucht, entscheidet dasselbe Skript wie in der CI
-# (scripts/ci/changed-scopes.sh, TODO c60eb0e2): Backend umgekehrt gefiltert — es baut, ausser
-# jede Datei liegt nachweislich ausserhalb seiner Reichweite (docs/, workflow-pool/, Teile des
-# Frontends und scripts/lib zaehlen dazu) —, Frontend auch bei templates/ und workflow-pool/.
-# Eine eigene Liste hier liefe der CI davon: lokal gruen, was die CI baut, oder umgekehrt.
+# Which suite a change needs is decided by the same script as in the CI
+# (scripts/ci/changed-scopes.sh, TODO c60eb0e2): backend filtered the other way round — it builds unless
+# every file demonstrably lies outside its reach (docs/, workflow-pool/, parts of the
+# frontend and scripts/lib count among them) —, frontend also for templates/ and workflow-pool/.
+# A list of our own here would drift from the CI: green locally what the CI builds, or vice versa.
 SCOPES_SCRIPT="$REPO_ROOT/scripts/ci/changed-scopes.sh"
 check_build() {  # $1 = A..B
   KIND="build"
@@ -342,8 +342,8 @@ check_build() {  # $1 = A..B
     echo "Pre-Push-Gate: Scope-Einordnung fehlt: $SCOPES_SCRIPT" >&2
     exit 2
   fi
-  # core.quotePath=false: Nicht-ASCII-Pfade kommen als Klartext, nicht als "docs/\303\244.md" —
-  # sonst ordnete changed-scopes.sh sie falsch ein.
+  # core.quotePath=false: non-ASCII paths come as plain text, not as "docs/\303\244.md" —
+  # otherwise changed-scopes.sh would classify them wrongly.
   if ! files="$(git -c core.quotePath=false diff --no-renames --name-only "$1" 2>/dev/null)"; then
     echo "Pre-Push-Gate: git diff ${1} fehlgeschlagen — Bau-Scope nicht bestimmbar" >&2
     exit 2
@@ -352,7 +352,7 @@ check_build() {  # $1 = A..B
     note "Bauprüfung: keine geaenderte Datei in ${1} — nichts zu bauen"
     return 0
   fi
-  # Ohne GITHUB_*-Umgebung: changed-scopes.sh soll hier nur die Liste einordnen.
+  # Without GITHUB_* environment: changed-scopes.sh should only classify the list here.
   scopes="$(printf '%s\n' "$files" | env -u GITHUB_EVENT_NAME -u GITHUB_REF_TYPE bash "$SCOPES_SCRIPT" --files 2>&1)"
   printf '%s\n' "$scopes" | sed -n 's/^changed-scopes: /  – Scope: /p'
   grep -qx 'backend=true' <<<"$scopes" && backend=1
@@ -382,7 +382,7 @@ check_build() {  # $1 = A..B
 }
 
 # ---------------------------------------------------------------------------
-# 3 — Bestands-Gates (dieselben wie im CI-Job "Public Hygiene")
+# 3 — Existing gates (the same as in the CI job "Public Hygiene")
 # ---------------------------------------------------------------------------
 TREE_GATES=(
   "Doku-Zahlen gegen den Code|bash|scripts/public-readiness/doc-facts-check.sh"
@@ -411,7 +411,7 @@ check_tree() {
 }
 
 # ---------------------------------------------------------------------------
-# Bereiche bestimmen
+# Determine ranges
 # ---------------------------------------------------------------------------
 RANGES=()
 ranges_from_stdin() {
@@ -423,7 +423,7 @@ ranges_from_stdin() {
       RANGES+=("${remote_sha}..${local_sha}")
       continue
     fi
-    # Neuer Branch auf dem Remote: alles, was noch kein Remote-Ref kennt.
+    # New branch on the remote: everything that no remote ref knows yet.
     oldest="$(git rev-list "$local_sha" --not --remotes 2>/dev/null | tail -1)"
     if [ -z "$oldest" ]; then
       note "${local_ref}: kein neuer Commit gegenueber den Remotes — nichts zu pruefen"
@@ -438,7 +438,7 @@ ranges_from_stdin() {
 }
 
 # ---------------------------------------------------------------------------
-# Lauf
+# Run
 # ---------------------------------------------------------------------------
 echo "Pre-Push-Gate (${MODE})"
 

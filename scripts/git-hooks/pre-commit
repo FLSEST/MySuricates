@@ -1,25 +1,25 @@
 #!/usr/bin/env bash
 #
-# Pre-commit Hygiene-Check
+# Pre-commit hygiene check
 #
-# Blockiert Commits, die NEU einfuehren:
-#   1. gestagte Dateien, die unter eine Ignore-Regel fallen
-#   2. gestagte Sicherungsdateien (*.bak, *.bak-<zeitstempel>, *.orig, ...)
-#   3. verbotene Literale in hinzugefuegten Zeilen
+# Blocks commits that NEWLY introduce:
+#   1. staged files that fall under an ignore rule
+#   2. staged backup files (*.bak, *.bak-<timestamp>, *.orig, ...)
+#   3. forbidden literals in added lines
 #
-# Prueft NUR staged changes — bestehende Verstoesse in unveraenderten Dateien
-# blockieren nichts. Der vollstaendige Tree-Check laeuft in der CI mit
+# Checks ONLY staged changes — existing violations in unchanged files
+# block nothing. The full tree check runs in CI with
 # scripts/ci/public-hygiene.sh --tracked.
 #
-# Regeln und Listen stehen in scripts/lib/hygiene-rules.sh und werden von Hook
-# und CI gemeinsam gelesen — vorher standen sie wortgleich in beiden Dateien.
+# Rules and lists are in scripts/lib/hygiene-rules.sh and are read by hook
+# and CI together — previously they were duplicated verbatim in both files.
 #
 # Bypass: git commit --no-verify
 #
 set -uo pipefail
 
-# Repo-Wurzel aus dem Hook-Pfad (scripts/git-hooks/pre-commit), nicht aus git — siehe
-# scripts/ci/public-hygiene.sh zu GIT_DIR in Worktrees.
+# Repo root from the hook path (scripts/git-hooks/pre-commit), not from git — see
+# scripts/ci/public-hygiene.sh on GIT_DIR in worktrees.
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 GATE="$REPO_ROOT/scripts/ci/public-hygiene.sh"
 

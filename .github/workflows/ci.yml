@@ -1,22 +1,22 @@
 name: CI
 
-# Push nur auf main und auf Release-Tags: Auf origin gibt es allein main, Arbeits-Branches aus
-# Worktrees werden nicht gepusht. Ein PR-Branch im selben Repo lief vorher doppelt (push und
-# pull_request); jetzt deckt ihn allein pull_request ab, ohne Branch-Filter, damit auch fremde
-# PRs voll durchlaufen.
+# Push only on main and on release tags: origin has only main, working branches from
+# worktrees are not pushed. A PR branch in the same repo used to run twice (push and
+# pull_request); now pull_request alone covers it, without a branch filter, so that foreign
+# PRs also run in full.
 on:
   push:
     branches: [main]
     tags: ["v*"]
   pull_request:
   workflow_dispatch:
-  # Einmal pro Woche alles, unabhaengig vom Pfadfilter: Wechselwirkungen und Drift
-  # (npm-Stand, OSV-Daten) fallen so auch ohne passende Aenderung auf.
+  # Once a week everything, regardless of the path filter: interactions and drift
+  # (npm state, OSV data) show up even without a matching change.
   schedule:
     - cron: "0 4 * * 1"
 
-# Ein neuer Lauf desselben Refs bricht den alten ab — ausser auf main: Dort soll jeder Commit
-# ein eigenes Ergebnis bekommen.
+# A new run of the same ref cancels the old one — except on main: there every commit
+# should get its own result.
 concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
@@ -25,10 +25,10 @@ permissions:
   contents: read
 
 jobs:
-  # Welche Suiten braucht diese Aenderung? Die Einordnung steht in scripts/ci/changed-scopes.sh
-  # (samt der Liste, was Backend-Tests ausserhalb von ai-automation-backend/ lesen) und hat einen
-  # eigenen Selbsttest. Ohne Fremd-Action: nur git diff. Tags, schedule, workflow_dispatch und
-  # jede fehlende Basis ergeben fuer beide Suiten true.
+  # Which suites does this change need? The classification lives in scripts/ci/changed-scopes.sh
+  # (including the list of what backend tests read outside ai-automation-backend/) and has its
+  # own self-test. No third-party action: just git diff. Tags, schedule, workflow_dispatch and
+  # any missing base yield true for both suites.
   changes:
     name: Geaenderte Bereiche
     runs-on: ubuntu-26.04
@@ -39,8 +39,8 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           fetch-depth: 0
-      # PR: Basis und Kopf des PRs (nicht der Merge-Commit), push: before..sha. GITHUB_EVENT_NAME
-      # und GITHUB_REF_TYPE setzt GitHub selbst; das Skript liest sie.
+      # PR: base and head of the PR (not the merge commit), push: before..sha. GITHUB_EVENT_NAME
+      # and GITHUB_REF_TYPE are set by GitHub itself; the script reads them.
       - name: Geaenderte Pfade einordnen
         id: scopes
         env:
@@ -52,9 +52,9 @@ jobs:
     name: Public Hygiene
     runs-on: ubuntu-26.04
     steps:
-      # fetch-depth: 0, weil doc-facts-check.sh die Commit-Zahl der README-Kopftabelle gegen
-      # `git rev-list --count HEAD` haelt. Im flachen Standard-Checkout zaehlt das nur die
-      # geholte Tiefe (1) — das Gate ueberspringt die Zahl dann hoerbar, prueft sie also nie.
+      # fetch-depth: 0, because doc-facts-check.sh checks the commit count of the README header table against
+      # `git rev-list --count HEAD`. In the shallow default checkout that only counts the
+      # fetched depth (1) — the gate then audibly skips the number, i.e. never checks it.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           fetch-depth: 0
@@ -62,13 +62,13 @@ jobs:
         run: bash scripts/ci/public-hygiene.sh --tracked
       - name: Hygiene-Gate Selbsttest (Worktrees, fehlende Regeldatei)
         run: bash scripts/tests/test-public-hygiene.sh
-      # Dieselbe Pruefung wie der pre-push-Hook, hier auf die Commits dieses Push-Ereignisses:
-      # faengt, was an einem Klon ohne installierte Hooks vorbeikam (Autor-Adresse, Nachricht,
-      # neu hinzugekommene Inhalte). Geaenderte Ausnahmedateien (.gitleaksignore, Hygiene-Regeln,
-      # Gate, Hooks, diese Datei) blockieren hier nicht — es gibt keinen Menschen, der freigibt —,
-      # sondern erscheinen als Warnung und in der Job-Summary (--rules-report-only).
-      # Beim ersten Push eines Refs (auch eines Tags) ist `before` die Null-Referenz, nach einem
-      # Force-Push liegt er nicht im Checkout — beides wird hoerbar uebersprungen.
+      # The same check as the pre-push hook, here on the commits of this push event:
+      # catches what slipped past a clone without installed hooks (author address, message,
+      # newly added content). Changed exception files (.gitleaksignore, hygiene rules,
+      # gate, hooks, this file) do not block here — there is no human to release them —
+      # but appear as a warning and in the job summary (--rules-report-only).
+      # On the first push of a ref (a tag too) `before` is the null ref, after a
+      # force push it is not in the checkout — both are audibly skipped.
       - name: Pre-Push-Gate auf die Commits dieses Pushes
         if: github.event_name == 'push'
         env:
@@ -79,13 +79,13 @@ jobs:
           else
             bash scripts/ci/pre-push-checks.sh --range "${BEFORE}..${GITHUB_SHA}" --skip-tree --skip-build --rules-report-only
           fi
-      # Dasselbe fuer einen Pull Request, damit auch fremde PRs die Commit-Pruefung bekommen.
-      # Geprueft wird der PR-Kopf, nicht der Merge-Commit, den GitHub fuer den Checkout baut —
-      # dessen Committer ist GitHub selbst. Untere Grenze ist die Merge-Basis von Basis und Kopf:
-      # Liegt der PR hinter main, saehe `git diff base..head` die neueren main-Zeilen sonst als
-      # entfernt und die alten als neu hinzugekommen. Fehlt einer der Commits im Checkout
-      # (fetch-depth 0 holt alle Branches, der Kopf haengt am Merge-Commit), wird hoerbar
-      # uebersprungen.
+      # The same for a pull request, so that foreign PRs also get the commit check.
+      # The PR head is checked, not the merge commit GitHub builds for the checkout —
+      # its committer is GitHub itself. The lower bound is the merge base of base and head:
+      # if the PR is behind main, `git diff base..head` would otherwise see the newer main lines as
+      # removed and the old ones as newly added. If one of the commits is missing from the checkout
+      # (fetch-depth 0 fetches all branches, the head hangs off the merge commit), it is audibly
+      # skipped.
       - name: Pre-Push-Gate auf die Commits dieses Pull Requests
         if: github.event_name == 'pull_request'
         env:
@@ -104,15 +104,15 @@ jobs:
         run: bash scripts/tests/test-changed-scopes.sh
       - name: Setup-Modul-Preset Selbsttest
         run: bash scripts/tests/test-module-preset.sh
-      # Der Probelauf selbst braucht Docker und zehn Minuten — hier nur Aufruf, Vorab-Pruefungen
-      # und der Report-Renderer; der echte Lauf ist der Workflow "Installer-Probe" vor einem Release.
+      # The trial run itself needs Docker and ten minutes — here only the invocation, pre-checks
+      # and the report renderer; the real run is the workflow "Installer-Probe" before a release.
       - name: Installer-Probe Selbsttest (ohne Docker)
         run: |
           bash scripts/tests/test-installer-probe.sh
           python3 -m unittest discover -s scripts/tests -p 'test_installer_probe_report.py'
-      # Der Lasttest selbst baut ein JAR und faehrt eine Wegwerf-Instanz (Workflow "Lasttest vor dem
-      # Release", release.sh fragt danach) — hier nur Auswertung, Verdict, Baseline und Treiber gegen
-      # einen HTTP-Server aus der Standardbibliothek.
+      # The load test itself builds a JAR and drives a throwaway instance (workflow "Lasttest vor dem
+      # Release", release.sh asks for it) — here only evaluation, verdict, baseline and driver against
+      # an HTTP server from the standard library.
       - name: Lasttest Selbsttest (ohne Instanz)
         run: python3 -m unittest discover -s scripts/tests -p 'test_load_test_*.py'
       - name: Container-Instanz Selbsttest (deploy/, ohne Docker)
@@ -121,30 +121,30 @@ jobs:
           bash scripts/tests/test-instance.sh
           bash scripts/tests/test-deploy-files.sh
           bash scripts/tests/test-staging-override.sh
-      # Die Python-Skripte fuer Betreiber fragen die eigene Instanz nie ueber einen Proxy aus der Umgebung
-      # (cf662c01): echte Aufrufe gegen fake_instance.py, braucht nur python3.
+      # The Python scripts for operators never query their own instance through a proxy from the environment
+      # (cf662c01): real calls against fake_instance.py, needs only python3.
       - name: Eigene Instanz ohne Proxy (Python-Skripte)
         run: python3 -m unittest discover -s scripts/tests -p 'test_local_api_proxy.py'
-      # TODO-Batch (cc0eb3ba): Skripte gegen Wegwerf-Repos, braucht nur python3 und git.
+      # TODO batch (cc0eb3ba): scripts against throwaway repos, needs only python3 and git.
       - name: TODO-Batch-Skripte
         run: python3 -m unittest discover -s scripts/tests -p 'test_todo_batch.py'
-      # README-Sync (c13a942b): Abschnitts-Diff, Einsetzen und Byte-Gate gegen Wegwerf-Repos,
-      # dazu der Gleichlauf der echten READMEs — braucht nur python3 und git.
+      # README sync (c13a942b): section diff, insertion and byte gate against throwaway repos,
+      # plus the parity of the real READMEs — needs only python3 and git.
       - name: README-Sync-Skript
         run: python3 -m unittest discover -s scripts/tests -p 'test_readme_sync.py'
-      # Liefen bisher nur lokal (cad7d821): Dev-Starter (JAR-Laufzeit, Run-Waechter, Proxy, Container-
-      # Modus mit Stubs) und die Seed-Vorlage gegen einen curl-Stub. Brauchen python3, curl, git, jq,
-      # node und script — kein Backend, kein Docker, keine KI-CLI.
+      # Used to run only locally (cad7d821): dev starter (JAR runtime, run guard, proxy, container
+      # mode with stubs) and the seed template against a curl stub. They need python3, curl, git, jq,
+      # node and script — no backend, no Docker, no AI CLI.
       - name: Dev-Starter und Seed-Vorlage Selbsttest
         run: |
           bash scripts/tests/test-start-mysuricates-dev.sh
           bash scripts/tests/test-seed-workflows-example.sh
-      # Liefen in keinem CI-Schritt und nicht in Maven (159e3e66): Gate-Bloecke der kombinierten
-      # Pool-Workflows (leerer/unbekannter Bericht = YELLOW) und das mitgelieferte run-workspace.py
-      # samt Aufbewahrung. Brauchen nur python3, bash und git.
+      # Ran in no CI step and not in Maven (159e3e66): gate blocks of the combined
+      # pool workflows (empty/unknown report = YELLOW) and the shipped run-workspace.py
+      # including retention. They need only python3, bash and git.
       - name: Pool-Gates und Run-Workspace (Python-Tests des Backends)
         run: python3 -m unittest discover -s ai-automation-backend/src/test/python -p 'test_*.py'
-      # tryout.sh mit Docker-Stub in einem Wegwerf-Repo — kein echtes Docker (159e3e66).
+      # tryout.sh with a Docker stub in a throwaway repo — no real Docker (159e3e66).
       - name: Tryout-Skript Selbsttest (ohne Docker)
         run: bash scripts/tests/test-tryout.sh
       - name: Installer-Bausteine Selbsttest (Anbieter, Sprachen, Oberflaeche, Kopf-Grafik)
@@ -156,11 +156,11 @@ jobs:
           bash scripts/tests/test-deps.sh
           bash scripts/tests/test-setup.sh
           python3 scripts/tools/installer-art.py --check
-      # Das Zahlen-Gate als eigener Schritt: es lief bisher nur als Fall 20 innerhalb von
-      # test-public-hygiene.sh mit — ein Umbau dort haette es unbemerkt aus der CI genommen.
-      # Doku-Zahlen, Doku-Verweise/DE-EN-Gleichstand, Diagramm-Drift und der API-Endpunkt-Abgleich
-      # laufen ueber dasselbe Skript wie der pre-push-Hook (--tree), damit Hook und CI nicht
-      # auseinanderlaufen.
+      # The numbers gate as its own step: it used to run only as case 20 inside
+      # test-public-hygiene.sh — a rework there would have removed it from CI unnoticed.
+      # Doc numbers, doc references/DE-EN parity, diagram drift and the API endpoint comparison
+      # run through the same script as the pre-push hook (--tree), so that hook and CI do not
+      # drift apart.
       - name: Bestands-Gates (Doku-Zahlen, Doku-Verweise, Diagramm-Seiten, API-Endpunkte) — wie im pre-push-Hook
         run: bash scripts/ci/pre-push-checks.sh --tree
       - name: Doku-Zahlen-Gate Selbsttest
@@ -173,41 +173,41 @@ jobs:
         run: bash scripts/tests/test-readiness-scans.sh
       - name: Doku-Verweis-Gate Selbsttest
         run: python3 -m unittest discover -s scripts/tests -p 'test_docs_parity_check.py'
-      # Misst nur, meldet nicht: das Urteil ueber die Kandidaten faellt der Workflow
-      # "Doku-Zehrprobe". Hier laeuft allein der Selbsttest, damit die Heuristik nicht
-      # unbemerkt driftet — ein Gate waere es nicht, weil "verwaist" ein Urteil ist.
+      # Only measures, does not report: the verdict on the candidates is made by the workflow
+      # "Doku-Zehrprobe". Only the self-test runs here, so that the heuristic does not
+      # drift unnoticed — it would not be a gate, because "orphaned" is a judgement.
       - name: Doku-Zehrprobe Selbsttest
         run: python3 -m unittest discover -s scripts/tests -p 'test_docs_orphan_scan.py'
       - name: Konzeptseiten-Gate Selbsttest
         run: python3 -m unittest discover -s scripts/tests -p 'test_concept_pages.py'
-      # Die HTML-Diagrammseiten werden aus docs/*-diagrams.md erzeugt. Ohne dieses
-      # Gate faellt eine von Hand geaenderte HTML-Datei erst auf, wenn jemand die
-      # Markdown-Quelle anfasst und die Aenderung wieder ueberschreibt.
+      # The HTML diagram pages are generated from docs/*-diagrams.md. Without this
+      # gate, a hand-edited HTML file is only noticed when someone touches the
+      # Markdown source and overwrites the change again.
       - name: Diagramm-Gate Selbsttest
         run: python3 -m unittest discover -s scripts/tests -p 'test_docs_diagrams.py'
       - name: Audit-Fakten Selbsttest
         run: bash scripts/tests/test-audit-facts.sh
-      # Einstufung des Architektur-Reviews (b8c06b94): liest nur Fixture-Faktenblaetter, kein jdeps,
-      # kein Maven. test-arch-metrics.sh braucht einen Build (jdeps) und laeuft lokal.
+      # Classification of the architecture review (b8c06b94): reads only fixture fact sheets, no jdeps,
+      # no Maven. test-arch-metrics.sh needs a build (jdeps) and runs locally.
       - name: Architektur-Einstufung Selbsttest
         run: bash scripts/tests/test-arch-findings.sh
-      # Frontend-Messung gegen eine Fixture: reines Lesen, kein npm, kein node_modules (159e3e66).
+      # Frontend measurement against a fixture: read-only, no npm, no node_modules (159e3e66).
       - name: Frontend-Metriken Selbsttest
         run: bash scripts/tests/test-frontend-metrics.sh
       - name: Coverage-Snapshot Selbsttest
         run: bash scripts/tests/test-coverage-snapshot.sh
       - name: Schwachstellen-Scan Selbsttest (ohne Netz)
         run: bash scripts/tests/test-dependency-risk-scan.sh
-      # Faehrt release.sh wirklich, aber in einem Wegwerf-Repo: der getaggte Commit muss die
-      # Version ohne -SNAPSHOT tragen (TODO dd82775b), sonst meldet jede Installation SNAPSHOT.
+      # Really runs release.sh, but in a throwaway repo: the tagged commit must carry the
+      # version without -SNAPSHOT (TODO dd82775b), otherwise every installation reports SNAPSHOT.
       - name: Release-Skript Selbsttest
         run: bash scripts/tests/test-release.sh
-      # release-notes.sh erzeugt die GitHub-Release-Notizen deterministisch, ohne KI-Aufruf —
-      # der Selbsttest laeuft in einem Wegwerf-Repo mit echten Merge-Commits (release.yml).
+      # release-notes.sh generates the GitHub release notes deterministically, without an AI call —
+      # the self-test runs in a throwaway repo with real merge commits (release.yml).
       - name: Release-Notizen Selbsttest
         run: bash scripts/tests/test-release-notes.sh
-      # release-handover.sh zwischen zwei Wegwerf-Repos (Arbeits-Repo + lokales bare/Klon): Ausschluss,
-      # Treue zum Tag, Gates mit Zuruecksetzen, annotiertes Tag — und dass nie gepusht wird.
+      # release-handover.sh between two throwaway repos (working repo + local bare/clone): exclusion,
+      # fidelity to the tag, gates with reset, annotated tag — and that it never pushes.
       - name: Release-Uebergabe Selbsttest
         run: bash scripts/tests/test-release-handover.sh
 
@@ -222,9 +222,9 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-  # Uebersprungen nur bei ausdruecklichem "false" aus changes: Scheitert die Einordnung selbst,
-  # laeuft die Suite trotzdem (!cancelled() statt des impliziten success()), statt als
-  # uebersprungen und damit bestanden durchzugehen.
+  # Skipped only on an explicit "false" from changes: if the classification itself fails,
+  # the suite runs anyway (!cancelled() instead of the implicit success()), instead of being
+  # skipped and thereby passing.
   backend:
     name: Backend Tests
     needs: changes
@@ -240,9 +240,9 @@ jobs:
           java-version: "21"
           distribution: temurin
           cache: maven
-      # Regressionswaechter fuer ExternalConfigIsolationTest (TODO b7e0d357): CI legt sonst nie
-      # eine config/application.yml an, also lief der reale Leak-Pfad hier nie durch. Werte
-      # bewusst abweichend vom Classpath-Default, damit ein Leck sichtbar waere.
+      # Regression guard for ExternalConfigIsolationTest (TODO b7e0d357): CI otherwise never creates
+      # a config/application.yml, so the real leak path never ran here. Values are
+      # deliberately different from the classpath default, so that a leak would be visible.
       - name: Externe config/application.yml mit abweichenden Werten anlegen
         run: |
           mkdir -p config
@@ -252,16 +252,16 @@ jobs:
               preset: core
               ui-editable: true
           EOF
-      # Surefire fuehrt Unit- und Integrationstests gemeinsam aus. Die Integrationstests
-      # aktivieren das Spring-Profil "integration" per @ActiveProfiles; ein eigenes
-      # Maven-Profil dafuer gibt es nicht. Jede Test-JVM bekommt ihre eigene SQLite-Datei
-      # (IntegrationTestDbSessionListener), der Pool bleibt bei einer Verbindung.
-      # Die Ausgabe der Tests geht je Klasse nach target/surefire-reports/<Klasse>-output.txt:
-      # Fehlerpfad-Tests lassen den Code absichtlich ERROR samt Stacktrace loggen (am
-      # 2026-09-21: 93 ERROR-Zeilen, 5716 Stacktrace-Zeilen in einem gruenen Lauf), und darin
-      # ging jede echte Meldung unter. Im Log bleiben Running/Tests run und die Surefire-
-      # Fehlermeldung eines roten Tests. Nur hier, nicht in der pom.xml: Der Workflow
-      # mysuricates-health-check greppt lokal target/surefire-reports/*.txt nach ERROR.
+      # Surefire runs unit and integration tests together. The integration tests
+      # activate the Spring profile "integration" via @ActiveProfiles; there is no
+      # separate Maven profile for it. Each test JVM gets its own SQLite file
+      # (IntegrationTestDbSessionListener), the pool stays at one connection.
+      # The output of the tests goes per class to target/surefire-reports/<Klasse>-output.txt:
+      # error-path tests deliberately make the code log ERROR including a stack trace (on
+      # 2026-09-21: 93 ERROR lines, 5716 stack trace lines in a green run), and every real
+      # message was lost in that. The log keeps Running/Tests run and the Surefire
+      # failure message of a red test. Only here, not in pom.xml: the workflow
+      # mysuricates-health-check locally greps target/surefire-reports/*.txt for ERROR.
       - name: Run backend tests
         run: ./mvnw -B --no-transfer-progress -Dmaven.test.redirectTestOutputToFile=true test
       - name: Surefire-Berichte samt Testausgabe sichern
