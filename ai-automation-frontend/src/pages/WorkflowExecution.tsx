@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useParams } from 'react-router-dom';
-import { Clock } from 'lucide-react';
+import { Clock, Star } from 'lucide-react';
 import { Card, CardHeader, Spinner } from '../components/ui';
 import { GateStatusBanner } from '../components/shared/GateStatusBanner';
 import { ErrorState } from '../components/shared/ErrorState';
@@ -92,18 +92,22 @@ export function WorkflowExecution() {
         {run.status === 'COMPLETED' && (
           <div className="flex items-center gap-1">
             <span className="text-text-secondary text-sm mr-1">{t.workflows.execution.rate}</span>
-            {[1, 2, 3, 4, 5].map((star) => (
-              <button
-                key={star}
-                onClick={() => handleRate(star)}
-                aria-label={`${star}/5`}
-                className={`text-lg transition-colors ${
-                  run.userRating && star <= run.userRating ? 'text-warning' : 'text-text-tertiary hover:text-warning'
-                }`}
-              >
-                ★
-              </button>
-            ))}
+            {[1, 2, 3, 4, 5].map((star) => {
+              const filled = !!run.userRating && star <= run.userRating;
+              return (
+                <button
+                  key={star}
+                  onClick={() => handleRate(star)}
+                  aria-label={`${star}/5`}
+                  aria-pressed={filled}
+                  className={`transition-colors ${filled ? 'text-warning' : 'text-text-tertiary hover:text-warning'}`}
+                >
+                  {/* An icon, not the text glyph U+2605: the default UI font lacks it, and without a
+                      fallback font the browser draws an empty box instead. */}
+                  <Star className="w-5 h-5" fill={filled ? 'currentColor' : 'none'} aria-hidden="true" />
+                </button>
+              );
+            })}
           </div>
         )}
       </div>
