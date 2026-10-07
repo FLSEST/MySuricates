@@ -180,6 +180,10 @@ jobs:
         run: python3 -m unittest discover -s scripts/tests -p 'test_docs_orphan_scan.py'
       - name: Konzeptseiten-Gate Selbsttest
         run: python3 -m unittest discover -s scripts/tests -p 'test_concept_pages.py'
+      # Self-presentation (789b35d0): runs the shell blocks of the pool workflow in German and
+      # English against this checkout, with a stub text per topic instead of the AI call.
+      - name: Praesentation Selbsttest (DE/EN, ohne KI)
+        run: python3 -m unittest discover -s scripts/tests -p 'test_presentation.py'
       # The HTML diagram pages are generated from docs/*-diagrams.md. Without this
       # gate, a hand-edited HTML file is only noticed when someone touches the
       # Markdown source and overwrites the change again.

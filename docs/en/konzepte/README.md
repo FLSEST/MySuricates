@@ -1,4 +1,4 @@
-<!-- last-sync: 2026-09-23 from: docs/konzepte/README.md -->
+<!-- last-sync: 2026-10-07 from: docs/konzepte/README.md -->
 
 # Concepts to adopt
 
@@ -69,10 +69,43 @@ The workflow definitions depend on this repository and are therefore marked as
 version remains the source; English corrections go through the same translation
 path.
 
+## Generate the presentation
+
+From the same concept pages, the README and measurements from the repository, the pool workflow
+[MySuricates presentation](../../../workflow-pool/mysuricates-presentation.json) builds a slide deck
+as one HTML file without external resources. The flow is `shell → foreach → shell`:
+`scripts/concepts/presentation.py facts` measures and bundles one packet per topic, one AI call per
+topic writes only the message as JSON (numbers only as `[[key]]`), `presentation.py render` sets
+frame, diagrams and data slides, inserts the measured values, reports foreign numbers and ends with
+`CHECK: OK`. Only the text per topic comes from the AI.
+
+| Context | Default | Meaning |
+|---|---|---|
+| `language` | `en` | `de` or `en`: sources (`README.de.md` and `docs/konzepte/` or `README.md` and `docs/en/konzepte/`), slide texts from `scripts/concepts/presentation_text.json` and target file |
+| `output_file` | empty | target file relative to `repo_root`; empty means `docs/presentation/index.html` (en) or `docs/presentation/de.html` (de). Only there do the two versions link to each other |
+| `repo_root` | `.` | the measured checkout, by default the working directory of the run |
+| `work_dir` | `reports/presentation` | work files per run under `<work_dir>/<run-id>/` (`facts.json`, `packets/`, `story-raw.txt`), relative to the working directory of the run; `reports/` is ignored |
+| `themes` | `all` | comma-separated list of topics: `wofuer`, `deterministisch`, `wiederverwenden`, `zugang`, `stoepseln`, `provider`, `kontrolle`, `erfahrung` |
+| `audience`, `big_idea`, `core_ideas` | empty | override the audience and the one idea (both from `presentation_text.json`) and the guiding ideas (from the README section "Leitideen" or "Guiding ideas") |
+| `ops_facts` | empty | operational counters of one installation, by default `reports/concepts/facts.json` from `scripts/concepts/collect_facts.py`; without them every number comes from the repository |
+
+Model and reasoning effort are set on the workflow (`opus`, `medium`), not on the blocks; after the
+installation they can be changed there. For both languages the workflow runs twice, once with
+`{"language": "de"}`. It does not commit.
+
+Set the text of an earlier run again with new numbers, without AI:
+
+```bash
+python3 scripts/concepts/presentation.py facts --root . --work reports/presentation/<run-id> --language en
+python3 scripts/concepts/presentation.py render --root . --work reports/presentation/<run-id> --language en \
+  --story-file reports/presentation/<run-id>/story-raw.txt
+```
+
 ## Local check
 
 ```bash
 python3 -m unittest discover -s scripts/tests -p 'test_concept_pages.py'
+python3 -m unittest discover -s scripts/tests -p 'test_presentation.py'
 python3 scripts/concepts/pages.py check --root . --work docs/konzepte
 python3 scripts/concepts/pages.py check --root . --work docs/en/konzepte --language en
 # single pages only:

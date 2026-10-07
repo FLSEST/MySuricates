@@ -68,10 +68,43 @@ Pool als `scope: repo` gekennzeichnet. Sie führen keine Commits oder Pushes aus
 Die deutsche Fassung bleibt die Quelle; englische Korrekturen laufen über denselben
 Übersetzungsweg.
 
+## Präsentation erzeugen
+
+Aus denselben Konzeptseiten, dem README und Messwerten aus dem Repository baut der Pool-Workflow
+[MySuricates Präsentation](../../workflow-pool/mysuricates-presentation.json) eine Folienseite als eine
+HTML-Datei ohne externe Ressourcen. Der Ablauf ist `shell → foreach → shell`:
+`scripts/concepts/presentation.py facts` misst und schnürt je Thema ein Paket, ein KI-Aufruf je Thema
+schreibt nur die Aussage als JSON (Zahlen nur als `[[schlüssel]]`), `presentation.py render` setzt
+Rahmen, Diagramme und Datenfolien, setzt die Messwerte ein, meldet fremde Zahlen und endet mit
+`CHECK: OK`. Nur der Text je Thema kommt von der KI.
+
+| Kontext | Standard | Bedeutung |
+|---|---|---|
+| `language` | `en` | `de` oder `en`: Quellen (`README.de.md` und `docs/konzepte/` bzw. `README.md` und `docs/en/konzepte/`), Folientexte aus `scripts/concepts/presentation_text.json` und Zieldatei |
+| `output_file` | leer | Zieldatei relativ zu `repo_root`; leer heißt `docs/presentation/index.html` (en) bzw. `docs/presentation/de.html` (de). Nur dort verlinken sich beide Fassungen gegenseitig |
+| `repo_root` | `.` | der gemessene Checkout, standardmäßig das Arbeitsverzeichnis des Laufs |
+| `work_dir` | `reports/presentation` | Arbeitsdateien je Lauf unter `<work_dir>/<run-id>/` (`facts.json`, `packets/`, `story-raw.txt`), relativ zum Arbeitsverzeichnis des Laufs; `reports/` ist ignoriert |
+| `themes` | `all` | Kommaliste der Themen: `wofuer`, `deterministisch`, `wiederverwenden`, `zugang`, `stoepseln`, `provider`, `kontrolle`, `erfahrung` |
+| `audience`, `big_idea`, `core_ideas` | leer | überschreiben Zielgruppe und die eine Idee (beide aus `presentation_text.json`) sowie die Leitideen (aus dem README-Abschnitt „Leitideen“ bzw. „Guiding ideas“) |
+| `ops_facts` | leer | Betriebszahlen einer Installation, standardmäßig `reports/concepts/facts.json` aus `scripts/concepts/collect_facts.py`; fehlen sie, stammen alle Zahlen aus dem Repository |
+
+Modell und Denkaufwand stehen am Workflow (`opus`, `medium`), nicht an den Blöcken; nach der
+Installation lassen sie sich dort ändern. Für beide Sprachen läuft der Workflow zweimal, einmal mit
+`{"language": "de"}`. Er committet nicht.
+
+Den Text eines früheren Laufs ohne KI mit neuen Zahlen neu setzen:
+
+```bash
+python3 scripts/concepts/presentation.py facts --root . --work reports/presentation/<run-id> --language en
+python3 scripts/concepts/presentation.py render --root . --work reports/presentation/<run-id> --language en \
+  --story-file reports/presentation/<run-id>/story-raw.txt
+```
+
 ## Lokale Prüfung
 
 ```bash
 python3 -m unittest discover -s scripts/tests -p 'test_concept_pages.py'
+python3 -m unittest discover -s scripts/tests -p 'test_presentation.py'
 python3 scripts/concepts/pages.py check --root . --work docs/konzepte
 python3 scripts/concepts/pages.py check --root . --work docs/en/konzepte --language en
 # nur einzelne Seiten:

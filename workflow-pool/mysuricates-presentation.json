@@ -1,0 +1,74 @@
+{
+ "name": {
+  "de": "MySuricates Präsentation (gemessen + gerendert)",
+  "en": "MySuricates presentation (measured + rendered)"
+ },
+ "description": {
+  "de": "Selbstdarstellung als eine HTML-Datei, Thema für Thema und wahlweise auf Deutsch oder Englisch (language): ein Shell-Schritt misst Fakten im Repository und schnürt je Thema ein Paket aus Konzeptseiten und README, ein KI-Aufruf je Thema textet nur die Aussage, ein Shell-Schritt setzt Rahmen, Diagramme und Datenfolien und prüft (CHECK: OK). Ziel: docs/presentation/index.html (en) bzw. de.html (de). Benötigt dieses Repository.",
+  "en": "Self-presentation as one HTML file, topic by topic, in German or English (language): a shell step measures facts in the repository and bundles one packet per topic from concept pages and README, one AI call per topic writes only the message, a shell step sets frame, diagrams and data slides and checks them (CHECK: OK). Target: docs/presentation/index.html (en) or de.html (de). Requires this repository."
+ },
+ "icon": "🎯",
+ "category": "DOCUMENTATION",
+ "scope": "repo",
+ "tags": [
+  "presentation",
+  "documentation",
+  "concepts",
+  "foreach",
+  "release"
+ ],
+ "model": "opus",
+ "effort": "medium",
+ "version": "1.0.0",
+ "author": "MySuricates",
+ "instructions": "Text for a presentation built from measured facts. The AI blocks write no files and answer with JSON only. No commits, pushes, API calls or TODO changes.",
+ "defaultContext": {
+  "language": "en",
+  "repo_root": ".",
+  "work_dir": "reports/presentation",
+  "output_file": "",
+  "themes": "all",
+  "audience": "",
+  "core_ideas": "",
+  "big_idea": "",
+  "ops_facts": ""
+ },
+ "blocks": [
+  {
+   "type": "shell",
+   "name": "facts",
+   "config": {
+    "label": "Measure facts + bundle topic packets",
+    "command": "set -euo pipefail\nset -- {{ repo_root }}; ROOT=\"${1:-.}\"\nset -- {{ language }}; PRES_LANG=\"${1:-en}\"\nset -- {{ workflow_run_id }}; RUN_ID=\"${1:-manual}\"\nset -- {{ work_dir }}; WORK=\"${1:-reports/presentation}/$RUN_ID\"\nset -- {{ themes }}; THEMES=\"${1:-all}\"\nset -- {{ ops_facts }}; OPS=\"${1:-}\"\nset -- {{ audience }}; AUDIENCE=\"${1:-}\"\nset -- {{ core_ideas }}; CORE_IDEAS=\"${1:-}\"\nset -- {{ big_idea }}; BIG_IDEA=\"${1:-}\"\npython3 \"$ROOT/scripts/concepts/presentation.py\" facts --root \"$ROOT\" --work \"$WORK\" --language \"$PRES_LANG\" \\\n  --themes \"$THEMES\" --ops-facts \"$OPS\" --audience \"$AUDIENCE\" --core-ideas \"$CORE_IDEAS\" --big-idea \"$BIG_IDEA\"\n",
+    "shell_escape_variables": true,
+    "timeout_seconds": 180
+   }
+  },
+  {
+   "type": "foreach",
+   "name": "story",
+   "config": {
+    "label": "Per topic: write the message (one AI call)",
+    "items_source": "command",
+    "items_command": "python3 {{ repo_root }}/scripts/concepts/presentation.py themes --work {{ work_dir }}/{{ workflow_run_id }}",
+    "shell_escape_variables": true,
+    "variable_name": "theme",
+    "execution_mode": "ai",
+    "command": "You write the text for EXACTLY ONE topic of a presentation about MySuricates. Topic: {{ theme }}. Slide language: {{ language }}.\n\nFirst read the file {{ work_dir }}/{{ workflow_run_id }}/packets/{{ theme }}.txt — it holds the language rule, the audience, the binding guiding idea, the measured values, concept pages and further material for this topic. Read nothing else unless a claim can only be backed that way.\n\nIMPORTANT: Do NOT write any files. Answer only with a single JSON object as text. Frame, diagrams, data slides, numbers and layout are produced deterministically by the next workflow step — you only supply the message.\n\n## Rules\n- Place the topic in \"the one idea\" from the packet: which point of the cycle (section \"The cycle of the deck\") does it occupy? It does not have to be stated, but the slides should make it felt.\n- 1 to 2 slides. Slide 1 carries the idea as a clear statement and says what one gets from it. Slide 2 (optional) shows concretely how the system implements it — ideally with a tangible example of what someone does with it.\n- Tone: confident and factual. Show what is there and what it brings. No superlatives, no marketing — but no list of shortcomings either: no slide and no entry \"where it falls short\", no section for weaknesses. A limitation only where it is needed for understanding, and then as half a sentence. The classification (research project, one installation) is bundled on the closing slide — do not repeat it.\n- Write every text field in the language given in the packet section \"Language of the slides\".\n- Use only keys that appear literally in the section \"Measured values\" — do not invent any. A text field with an unknown key is dropped.\n- NEVER write a measured value yourself: reference it as [[key]] from the section \"Measured values\" (e.g. \"[[ops_steps_shell]] of [[ops_steps_total]] steps\"). The renderer inserts the value and reports every other number.\n- Measured values show what is built and running. Do not overstretch them (stock is not impact), but do not play them down either.\n- Material from the repository supplies thoughts, not quotations: take them over, do not quote them word for word, no links, no paths.\n- Short: title max. 70 characters, lead max. 200, items[].head max. 40, items[].text max. 140. Inline allowed: **bold** and `code`.\n\n## Layouts\nstatement (title = one strong sentence, lead) · bullets (title, lead, items 2–4) · cards (title, lead, items 2–4) · quote (title = verbatim quote from a concept page, lead = source)\nOptional \"data_leads\": one sentence per data slide of this topic (possible keys: cost, blocks, connect, providers, guardrails, modules) that says what to look at.\n\n## Output format\n{\"theme\": \"{{ theme }}\", \"slides\": [{\"layout\": \"statement\", \"title\": \"...\", \"lead\": \"...\", \"note\": \"speaker note\"}], \"data_leads\": {\"cost\": \"...\"}}",
+    "timeout_seconds": 600,
+    "continue_on_error": true
+   }
+  },
+  {
+   "type": "shell",
+   "name": "render",
+   "config": {
+    "label": "Render + check",
+    "command": "set -euo pipefail\nset -- {{ repo_root }}; ROOT=\"${1:-.}\"\nset -- {{ language }}; PRES_LANG=\"${1:-en}\"\nset -- {{ workflow_run_id }}; RUN_ID=\"${1:-manual}\"\nset -- {{ work_dir }}; WORK=\"${1:-reports/presentation}/$RUN_ID\"\nset -- {{ output_file }}; OUT=\"${1:-}\"\nset -- {{ block.story.output }}; STORY=\"${1:-}\"\nprintf '%s\\n' \"$STORY\" > \"$WORK/story-raw.txt\"\npython3 \"$ROOT/scripts/concepts/presentation.py\" render --root \"$ROOT\" --work \"$WORK\" --language \"$PRES_LANG\" \\\n  --story-file \"$WORK/story-raw.txt\" --out \"$OUT\"\n",
+    "shell_escape_variables": true,
+    "timeout_seconds": 120
+   }
+  }
+ ],
+  "integrity": "sha256:7a525ab0d015bcabee84622dc56a8a5949ddf15216223151563f3ff6c30a983f"
+}
