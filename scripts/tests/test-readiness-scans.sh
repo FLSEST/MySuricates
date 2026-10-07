@@ -68,6 +68,20 @@ echo "x" > "$FAKE/neu.txt"
 OUT="$(run safe-inventory.sh)"
 check "Aenderung erscheint statt sauber"        'grep -q "?? neu.txt" <<< "$OUT"'
 
+echo "5) test-map: only code files count as test files (2026-10-02: docker-compose.test.yml was listed)"
+touch "$FAKE/ai-automation-backend/docker-compose.test.yml" "$FAKE/ai-automation-frontend/src/a.test.ts" \
+      "$FAKE/ai-automation-backend/src/test/java/a/FooTest.java"
+OUT="$(run test-map.sh)"
+check "compose file is not a test file"         '! grep -q "docker-compose.test.yml" <<< "$OUT"'
+check "frontend test file is listed"            'grep -qx "ai-automation-frontend/src/a.test.ts" <<< "$OUT"'
+check "backend test file is listed"             'grep -qx "ai-automation-backend/src/test/java/a/FooTest.java" <<< "$OUT"'
+
+echo "6) tool_section: tool_version carries no ANSI colour codes (2026-10-02: Maven's version line)"
+mkdir -p "$TMP/bin"
+printf '#!/bin/sh\nprintf "\\033[1mApache Maven 3.8.7\\033[m\\n"\n' > "$TMP/bin/fakemvn"; chmod +x "$TMP/bin/fakemvn"
+OUT="$(PATH="$TMP/bin:$PATH" bash -c 'source "$1/common.sh"; tool_section "x" fakemvn' _ "$PR")"
+check "version line is plain text"              'grep -qx "tool_version: Apache Maven 3.8.7" <<< "$OUT"'
+
 echo
 echo "PASS=$PASS FAIL=$FAIL"
 [ "$FAIL" -eq 0 ]

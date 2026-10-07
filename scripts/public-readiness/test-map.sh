@@ -5,7 +5,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"; source "$SCRIPT_DIR/
 section "Test map"
 
 inventory_section "Test files (sample)"
-find . -type f \( -name '*Test.java' -o -name '*Tests.java' -o -name '*.test.*' -o -name '*.spec.*' \) ! -path '*/node_modules/*' ! -path '*/target/*' ! -path '*/dist/*' ! -path '*/build/*' ! -path '*/data/*' | sed 's#^./##' | sort | head -120 | redact
+find . -type f \( -name '*Test.java' -o -name '*Tests.java' -o -name '*.test.ts' -o -name '*.test.tsx' -o -name '*.spec.ts' -o -name '*.spec.tsx' -o -name '*.cy.ts' \) ! -path '*/node_modules/*' ! -path '*/target/*' ! -path '*/dist/*' ! -path '*/build/*' ! -path '*/data/*' | sed 's#^./##' | sort | head -120 | redact
 
 inventory_section "Production source counts"
 java_src=$(find ai-automation-backend/src/main -type f -name '*.java' 2>/dev/null | wc -l | tr -d ' ')
