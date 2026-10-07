@@ -5,7 +5,7 @@ import type { Workflow } from '../../types';
 
 /** Status → dot color (shared by Simple home, workflows, runs, schedules). */
 const STATUS_DOT: Record<string, string> = {
-  COMPLETED: 'var(--color-success)', COMPLETED_WITH_ERRORS: 'var(--color-success)',
+  COMPLETED: 'var(--color-success)', COMPLETED_WITH_ERRORS: 'var(--color-warning)',
   FAILED: 'var(--color-danger)', RUNNING: 'var(--color-info)', PAUSED: 'var(--color-warning)',
   PENDING: 'var(--color-text-tertiary)', CANCELLED: 'var(--color-text-tertiary)', INTERRUPTED: 'var(--color-warning)',
   STOPPED: 'var(--color-text-tertiary)', STARTING: 'var(--color-warning)', ERROR: 'var(--color-danger)',

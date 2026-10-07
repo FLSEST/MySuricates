@@ -1,7 +1,8 @@
 import { Link, useParams, useNavigate } from 'react-router-dom';
 import { ArrowLeft, ArrowDown, ExternalLink, XCircle, CheckCircle2, AlertCircle, Clock, Loader2 } from 'lucide-react';
-import { Card, Button, Badge, Spinner } from '../components/ui';
+import { Card, Button, Spinner } from '../components/ui';
 import { TriggerSourceChip } from '../components/workflow/TriggerSourceChip';
+import { ChainStatusBadge } from '../components/chains/ChainStatusBadge';
 import { useChainRun, useCancelChainRun } from '../hooks/useChains';
 import { useI18nStore, useT } from '../i18n';
 import { formatDuration } from '../utils/formatTime';
@@ -13,7 +14,7 @@ function EntryStatusIcon({ status }: { status: string }) {
     case 'COMPLETED':
       return <CheckCircle2 className="w-5 h-5 text-success" />;
     case 'COMPLETED_WITH_ERRORS':
-      return <CheckCircle2 className="w-5 h-5 text-success" />;
+      return <CheckCircle2 className="w-5 h-5 text-warning" />;
     case 'FAILED':
       return <AlertCircle className="w-5 h-5 text-danger" />;
     case 'RUNNING':
@@ -23,16 +24,6 @@ function EntryStatusIcon({ status }: { status: string }) {
     default:
       return <Clock className="w-5 h-5 text-text-tertiary" />;
   }
-}
-
-function StatusBadge({ status }: { status: string }) {
-  const variant = (status === 'COMPLETED' || status === 'COMPLETED_WITH_ERRORS') ? 'success'
-    : status === 'FAILED' ? 'danger'
-    : status === 'RUNNING' ? 'accent'
-    : status === 'CANCELLED' ? 'warning'
-    : 'default';
-  const label = status === 'COMPLETED_WITH_ERRORS' ? 'Completed' : status;
-  return <Badge variant={variant} dot>{label}</Badge>;
 }
 
 export function ChainExecution() {
@@ -72,7 +63,7 @@ export function ChainExecution() {
           </div>
         </div>
         <div className="flex items-center gap-3">
-          <StatusBadge status={run.status} />
+          <ChainStatusBadge status={run.status} />
           {run.durationMs != null && (
             <span className="text-sm text-text-tertiary">{formatDuration(run.durationMs, locale)}</span>
           )}

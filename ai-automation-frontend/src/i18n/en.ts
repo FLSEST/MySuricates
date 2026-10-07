@@ -2363,13 +2363,19 @@ export const en = {
     // Status filter of the run lists (workflow and chain runs)
     statuses: {
       COMPLETED: 'Completed',
-      COMPLETED_WITH_ERRORS: 'Completed (legacy)',
+      COMPLETED_WITH_ERRORS: 'Completed with errors',
       FAILED: 'Failed',
       RUNNING: 'Running',
       CANCELLED: 'Cancelled',
       PAUSED: 'Paused',
       PENDING: 'Pending',
       INTERRUPTED: 'Interrupted',
+    },
+    // Status badge of steps (shared StatusBadge); run statuses come from `statuses` above
+    stepStatuses: {
+      SKIPPED: 'Skipped',
+      WAITING_APPROVAL: 'Approval',
+      AWAITING_DECOMPOSE_APPROVAL: 'Review',
     },
     chainFailedCount: '({count} failed)',
   },

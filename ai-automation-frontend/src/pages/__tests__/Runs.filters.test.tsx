@@ -54,7 +54,7 @@ describe('Runs page — filters in the app language', () => {
     const statusSelect = await screen.findByDisplayValue('Alle Status');
     const labels = within(statusSelect).getAllByRole('option').map((o) => o.textContent);
     expect(labels).toEqual([
-      'Alle Status', 'Abgeschlossen', 'Abgeschlossen (alt)', 'Fehlgeschlagen', 'Läuft', 'Abgebrochen', 'Pausiert', 'Wartend', 'Unterbrochen',
+      'Alle Status', 'Abgeschlossen', 'Mit Fehlern abgeschlossen', 'Fehlgeschlagen', 'Läuft', 'Abgebrochen', 'Pausiert', 'Wartend', 'Unterbrochen',
     ]);
   });
 

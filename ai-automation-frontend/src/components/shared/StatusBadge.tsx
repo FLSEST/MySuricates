@@ -1,27 +1,30 @@
 import { Badge } from '../ui/Badge';
+import { useStatusLabel } from './statusLabel';
 import type { ProjectStatus, RunStatus, ContainerStatus, StepStatus } from '../../types';
 
 type AnyStatus = ProjectStatus | RunStatus | ContainerStatus | StepStatus | string;
+type Variant = 'success' | 'warning' | 'danger' | 'accent' | 'default';
 
-const statusConfig: Record<string, { variant: 'success' | 'warning' | 'danger' | 'accent' | 'default'; label?: string }> = {
+const statusVariant: Record<string, Variant> = {
   // Project / Container
-  RUNNING: { variant: 'success' },
-  STARTING: { variant: 'warning' },
-  STOPPED: { variant: 'default' },
-  ERROR: { variant: 'danger' },
-  CREATED: { variant: 'default' },
+  RUNNING: 'success',
+  STARTING: 'warning',
+  STOPPED: 'default',
+  ERROR: 'danger',
+  CREATED: 'default',
   // Workflow Run
-  PENDING: { variant: 'default' },
-  PAUSED: { variant: 'warning' },
-  COMPLETED: { variant: 'success' },
-  COMPLETED_WITH_ERRORS: { variant: 'success', label: 'Completed' },
-  FAILED: { variant: 'danger' },
-  CANCELLED: { variant: 'default' },
-  INTERRUPTED: { variant: 'warning', label: 'Interrupted' },
+  PENDING: 'default',
+  PAUSED: 'warning',
+  COMPLETED: 'success',
+  // A checked step failed and the run carried on: finished, but not clean.
+  COMPLETED_WITH_ERRORS: 'warning',
+  FAILED: 'danger',
+  CANCELLED: 'default',
+  INTERRUPTED: 'warning',
   // Step
-  SKIPPED: { variant: 'default' },
-  WAITING_APPROVAL: { variant: 'warning', label: 'Approval' },
-  AWAITING_DECOMPOSE_APPROVAL: { variant: 'accent', label: 'Review' },
+  SKIPPED: 'default',
+  WAITING_APPROVAL: 'warning',
+  AWAITING_DECOMPOSE_APPROVAL: 'accent',
 };
 
 interface StatusBadgeProps {
@@ -30,10 +33,10 @@ interface StatusBadgeProps {
 }
 
 export function StatusBadge({ status, label }: StatusBadgeProps) {
-  const config = statusConfig[status] ?? { variant: 'default' as const };
+  const statusLabel = useStatusLabel();
   return (
-    <Badge variant={config.variant} dot>
-      {label ?? config.label ?? status}
+    <Badge variant={statusVariant[status] ?? 'default'} dot>
+      {label ?? statusLabel(status)}
     </Badge>
   );
 }

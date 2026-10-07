@@ -118,13 +118,13 @@ describe('useRunsFilters', () => {
   it('offers the statuses in the app language', () => {
     const { result, rerender } = renderHook(() => useRunsFilters(true));
     expect(result.current.statusOptions.map((o) => o.label)).toEqual([
-      'All Statuses', 'Completed', 'Completed (legacy)', 'Failed', 'Running', 'Cancelled', 'Paused', 'Pending', 'Interrupted',
+      'All Statuses', 'Completed', 'Completed with errors', 'Failed', 'Running', 'Cancelled', 'Paused', 'Pending', 'Interrupted',
     ]);
 
     act(() => useI18nStore.setState({ locale: 'de' }));
     rerender();
     expect(result.current.statusOptions.map((o) => o.label)).toEqual([
-      'Alle Status', 'Abgeschlossen', 'Abgeschlossen (alt)', 'Fehlgeschlagen', 'Läuft', 'Abgebrochen', 'Pausiert', 'Wartend', 'Unterbrochen',
+      'Alle Status', 'Abgeschlossen', 'Mit Fehlern abgeschlossen', 'Fehlgeschlagen', 'Läuft', 'Abgebrochen', 'Pausiert', 'Wartend', 'Unterbrochen',
     ]);
     expect(result.current.statusOptions.map((o) => o.value)).toEqual([
       '', 'COMPLETED', 'COMPLETED_WITH_ERRORS', 'FAILED', 'RUNNING', 'CANCELLED', 'PAUSED', 'PENDING', 'INTERRUPTED',

@@ -2360,13 +2360,19 @@ export const de: TranslationKeys = {
     // Status filter of the run lists (workflow and chain runs)
     statuses: {
       COMPLETED: 'Abgeschlossen',
-      COMPLETED_WITH_ERRORS: 'Abgeschlossen (alt)',
+      COMPLETED_WITH_ERRORS: 'Mit Fehlern abgeschlossen',
       FAILED: 'Fehlgeschlagen',
       RUNNING: 'Läuft',
       CANCELLED: 'Abgebrochen',
       PAUSED: 'Pausiert',
       PENDING: 'Wartend',
       INTERRUPTED: 'Unterbrochen',
+    },
+    // Status badge of steps (shared StatusBadge); run statuses come from `statuses` above
+    stepStatuses: {
+      SKIPPED: 'Übersprungen',
+      WAITING_APPROVAL: 'Freigabe',
+      AWAITING_DECOMPOSE_APPROVAL: 'Prüfung',
     },
     chainFailedCount: '({count} fehlgeschlagen)',
   },

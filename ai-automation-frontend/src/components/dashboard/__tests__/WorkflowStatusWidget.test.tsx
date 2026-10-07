@@ -48,8 +48,8 @@ describe('WorkflowStatusWidget', () => {
     render(ENTRY);
 
     expect(screen.getByText('Nightly QA')).toBeInTheDocument();
-    // StatusBadge prints the status itself; only COMPLETED_WITH_ERRORS and INTERRUPTED get a label.
-    expect(screen.getByText('COMPLETED')).toBeInTheDocument();
+    // StatusBadge prints the translated status label (runs.statuses).
+    expect(screen.getByText('Completed')).toBeInTheDocument();
     expect(screen.getByText('2.0m')).toBeInTheDocument();
     expect(screen.getByText('YELLOW')).toBeInTheDocument();
   });
