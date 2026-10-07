@@ -1,7 +1,7 @@
 import { Link2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import type { UseQueryResult } from '@tanstack/react-query';
-import { Card, Select, Spinner, Table } from '../ui';
+import { Card, Input, Select, Spinner, Table } from '../ui';
 import { Pagination } from '../shared/Pagination';
 import { EmptyState } from '../shared/EmptyState';
 import { ErrorState } from '../shared/ErrorState';
@@ -37,16 +37,13 @@ export function ChainsTab({ filters, statusOptions, chainRuns }: ChainsTabProps)
           />
         </div>
         <div className="flex-1 min-w-[200px]">
-          <label className="block text-xs font-medium text-text-secondary mb-1">
-            {t.common.search}
-          </label>
-          <input
+          <Input
             type="text"
+            label={t.common.search}
             value={filters.search}
             onChange={(e) => filters.setSearch(e.target.value)}
             placeholder={t.common.search}
-            className="w-full px-3 py-2 rounded-lg border border-border bg-surface text-text text-sm
-                       focus:outline-hidden focus:ring-2 focus:ring-accent/50"
+            className="text-sm"
           />
         </div>
       </div>
