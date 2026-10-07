@@ -68,6 +68,8 @@ java_class "$MAIN/controller/ThinTwo.java" 70 10
 { echo "package com.automation.service.deep;"; echo "public sealed interface Shape permits Circle {}"; } \
   > "$MAIN/service/deep/Shape.java"
 echo "export const x = 1;" > "$FIX/ai-automation-frontend/src/x.ts"
+# package-info.java is no class: never listed as untested (2026-10-07: executor/spec/package-info.java was a finding)
+echo "package com.automation.service.deep;" > "$MAIN/service/deep/package-info.java"
 git init -q "$FIX" && ( cd "$FIX" && git -c user.name=t -c user.email=t@example.invalid \
   add -A && git -c user.name=t -c user.email=t@example.invalid commit -q -m init )
 
@@ -97,6 +99,7 @@ check "kleinste Klasse (Rang 20) gelistet"    'grep -q "Untested01.java" "$UNTES
 check "groesste Klasse gelistet"              'grep -q "Untested20.java" "$UNTESTED_ROWS"'
 check "Klasse ohne public-Zeile gelistet"     'grep -q "^controller/NoPublicUntested\.java${TAB}[0-9]\+$" "$UNTESTED_ROWS"'
 check "kein head -15 im Messblock"            '! grep -q "head -15" "$TMP/command.sh"'
+check "package-info not listed"                '! grep -q "package-info" "$UNTESTED_ROWS"'
 check "Record/Interface nicht gelistet"       '! grep -qE "PlainRecord|PlainPort|Shape" "$UNTESTED_ROWS"'
 check "Record/Interface als ausgenommen gezaehlt" \
   'grep -qx "Datenklassen ausgenommen (DTO/Entity/Repository/Event/Enum/Record/Interface): 3" "$TMP/out.txt"'
