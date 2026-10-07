@@ -91,4 +91,38 @@ class IntegrationParamsTest {
                     assertThat(error.params()).isEqualTo(Map.of("name", "chat_id"));
                 });
     }
+
+    @Test
+    void paramString_defaultOnlyWhenMissing_blankAndNumbersKept() {
+        assertThat(IntegrationParams.paramString(Map.of(), "state", "open")).isEqualTo("open");
+        assertThat(IntegrationParams.paramString(params("state", null), "state", "open")).isEqualTo("open");
+        assertThat(IntegrationParams.paramString(params("state", "  "), "state", "open")).isEqualTo("  ");
+        assertThat(IntegrationParams.paramString(params("state", 7), "state", "open")).isEqualTo("7");
+    }
+
+    @Test
+    void requireParam_failsOnlyWhenMissing_andKeepsTheValueAsIs() {
+        assertThat(IntegrationParams.requireParam(params("q", " a b "), "q")).isEqualTo(" a b ");
+        assertThat(IntegrationParams.requireParam(params("q", ""), "q")).isEmpty();
+        assertThat(IntegrationParams.requireParam(params("q", 42), "q")).isEqualTo("42");
+        assertThatThrownBy(() -> IntegrationParams.requireParam(params("q", null), "q"))
+                .isInstanceOf(LocalizedError.class)
+                .hasMessage("Required parameter missing: q");
+    }
+
+    @Test
+    void requireNonBlank_failsWhenMissingOrBlank_andDoesNotTrim() {
+        assertThat(IntegrationParams.requireNonBlank(params("q", " a "), "q")).isEqualTo(" a ");
+        for (Object bad : new Object[] {null, "", "   "}) {
+            assertThatThrownBy(() -> IntegrationParams.requireNonBlank(params("q", bad), "q"))
+                    .as(String.valueOf(bad))
+                    .isInstanceOf(LocalizedError.class)
+                    .hasMessage("Required parameter missing: q");
+        }
+    }
+
+    @Test
+    void urlEncode_utf8FormEncoding() {
+        assertThat(IntegrationParams.urlEncode("a b&c=ä/ü")).isEqualTo("a+b%26c%3D%C3%A4%2F%C3%BC");
+    }
 }

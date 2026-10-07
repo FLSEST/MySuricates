@@ -2,8 +2,6 @@ package com.automation.service.integration.providers.trello;
 
 import com.automation.service.integration.providers.IntegrationParams;
 
-import java.net.URLEncoder;
-import java.nio.charset.StandardCharsets;
 import java.util.Map;
 
 /** Parameter parsing shared by the Trello actions — pure functions, no I/O. */
@@ -12,8 +10,7 @@ final class TrelloParams {
     private TrelloParams() {}
 
     static String paramString(Map<String, Object> params, String key, String defaultValue) {
-        Object val = params.get(key);
-        return val != null ? val.toString() : defaultValue;
+        return IntegrationParams.paramString(params, key, defaultValue);
     }
 
     /** Missing or blank → {@code defaultValue}; a number is read like its text ({@link IntegrationParams}). */
@@ -22,12 +19,10 @@ final class TrelloParams {
     }
 
     static String requireParam(Map<String, Object> params, String key) {
-        Object val = params.get(key);
-        if (val == null) throw IntegrationParams.missing(key);
-        return val.toString();
+        return IntegrationParams.requireParam(params, key);
     }
 
     static String urlEncode(String value) {
-        return URLEncoder.encode(value, StandardCharsets.UTF_8);
+        return IntegrationParams.urlEncode(value);
     }
 }

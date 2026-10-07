@@ -3,12 +3,19 @@ package com.automation.service.integration.providers;
 import com.automation.exception.ErrorMessage;
 import com.automation.exception.LocalizedArgumentException;
 
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.util.Map;
 
 /**
- * Whole-number parameters shared by the integration actions — pure functions, no I/O (TODO ac639b39).
+ * Parameters shared by the integration actions — pure functions, no I/O (TODO ac639b39).
  *
- * <p>A number is read like its text, the way {@code TelegramParams} started it: {@code 5}, {@code "5"}
+ * <p>Text: {@link #paramString}, {@link #requireParam}, {@link #requireNonBlank} and {@link #urlEncode}
+ * replace the copies every provider's params class carried; provider-specific helpers stay there.
+ *
+ * <p>Whole numbers:
+ *
+ * a number is read like its text, the way {@code TelegramParams} started it: {@code 5}, {@code "5"}
  * and {@code " 5 "} are the same value, while {@code 1.5}, {@code 5.0} and values beyond the target
  * type fail with the parameter's name — as the strings {@code "1.5"} and {@code "5.0"} always did.
  * Before, a JSON number went through {@code intValue()}: {@code limit: 1.5} silently became 1, and a
@@ -26,6 +33,39 @@ public final class IntegrationParams {
      */
     public static IllegalArgumentException missing(String key) {
         return new LocalizedArgumentException(ErrorMessage.INTEGRATION_PARAMETER_MISSING, Map.of("name", String.valueOf(key)));
+    }
+
+    /** {@code params.get(key)} as text; {@code defaultValue} only when missing (a blank value is kept). */
+    public static String paramString(Map<String, Object> params, String key, String defaultValue) {
+        Object val = params.get(key);
+        return val != null ? val.toString() : defaultValue;
+    }
+
+    /**
+     * {@code params.get(key)} as text, untrimmed; a blank value is accepted.
+     *
+     * @throws IllegalArgumentException {@link #missing} when the key is missing
+     */
+    public static String requireParam(Map<String, Object> params, String key) {
+        Object val = params.get(key);
+        if (val == null) throw missing(key);
+        return val.toString();
+    }
+
+    /**
+     * {@code params.get(key)} as text, untrimmed.
+     *
+     * @throws IllegalArgumentException {@link #missing} when the key is missing or blank
+     */
+    public static String requireNonBlank(Map<String, Object> params, String key) {
+        Object val = params.get(key);
+        if (isBlank(val)) throw missing(key);
+        return val.toString();
+    }
+
+    /** {@code value} encoded for a URL query or path segment (UTF-8, form encoding). */
+    public static String urlEncode(String value) {
+        return URLEncoder.encode(value, StandardCharsets.UTF_8);
     }
 
     /** {@code params.get(key)} as int; {@code defaultValue} when missing or blank. */

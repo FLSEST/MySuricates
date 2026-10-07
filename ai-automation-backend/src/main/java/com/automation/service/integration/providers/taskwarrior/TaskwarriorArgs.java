@@ -151,15 +151,10 @@ final class TaskwarriorArgs {
     }
 
     static String paramString(Map<String, Object> params, String key, String defaultValue) {
-        Object val = params.get(key);
-        return val != null ? val.toString() : defaultValue;
+        return IntegrationParams.paramString(params, key, defaultValue);
     }
 
     static String requireParam(Map<String, Object> params, String key) {
-        Object val = params.get(key);
-        if (val == null || val.toString().isBlank()) {
-            throw IntegrationParams.missing(key);
-        }
-        return val.toString();
+        return IntegrationParams.requireNonBlank(params, key);
     }
 }

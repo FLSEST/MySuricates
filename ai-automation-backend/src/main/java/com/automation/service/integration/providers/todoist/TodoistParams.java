@@ -2,8 +2,6 @@ package com.automation.service.integration.providers.todoist;
 
 import com.automation.service.integration.providers.IntegrationParams;
 
-import java.net.URLEncoder;
-import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
@@ -27,11 +25,7 @@ final class TodoistParams {
     }
 
     static String requireParam(Map<String, Object> params, String key) {
-        Object val = params.get(key);
-        if (val == null || val.toString().isBlank()) {
-            throw IntegrationParams.missing(key);
-        }
-        return val.toString();
+        return IntegrationParams.requireNonBlank(params, key);
     }
 
     static String optionalString(Map<String, Object> params, String key) {
@@ -89,6 +83,6 @@ final class TodoistParams {
     }
 
     static String urlEncode(String value) {
-        return URLEncoder.encode(value, StandardCharsets.UTF_8);
+        return IntegrationParams.urlEncode(value);
     }
 }

@@ -13,14 +13,16 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 import java.net.URI;
-import java.net.URLEncoder;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
-import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+
+import static com.automation.service.integration.providers.IntegrationParams.paramString;
+import static com.automation.service.integration.providers.IntegrationParams.requireParam;
+import static com.automation.service.integration.providers.IntegrationParams.urlEncode;
 
 @Component
 @RequiredArgsConstructor
@@ -287,22 +289,5 @@ public class ConfluenceProvider implements IntegrationProvider {
         if (response.statusCode() >= 400) {
             throw new IllegalStateException("Confluence API error " + response.statusCode() + ": " + response.body());
         }
-    }
-
-    // --- Parameter helpers ---
-
-    private static String paramString(Map<String, Object> params, String key, String defaultValue) {
-        Object val = params.get(key);
-        return val != null ? val.toString() : defaultValue;
-    }
-
-    private static String requireParam(Map<String, Object> params, String key) {
-        Object val = params.get(key);
-        if (val == null) throw IntegrationParams.missing(key);
-        return val.toString();
-    }
-
-    private static String urlEncode(String value) {
-        return URLEncoder.encode(value, StandardCharsets.UTF_8);
     }
 }
