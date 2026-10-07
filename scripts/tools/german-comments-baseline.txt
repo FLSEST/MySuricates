@@ -29,7 +29,6 @@
 1 ai-automation-frontend/src/components/goal/GoalCandidates.tsx
 1 ai-automation-frontend/src/components/goal/GoalCreateForm.tsx
 3 ai-automation-frontend/src/components/goal/GoalGuardControl.tsx
-1 ai-automation-frontend/src/components/goal/GoalOutline.tsx
 2 ai-automation-frontend/src/components/goal/GoalProjectsBar.tsx
 1 ai-automation-frontend/src/components/goal/GoalRelationMap.tsx
 1 ai-automation-frontend/src/components/goal/GoalSidePanel.tsx
