@@ -1,53 +1,36 @@
-import { useState, useMemo, useEffect } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useState, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { GitBranch, Play, Search, Pin, Trash2 } from 'lucide-react';
 import { Button, Spinner } from '../components/ui';
 import { EmptyState } from '../components/shared/EmptyState';
 import { ErrorState } from '../components/shared/ErrorState';
 import { SimpleRow, StatusDot } from '../components/simple/kit';
 import { useSimpleRun } from '../components/simple/useSimpleRun';
-import { WorkflowCreateFlow, type CreateStep } from '../components/workflow/WorkflowCreateFlow';
+import { WorkflowCreateFlow } from '../components/workflow/WorkflowCreateFlow';
 import { DeleteWorkflowModal } from '../components/workflow/DeleteWorkflowModal';
 import { FirstProjectActions } from '../components/project/FirstProjectActions';
-import {
-  useWorkflows,
-  useCreateWorkflow,
-  useDeleteWorkflow,
-} from '../hooks/useWorkflows';
+import { useWorkflows, useDeleteWorkflow } from '../hooks/useWorkflows';
+import { useWorkflowCreateFlow } from '../hooks/useWorkflowCreateFlow';
 import { useSettingsStore } from '../stores/settingsStore';
 import { useProjects } from '../hooks/useProjects';
-import { useT, useI18nStore } from '../i18n';
-import { blueprintPartIds, resolveTemplateName } from '../utils/templateUtils';
+import { useT } from '../i18n';
 import { curateWorkflows } from '../utils/curateWorkflows';
 import { AREA_COLORS } from '../utils/homeTiles';
 import { useLatestRunStatuses } from '../hooks/useLatestRunStatuses';
-import type { CreateWorkflowRequest, WorkflowTemplate, PoolWorkflowEntry, Workflow } from '../types';
-import { useInstallPoolWorkflow, usePoolWorkflows } from '../hooks/usePool';
-import { useInstallTemplate, useTemplates } from '../hooks/useTemplates';
+import type { Workflow } from '../types';
 
 export function SimpleWorkflows() {
   const t = useT();
-  const locale = useI18nStore((s) => s.locale);
   const navigate = useNavigate();
 
   const { data: workflows, isLoading, error, refetch } = useWorkflows();
   const { data: projects } = useProjects();
-  const createWorkflow = useCreateWorkflow();
-  const installPoolWorkflow = useInstallPoolWorkflow();
-  const installTemplate = useInstallTemplate();
   const simpleRun = useSimpleRun();
   const deleteWorkflow = useDeleteWorkflow();
 
   // `?new=1` (the Simple home's "start from a template") opens the create dialog right away;
   // `?template=<id>` / `?pool=<id>` (a hit of the home's command field) open it with that entry chosen
-  const [searchParams, setSearchParams] = useSearchParams();
-  const requestedCreate = ['new', 'template', 'pool'].some((key) => searchParams.has(key));
-  const [pick, setPick] = useState(() => ({ template: searchParams.get('template'), pool: searchParams.get('pool') }));
-  const pickedTemplates = useTemplates({ enabled: !!pick.template });
-  const pickedPool = usePoolWorkflows({ enabled: !!pick.pool });
-  const [createStep, setCreateStep] = useState<CreateStep>(requestedCreate ? 'template' : 'closed');
-  const [selectedTemplate, setSelectedTemplate] = useState<WorkflowTemplate | null>(null);
-  const [form, setForm] = useState<CreateWorkflowRequest>({ projectId: '', name: '' });
+  const creation = useWorkflowCreateFlow({ poolParam: true });
   const [search, setSearch] = useState('');
   const [showAll, setShowAll] = useState(false);
   // Workflow whose deletion waits for the confirmation (23635ef6)
@@ -73,108 +56,6 @@ export function SimpleWorkflows() {
 
   const visible = search ? [...curated, ...rest] : showAll ? [...curated, ...rest] : curated;
 
-  const openCreate = () => {
-    setCreateStep('template');
-    setSelectedTemplate(null);
-    setForm({ projectId: '', name: '' });
-  };
-
-  // The params have done their job once the dialog is open; dropping them keeps back/reload from reopening it
-  useEffect(() => {
-    if (!requestedCreate) return;
-    setSearchParams((prev) => {
-      const next = new URLSearchParams(prev);
-      next.delete('new');
-      next.delete('template');
-      next.delete('pool');
-      return next;
-    }, { replace: true });
-  }, [requestedCreate, setSearchParams]);
-
-  const handleTemplateSelect = (template: WorkflowTemplate | null) => {
-    setSelectedTemplate(template);
-    if (template) {
-      setForm({
-        projectId: '',
-        name: resolveTemplateName(template.name, locale),
-        description: resolveTemplateName(template.description, locale),
-        icon: template.icon,
-        blocks: template.blocks,
-        instructions: template.instructions ?? undefined,
-        model: template.model ?? undefined,
-        templateId: template.id,
-      });
-    } else {
-      setForm({ projectId: '', name: '' });
-    }
-    setCreateStep('details');
-  };
-
-  const handlePoolSelect = (entry: PoolWorkflowEntry) => {
-    setSelectedTemplate(null);
-    setForm({
-      projectId: '',
-      name: resolveTemplateName(entry.name, locale),
-      description: resolveTemplateName(entry.description, locale),
-      icon: entry.icon,
-      blocks: entry.blocks,
-      instructions: entry.instructions ?? undefined,
-      model: entry.model ?? undefined,
-      metadata: { poolSource: entry.id },
-      ...(entry.defaultContext
-        ? { defaultContext: Object.fromEntries(Object.entries(entry.defaultContext).map(([k, v]) => [k, String(v)])) }
-        : {}),
-    } as CreateWorkflowRequest);
-    setCreateStep('details');
-  };
-
-  // Once the requested entry is known, continue with it; unknown or not loadable ⇒ the template list stays open
-  if (pick.template && (pickedTemplates.data || pickedTemplates.isError)) {
-    const template = pickedTemplates.data?.find((tmpl) => tmpl.id === pick.template);
-    setPick((prev) => ({ ...prev, template: null }));
-    if (template) handleTemplateSelect(template);
-  }
-  if (pick.pool && (pickedPool.data || pickedPool.isError)) {
-    const entry = pickedPool.data?.find((e) => e.id === pick.pool);
-    setPick((prev) => ({ ...prev, pool: null }));
-    if (entry) handlePoolSelect(entry);
-  }
-
-  const handleCreate = () => {
-    const poolId = (form.metadata as Record<string, unknown> | undefined)?.poolSource as string | undefined;
-    const onDone = () => {
-      setCreateStep('closed');
-      setForm({ projectId: '', name: '' });
-      setSelectedTemplate(null);
-    };
-
-    if (poolId && form.projectId) {
-      installPoolWorkflow.mutate(
-        { poolId, projectId: form.projectId, name: form.name || undefined },
-        { onSuccess: (data) => { onDone(); navigate(`/workflows/${data.workflowId}`); } },
-      );
-      return;
-    }
-
-    const autoTodoDefault = useSettingsStore.getState().autoTodoDefault;
-    const payload = autoTodoDefault
-      ? { ...form, metadata: { ...form.metadata, autoTodo: { enabled: true } } }
-      : form;
-
-    // A blueprint package (e.g. from ?template=) is created by the server, which wires its part (093d2f11)
-    if (selectedTemplate && form.templateId === selectedTemplate.id && blueprintPartIds(selectedTemplate).length > 0) {
-      installTemplate.mutate(
-        { templateId: selectedTemplate.id, projectId: form.projectId, name: form.name, description: form.description,
-          ...(payload.metadata ? { metadata: payload.metadata } : {}) },
-        { onSuccess: (data) => { onDone(); navigate(`/workflows/${data.workflowId}`); } },
-      );
-      return;
-    }
-    createWorkflow.mutate(payload, {
-      onSuccess: (wf) => { onDone(); navigate(`/workflows/${wf.id}`); },
-    });
-  };
-
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -191,7 +72,7 @@ export function SimpleWorkflows() {
     <div className="animate-fade-in max-w-4xl mx-auto space-y-6">
       <div className="flex items-center justify-between gap-4">
         <h1 className="text-[28px] font-bold text-text tracking-tight leading-none">{t.simple.home.tiles.workflows.title}</h1>
-        <Button icon={<GitBranch className="w-4 h-4" />} onClick={openCreate}>
+        <Button icon={<GitBranch className="w-4 h-4" />} onClick={creation.openCreate}>
           {t.workflows.create}
         </Button>
       </div>
@@ -222,7 +103,7 @@ export function SimpleWorkflows() {
           title={t.workflows.title}
           description={t.workflows.noWorkflows}
           action={
-            <Button size="sm" onClick={openCreate}>
+            <Button size="sm" onClick={creation.openCreate}>
               {t.workflows.create}
             </Button>
           }
@@ -294,18 +175,18 @@ export function SimpleWorkflows() {
 
       <WorkflowCreateFlow
         t={t}
-        locale={locale}
-        createStep={createStep}
-        selectedTemplate={selectedTemplate}
-        form={form}
+        locale={creation.locale}
+        createStep={creation.createStep}
+        selectedTemplate={creation.selectedTemplate}
+        form={creation.form}
         projects={projects}
-        createLoading={createWorkflow.isPending || installPoolWorkflow.isPending || installTemplate.isPending}
-        onFormChange={setForm}
-        onTemplateSelect={handleTemplateSelect}
-        onPoolSelect={handlePoolSelect}
-        onCreate={handleCreate}
-        onClose={() => { setCreateStep('closed'); setSelectedTemplate(null); setForm({ projectId: '', name: '' }); }}
-        onBackToTemplates={() => setCreateStep('template')}
+        createLoading={creation.createLoading}
+        onFormChange={creation.setForm}
+        onTemplateSelect={creation.selectTemplate}
+        onPoolSelect={creation.selectPoolEntry}
+        onCreate={creation.create}
+        onClose={creation.close}
+        onBackToTemplates={creation.backToTemplates}
         variant="simple"
       />
     </div>

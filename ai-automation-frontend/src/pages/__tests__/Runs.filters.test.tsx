@@ -88,6 +88,24 @@ describe('Runs page — filters in the app language', () => {
     expect(sources[0].textContent).toMatch(/^Gestartet durch /);
   });
 
+  it('names the search field of both tabs by its label and sends what is typed', async () => {
+    const queries: string[] = [];
+    const chainQueries: string[] = [];
+    serve(queries);
+    server.use(http.get('/api/v1/chains/runs', ({ request }) => {
+      chainQueries.push(new URL(request.url).search);
+      return HttpResponse.json({ content: [chainRun], page: 0, size: 50, totalElements: 1, totalPages: 1 });
+    }));
+    renderWithProviders(<Runs />);
+
+    fireEvent.change(await screen.findByLabelText('Suchen...'), { target: { value: 'Nightly' } });
+    await waitFor(() => expect(queries.some((q) => q.includes('search=Nightly'))).toBe(true));
+
+    fireEvent.click(screen.getByRole('button', { name: 'Ketten' }));
+    fireEvent.change(await screen.findByLabelText('Suchen...'), { target: { value: 'Release' } });
+    await waitFor(() => expect(chainQueries.some((q) => q.includes('search=Release'))).toBe(true));
+  });
+
   it('goes back to the first page when a filter changes', async () => {
     const queries: string[] = [];
     serve(queries, 3);
