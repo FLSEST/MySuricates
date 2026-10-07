@@ -179,6 +179,53 @@ describe('useWorkflowCreateFlow', () => {
     expect(location.search).toBe('');
   });
 
+  /** Router at `entry` around the create flow; `location.search` follows the URL. */
+  function setupAt(entry: string, options?: Parameters<typeof useWorkflowCreateFlow>[0]) {
+    const location = { search: '' };
+    function Spy() {
+      location.search = useLocation().search;
+      return null;
+    }
+    const qc = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 } } });
+    const wrapper = ({ children }: { children: ReactNode }) => (
+      <QueryClientProvider client={qc}>
+        <MemoryRouter initialEntries={[entry]}>
+          {children}
+          <Routes><Route path="*" element={<Spy />} /></Routes>
+        </MemoryRouter>
+      </QueryClientProvider>
+    );
+    return { ...renderHook(() => useWorkflowCreateFlow(options), { wrapper }), location };
+  }
+
+  it('opens with the pool entry from ?pool= chosen when poolParam is set — a hit of the Simple home field', async () => {
+    server.use(http.get('/api/v1/pool', () => HttpResponse.json([poolEntry])));
+    const { result, location } = setupAt('/workflows?pool=pool-1', { poolParam: true });
+
+    expect(result.current.createStep).toBe('template');
+    await waitFor(() => expect(result.current.createStep).toBe('details'));
+    expect(result.current.selectedTemplate).toBeNull();
+    expect(result.current.form).toMatchObject({ name: 'Aufräumen', metadata: { poolSource: 'pool-1' } });
+    expect(location.search).toBe('');
+  });
+
+  it('keeps the list open for an unknown ?pool= id', async () => {
+    let poolCalls = 0;
+    server.use(http.get('/api/v1/pool', () => { poolCalls++; return HttpResponse.json([poolEntry]); }));
+    const { result } = setupAt('/workflows?pool=gone', { poolParam: true });
+
+    await waitFor(() => expect(poolCalls).toBe(1));
+    await waitFor(() => expect(result.current.createStep).toBe('template'));
+    expect(result.current.form).toEqual({ projectId: '', name: '' });
+  });
+
+  it('ignores ?pool= without poolParam and leaves the URL alone', () => {
+    const { result, location } = setupAt('/workflows?pool=pool-1');
+
+    expect(result.current.createStep).toBe('closed');
+    expect(location.search).toBe('?pool=pool-1');
+  });
+
   it('starts blank without a template and closes again', () => {
     const { result } = setup(useWorkflowCreateFlow);
     act(() => result.current.selectTemplate(null));

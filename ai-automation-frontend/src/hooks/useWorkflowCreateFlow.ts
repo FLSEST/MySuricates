@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useCreateWorkflow } from './useWorkflows';
-import { useInstallPoolWorkflow } from './usePool';
+import { useInstallPoolWorkflow, usePoolWorkflows } from './usePool';
 import { useInstallTemplate, useTemplates } from './useTemplates';
 import { useSettingsStore } from '../stores/settingsStore';
 import { useI18nStore } from '../i18n';
@@ -9,13 +9,21 @@ import { blueprintPartIds, resolveTemplateName } from '../utils/templateUtils';
 import type { CreateStep } from '../components/workflow/WorkflowCreateFlow';
 import type { CreateWorkflowRequest, WorkflowTemplate, PoolWorkflowEntry } from '../types';
 
+export interface WorkflowCreateFlowOptions {
+  /**
+   * Also honour `?pool=<id>` (a hit of the Simple home's command field): it opens the dialog with
+   * that pool entry chosen once the pool is loaded, like `?template=` does for templates.
+   */
+  poolParam?: boolean;
+}
+
 /**
  * Creating a workflow from the list: first pick template, pool entry or empty, then
  * details. A pool entry with a project is installed via the pool, a blueprint package (a
  * sub-workflow block names a blueprint) via the server, which creates the part too; everything else is
  * created fresh (with auto-TODO if that is the default); afterwards it goes to the new workflow.
  */
-export function useWorkflowCreateFlow() {
+export function useWorkflowCreateFlow({ poolParam = false }: WorkflowCreateFlowOptions = {}) {
   const navigate = useNavigate();
   const locale = useI18nStore((s) => s.locale);
   const createWorkflow = useCreateWorkflow();
@@ -24,12 +32,18 @@ export function useWorkflowCreateFlow() {
   // `?new=1[&template=<id>]` — a hint's blueprint link (093d2f11) — opens the dialog, with that
   // template chosen once the list is loaded; unknown ids leave the list open
   const [searchParams, setSearchParams] = useSearchParams();
-  const [requested] = useState(() => ({
-    open: searchParams.has('new') || searchParams.has('template'),
-    template: searchParams.get('template'),
-  }));
+  const [requested] = useState(() => {
+    const pool = poolParam ? searchParams.get('pool') : null;
+    return {
+      open: searchParams.has('new') || searchParams.has('template') || pool !== null,
+      template: searchParams.get('template'),
+      pool,
+    };
+  });
   const [pendingTemplate, setPendingTemplate] = useState(requested.template);
+  const [pendingPool, setPendingPool] = useState(requested.pool);
   const pickedTemplates = useTemplates({ enabled: !!pendingTemplate });
+  const pickedPool = usePoolWorkflows({ enabled: !!pendingPool });
   const [createStep, setCreateStep] = useState<CreateStep>(requested.open ? 'template' : 'closed');
   const [selectedTemplate, setSelectedTemplate] = useState<WorkflowTemplate | null>(null);
   const [form, setForm] = useState<CreateWorkflowRequest>({ projectId: '', name: '' });
@@ -66,9 +80,10 @@ export function useWorkflowCreateFlow() {
       const next = new URLSearchParams(prev);
       next.delete('new');
       next.delete('template');
+      if (poolParam) next.delete('pool');
       return next;
     }, { replace: true });
-  }, [requested.open, setSearchParams]);
+  }, [requested.open, poolParam, setSearchParams]);
 
   if (pendingTemplate && (pickedTemplates.data || pickedTemplates.isError)) {
     const template = pickedTemplates.data?.find((tmpl) => tmpl.id === pendingTemplate);
@@ -94,6 +109,13 @@ export function useWorkflowCreateFlow() {
     } as CreateWorkflowRequest);
     setCreateStep('details');
   };
+
+  // Once the requested pool entry is known, continue with it; unknown or not loadable ⇒ the list stays open
+  if (pendingPool && (pickedPool.data || pickedPool.isError)) {
+    const entry = pickedPool.data?.find((e) => e.id === pendingPool);
+    setPendingPool(null);
+    if (entry) selectPoolEntry(entry);
+  }
 
   const create = () => {
     const poolId = (form.metadata as Record<string, unknown> | undefined)?.poolSource as string | undefined;
