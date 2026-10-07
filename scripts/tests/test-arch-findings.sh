@@ -503,7 +503,7 @@ check "Hotspots: Befunde zuerst (nach Aenderungen), dann Beobachtungen; neue nac
 check "aenderungen_7d aus ## recent, 0 ohne Eintrag" \
   '[ "$(section "$TMP/cand.txt" review_candidates | awk -F"\t" "{ print \$3 }" | tr "\n" " ")" = "2 0 0 4 3 2 1 " ]'
 check "angaben = evidence der Einstufung plus Befund bzw. Beobachtung" \
-  'section "$TMP/cand.txt" review_candidates | grep -qx "hotspot${TAB}$C/CoupledHot.java${TAB}2${TAB}100 NCLOC (140 Zeilen), 10 deps, 8 Aenderungen in 90 Tagen (Hotspot ab 5); befund arch.high-coupling MEDIUM${TAB}arch_com.automation.cand.CoupledHot.java"'
+  'section "$TMP/cand.txt" review_candidates | grep -x "hotspot${TAB}$C/CoupledHot.java${TAB}2${TAB}100 NCLOC (140 Zeilen), 10 deps, 8 Aenderungen in 90 Tagen (Hotspot ab 5); befund arch.high-coupling MEDIUM${TAB}arch_com.automation.cand.CoupledHot.java" >/dev/null'
 check "findings_summary zaehlt die Kandidaten" '[ "$(summary "$TMP/cand.txt" review_candidates)" = 7 ]'
 check "kein Kandidat ist ein Hotspot ohne Befund oder Beobachtung, keiner stabil" \
   '! section "$TMP/cand.txt" review_candidates | grep -E "Plain.java|ObsStable.java|NewSmall.java" >/dev/null'
@@ -524,18 +524,18 @@ check "kein Kandidat ist ein Hotspot ohne Befund oder Beobachtung, keiner stabil
 } > "$TMP/cap-backend.txt"
 python3 "$FINDINGS" "$TMP/cap-backend.txt" "$TMP/cand-frontend.txt" > "$TMP/cap.txt"
 check "hoechstens 6 Hotspots, die mit den meisten Aenderungen" \
-  '[ "$(candidates "$TMP/cap.txt" | grep -c "^hotspot $C/Hot")" -eq 6 ] && ! candidates "$TMP/cap.txt" | grep -qE "Hot[12]\.java"'
+  '[ "$(candidates "$TMP/cap.txt" | grep -c "^hotspot $C/Hot")" -eq 6 ] && ! candidates "$TMP/cap.txt" | grep -E "Hot[12]\.java" >/dev/null'
 check "hoechstens 3 neue Dateien, die groessten" \
-  '[ "$(candidates "$TMP/cap.txt" | grep -c "^neu")" -eq 3 ] && [ "$(candidates "$TMP/cap.txt" | grep "^neu" | head -1)" = "neu frontend/src/components/NewPanel.tsx" ]'
+  '[ "$(candidates "$TMP/cap.txt" | grep -c "^neu")" -eq 3 ] && [ "$(candidates "$TMP/cap.txt" | grep "^neu" | sed -n 1p)" = "neu frontend/src/components/NewPanel.tsx" ]'
 # Without ## recent (older sheet) there are no new files, and the section says so.
 awk '/^## recent$/ { skip = 1; next } /^## / { skip = 0 } !skip' "$TMP/cand-backend.txt" > "$TMP/cand-norecent.txt"
 python3 "$FINDINGS" "$TMP/cand-norecent.txt" "$TMP/cand-frontend.txt" > "$TMP/norecent.txt"
 check "ohne ## recent: Hinweis und keine neuen Backend-Dateien" \
-  'grep -q "^# ## recent fehlt (backend)" "$TMP/norecent.txt" && ! candidates "$TMP/norecent.txt" | grep -q "^neu $C/"'
-check "ohne ## recent: Hotspots bleiben" 'candidates "$TMP/norecent.txt" | grep -qx "hotspot $C/CoupledHot.java"'
+  'grep -q "^# ## recent fehlt (backend)" "$TMP/norecent.txt" && ! candidates "$TMP/norecent.txt" | grep "^neu $C/" >/dev/null'
+check "ohne ## recent: Hotspots bleiben" 'candidates "$TMP/norecent.txt" | grep -x "hotspot $C/CoupledHot.java" >/dev/null'
 python3 "$FINDINGS" "$TMP/leer.txt" "$TMP/leer.txt" > "$TMP/leer-cand.out"
 check "nichts gemessen: (keine Kandidaten) mit Hinweis" \
-  'section "$TMP/leer-cand.out" review_candidates | grep -qx "(keine Kandidaten)" && grep -q "^# Groessen nicht gemessen" "$TMP/leer-cand.out"'
+  'section "$TMP/leer-cand.out" review_candidates | grep -x "(keine Kandidaten)" >/dev/null && grep -q "^# Groessen nicht gemessen" "$TMP/leer-cand.out"'
 
 echo "14) Werkzeug-Fakten: CPD-Duplikate als Kandidaten, PMD-Komplexitaet je Kandidat (TODO 67128699)"
 W=/workspace/ai-automation-backend/src/main/java
@@ -560,12 +560,12 @@ python3 "$FINDINGS" "$TMP/cand-backend.txt" "$TMP/cand-frontend.txt" --cpd java=
   --cpd typescript="$TMP/cpd-ts.csv" --pmd "$TMP/pmd.txt" > "$TMP/tools.txt" 2> "$TMP/tools.err"; RC=$?
 check "mit Werkzeug-Eingaben: exit 0, stderr leer" '[ "$RC" -eq 0 ] && [ ! -s "$TMP/tools.err" ]'
 check "dublette: groesstes Duplikat, erste freie Datei, die anderen Stellen in angaben" \
-  'section "$TMP/tools.txt" review_candidates | grep -qx "dublette${TAB}$C/Plain.java${TAB}0${TAB}40 Zeilen (250 Tokens) doppelt, hier ab Zeile 12; ebenso in $C/NewBig.java:10${TAB}arch_com.automation.cand.Plain.java"'
+  'section "$TMP/tools.txt" review_candidates | grep -x "dublette${TAB}$C/Plain.java${TAB}0${TAB}40 Zeilen (250 Tokens) doppelt, hier ab Zeile 12; ebenso in $C/NewBig.java:10${TAB}arch_com.automation.cand.Plain.java" >/dev/null'
 check "dublette: schon gewaehlte Kandidaten werden nicht erneut subject (CoupledHot -> ObsStable)" \
-  'section "$TMP/tools.txt" review_candidates | grep -q "^dublette${TAB}$C/ObsStable.java${TAB}"'
+  'section "$TMP/tools.txt" review_candidates | grep "^dublette${TAB}$C/ObsStable.java${TAB}" >/dev/null'
 check "dublette: hoechstens 3, Duplikate innerhalb einer Datei und Testdateien zaehlen nicht" \
   '[ "$(section "$TMP/tools.txt" review_candidates | grep -c "^dublette")" -eq 3 ] \
-     && ! section "$TMP/tools.txt" review_candidates | grep -q "PlainTest" && ! section "$TMP/tools.txt" review_candidates | grep -q "Zeta"'
+     && ! section "$TMP/tools.txt" review_candidates | grep "PlainTest" >/dev/null && ! section "$TMP/tools.txt" review_candidates | grep "Zeta" >/dev/null'
 check "duplicates: nur dateiuebergreifende, nach Zeilen sortiert, Testpfade entfernt" \
   '[ "$(section "$TMP/tools.txt" duplicates | sed -n 1p)" = "40${TAB}250${TAB}$C/NewBig.java:10, $C/Plain.java:12" ] \
      && [ "$(section "$TMP/tools.txt" duplicates | wc -l | tr -d " ")" -eq 4 ]'
@@ -608,12 +608,12 @@ python3 "$FINDINGS" "$TMP/cand-backend.txt" "$TMP/cand-frontend.txt" --cpd java=
   --jscpd "$TMP/jscpd.txt" --lizard "$TMP/lizard.txt" > "$TMP/fe-tools.txt" 2> "$TMP/fe-tools.err"; RC=$?
 check "jscpd/lizard: exit 0, stderr leer" '[ "$RC" -eq 0 ] && [ ! -s "$TMP/fe-tools.err" ]'
 check "jscpd: .tsx-Duplikat steht in der Frontend-Liste, zeilen -, Testdatei faellt weg" \
-  'section "$TMP/fe-tools.txt" duplicates | grep -qx -- "-${TAB}300${TAB}frontend/src/components/NewHelper.ts:24, frontend/src/pages/HotPage.tsx:28" \
+  'section "$TMP/fe-tools.txt" duplicates | grep -x -- "-${TAB}300${TAB}frontend/src/components/NewHelper.ts:24, frontend/src/pages/HotPage.tsx:28" >/dev/null \
      && ! grep -q "X.test.tsx" "$TMP/fe-tools.txt"'
 check "jscpd: Frontend gemessen, Hinweis nennt jscpd statt ungeprueft" \
   '[ -z "$(summary "$TMP/fe-tools.txt" duplicates_not_measured)" ] && grep -q "^# Frontend samt .tsx jscpd" "$TMP/fe-tools.txt" && ! grep -q "^# .tsx ungeprueft" "$TMP/fe-tools.txt"'
 check "jscpd: dublette nennt Tokens ohne Zeilenzahl, schon gewaehlte Kandidaten bleiben aussen vor" \
-  'section "$TMP/fe-tools.txt" review_candidates | grep -q "^dublette${TAB}frontend/src/components/NewHelper.ts${TAB}1${TAB}300 Tokens doppelt, hier ab Zeile 24; ebenso in frontend/src/pages/HotPage.tsx:28${TAB}arch_frontend.src.components.NewHelper.ts$"'
+  'section "$TMP/fe-tools.txt" review_candidates | grep "^dublette${TAB}frontend/src/components/NewHelper.ts${TAB}1${TAB}300 Tokens doppelt, hier ab Zeile 24; ebenso in frontend/src/pages/HotPage.tsx:28${TAB}arch_frontend.src.components.NewHelper.ts$" >/dev/null'
 check "lizard: Komplexitaet nur fuer Frontend-Kandidaten, Zustand ok" \
   '[ "$(section "$TMP/fe-tools.txt" complexity | cut -f1-3 | tr "\n" "|")" = "frontend/src/pages/HotPage.tsx${TAB}30${TAB}CCN|" ] \
      && [ "$(summary "$TMP/fe-tools.txt" frontend_complexity_state)" = ok ]'
@@ -622,17 +622,17 @@ printf '## FAKTENBLATT jscpd\nNICHT GEMESSEN: jscpd_findings (keine SARIF-Datei)
 python3 "$FINDINGS" "$TMP/cand-backend.txt" "$TMP/cand-frontend.txt" --cpd java="$TMP/cpd-java.csv" \
   --jscpd "$TMP/jscpd-missing.txt" --lizard "$TMP/lizard-broken.txt" > "$TMP/fe-gap.txt"
 check "Fehlermeldung statt Warnungen: lizard nicht gemessen, keine Frontend-Komplexitaet" \
-  '[ "$(summary "$TMP/fe-gap.txt" frontend_complexity_state)" = not_measured ] && ! section "$TMP/fe-gap.txt" complexity | grep -q "^frontend/"'
+  '[ "$(summary "$TMP/fe-gap.txt" frontend_complexity_state)" = not_measured ] && ! section "$TMP/fe-gap.txt" complexity | grep "^frontend/" >/dev/null'
 check "jscpd NICHT GEMESSEN: Frontend-Duplikate nicht gemessen, .tsx als ungeprueft benannt" \
   '[ "$(summary "$TMP/fe-gap.txt" duplicates_not_measured)" = typescript ] && grep -q "^# .tsx ungeprueft" "$TMP/fe-gap.txt"'
 printf '\n' > "$TMP/lizard-empty.txt"
 python3 "$FINDINGS" "$TMP/cand-backend.txt" --lizard "$TMP/lizard-empty.txt" > "$TMP/fe-empty.txt"
 check "lizard ohne Warnung: gemessen, nur nichts ueber der Schwelle" '[ "$(summary "$TMP/fe-empty.txt" frontend_complexity_state)" = ok ]'
 check "dublette wechselt zwischen Backend und Frontend (erst das groesste Backend-, dann das Frontend-Duplikat)" \
-  '[ "$(section "$TMP/fe-tools.txt" review_candidates | awk -F"\t" "\$1 == \"dublette\" { print \$2 }" | head -2 | tr "\n" "|")" = "$C/Plain.java|frontend/src/components/NewHelper.ts|" ]'
+  '[ "$(section "$TMP/fe-tools.txt" review_candidates | awk -F"\t" "\$1 == \"dublette\" { print \$2 }" | sed -n 1,2p | tr "\n" "|")" = "$C/Plain.java|frontend/src/components/NewHelper.ts|" ]'
 check "duplicates: Backend-Liste vor der Frontend-Liste" \
-  'section "$TMP/fe-tools.txt" duplicates | sed -n 1p | grep -q "^40${TAB}250${TAB}$C/NewBig.java" \
-     && section "$TMP/fe-tools.txt" duplicates | tail -1 | grep -q "frontend/src/"'
+  'section "$TMP/fe-tools.txt" duplicates | sed -n 1p | grep "^40${TAB}250${TAB}$C/NewBig.java" >/dev/null \
+     && section "$TMP/fe-tools.txt" duplicates | tail -1 | grep "frontend/src/" >/dev/null'
 
 echo "16) Evidence as fact sheet and measurement scope (TODO 2c07ce7e)"
 facts() { section "$1" "FAKTENBLATT arch"; }

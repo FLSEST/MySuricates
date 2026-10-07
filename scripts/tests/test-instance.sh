@@ -413,10 +413,11 @@ else
 fi
 # Every call against the own instance goes through lib/local-curl.sh — a new bare curl is noticed here.
 # Excluded: downloads from the network (lib/deps.sh, they need the proxy), installation hints
-# as text (lib/provider-catalog.generated.sh) and the tests with their stubs. git grep --untracked: also
+# as text (lib/provider-catalog.generated.sh), Markdown (prose such as the reference intros in
+# docs-reference/ names curl without calling it) and the tests with their stubs. git grep --untracked: also
 # new files, but no ignored ones like the private copy scripts/seed-workflows.sh. The call in the
 # helper itself must be found — otherwise the search saw nothing.
-CURLS="$(cd "$HERE/.." && git grep --untracked -nIE "(^|[^[:alnum:]_-])curl[[:space:]]+(-|\"|'|\\\$|http|\\\\)" -- . 2>/dev/null)"
+CURLS="$(cd "$HERE/.." && git grep --untracked -nIE "(^|[^[:alnum:]_-])curl[[:space:]]+(-|\"|'|\\\$|http|\\\\)" -- . ':!*.md' 2>/dev/null)"
 NAKED="$(printf '%s\n' "$CURLS" | grep -vE '^(tests/|lib/local-curl\.sh:|lib/deps\.sh:|lib/provider-catalog\.generated\.sh:)' \
   | grep -vE '^[^:]+:[0-9]+:[[:space:]]*#')"
 check "every curl to the own instance goes through lib/local-curl.sh" 'printf "%s" "$CURLS" | grep "^lib/local-curl.sh:" >/dev/null && { [ -z "$NAKED" ] || { printf "%s\n" "$NAKED" | sed "s/^/         /"; false; }; }'

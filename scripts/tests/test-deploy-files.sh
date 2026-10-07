@@ -113,7 +113,7 @@ BUILD="$R/scripts/build-agent-images.sh"
 for svc in agent-node agent-python agent-devops agent-java agent-analysis; do
   f="$R/ai-automation-backend/docker/Dockerfile.$svc"
   check "$svc: label is the last instruction before CMD" \
-    '[ "$(grep -vE "^[[:space:]]*(#|$)" "$f" | tail -3 | head -2 | tr "\n" "|")" = "ARG DOCKERFILE_SHA256=|LABEL org.mysuricates.dockerfile-sha256=\$DOCKERFILE_SHA256|" ]'
+    '[ "$(grep -vE "^[[:space:]]*(#|$)" "$f" | tail -3 | sed -n 1,2p | tr "\n" "|")" = "ARG DOCKERFILE_SHA256=|LABEL org.mysuricates.dockerfile-sha256=\$DOCKERFILE_SHA256|" ]'
   up="$(printf '%s' "${svc#agent-}" | tr '[:lower:]' '[:upper:]')"
   check "$svc: compose passes AGENT_${up}_DOCKERFILE_SHA256" 'grep -q "DOCKERFILE_SHA256: \${AGENT_${up}_DOCKERFILE_SHA256:-}" "$DC"'
 done
