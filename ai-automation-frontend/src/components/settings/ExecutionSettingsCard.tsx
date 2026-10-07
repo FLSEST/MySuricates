@@ -5,8 +5,10 @@ import { useExecutionConfig, useUpdateExecutionConfig } from '../../hooks/useSys
 import { Zap, Save, Loader2 } from 'lucide-react';
 import { Spinner } from '../ui';
 import { providerName } from '../shared/aiProviderStatus';
-
-type NumericFormKeys = Exclude<keyof FormState, 'rateLimitEnabled' | 'schedulerCatchUpOnResume' | 'runAutoResumeEnabled' | 'dashboardReportAssistEnabled' | 'liveLogPersistDefault'>;
+import {
+  DEFAULT_FORM, hasChanges as formHasChanges, toFormState, toPayload,
+  type ExecutionSettingsForm, type FlagSettingKey, type NumericSettingKey,
+} from './executionSettingsForm';
 
 interface FieldConfig {
   key: string;
@@ -14,96 +16,15 @@ interface FieldConfig {
   hint: string;
   min: number;
   max: number;
-  configKey: NumericFormKeys;
+  configKey: NumericSettingKey;
 }
 
-interface FormState {
-  executionMaxConcurrent: number;
-  claudeMaxConcurrentCalls: number;
-  claudeReservedForInteractive: number;
-  piMaxConcurrentCalls: number;
-  piReservedForInteractive: number;
-  codexMaxConcurrentCalls: number;
-  codexReservedForInteractive: number;
-  aiCliMaxConcurrentCalls: number;
-  aiCliReservedForInteractive: number;
-  claudeTimeoutSeconds: number;
-  claudeInterCallDelayMs: number;
-  chainWorkflowTimeoutMinutes: number;
-  rateLimitEnabled: boolean;
-  rateLimitRequestsPerMinute: number;
-  assistantChatTimeoutSeconds: number;
-  schedulerCatchUpOnResume: boolean;
-  schedulerResumeGraceMinutes: number;
-  runAutoResumeEnabled: boolean;
-  runAutoResumeDelaySeconds: number;
-  summarizationTimeoutSeconds: number;
-  factoryTimeoutSeconds: number;
-  runRetentionDays: number;
-  runRetentionMaxPerNight: number;
-  liveLogPersistDefault: boolean;
-  dashboardLayoutRetentionCount: number;
-  dashboardReportAssistEnabled: boolean;
-}
-
-const DEFAULT_FORM: FormState = {
-  executionMaxConcurrent: 10,
-  claudeMaxConcurrentCalls: 5,
-  claudeReservedForInteractive: 1,
-  piMaxConcurrentCalls: 5,
-  piReservedForInteractive: 1,
-  codexMaxConcurrentCalls: 5,
-  codexReservedForInteractive: 1,
-  aiCliMaxConcurrentCalls: 8,
-  aiCliReservedForInteractive: 1,
-  claudeTimeoutSeconds: 300,
-  claudeInterCallDelayMs: 0,
-  chainWorkflowTimeoutMinutes: 180,
-  rateLimitEnabled: true,
-  rateLimitRequestsPerMinute: 120,
-  assistantChatTimeoutSeconds: 240,
-  schedulerCatchUpOnResume: true,
-  schedulerResumeGraceMinutes: 5,
-  runAutoResumeEnabled: true,
-  runAutoResumeDelaySeconds: 30,
-  summarizationTimeoutSeconds: 120,
-  factoryTimeoutSeconds: 600,
-  runRetentionDays: 90,
-  runRetentionMaxPerNight: 200,
-  liveLogPersistDefault: true,
-  dashboardLayoutRetentionCount: 100,
-  dashboardReportAssistEnabled: true,
-};
-
-function toFormState(config: NonNullable<ReturnType<typeof useExecutionConfig>['data']>): FormState {
-  return {
-    executionMaxConcurrent: config.executionMaxConcurrent,
-    claudeMaxConcurrentCalls: config.claudeMaxConcurrentCalls,
-    claudeReservedForInteractive: config.claudeReservedForInteractive ?? 1,
-    piMaxConcurrentCalls: config.piMaxConcurrentCalls ?? 5,
-    piReservedForInteractive: config.piReservedForInteractive ?? 1,
-    codexMaxConcurrentCalls: config.codexMaxConcurrentCalls ?? 5,
-    codexReservedForInteractive: config.codexReservedForInteractive ?? 1,
-    aiCliMaxConcurrentCalls: config.aiCliMaxConcurrentCalls ?? 8,
-    aiCliReservedForInteractive: config.aiCliReservedForInteractive ?? 1,
-    claudeTimeoutSeconds: config.claudeTimeoutSeconds,
-    claudeInterCallDelayMs: config.claudeInterCallDelayMs,
-    chainWorkflowTimeoutMinutes: config.chainWorkflowTimeoutMinutes,
-    rateLimitEnabled: config.rateLimitEnabled === 1,
-    rateLimitRequestsPerMinute: config.rateLimitRequestsPerMinute,
-    assistantChatTimeoutSeconds: config.assistantChatTimeoutSeconds ?? 240,
-    schedulerCatchUpOnResume: (config.schedulerCatchUpOnResume ?? 1) === 1,
-    schedulerResumeGraceMinutes: config.schedulerResumeGraceMinutes ?? 5,
-    runAutoResumeEnabled: (config.runAutoResumeEnabled ?? 1) === 1,
-    runAutoResumeDelaySeconds: config.runAutoResumeDelaySeconds ?? 30,
-    summarizationTimeoutSeconds: config.summarizationTimeoutSeconds ?? 120,
-    factoryTimeoutSeconds: config.factoryTimeoutSeconds ?? 600,
-    runRetentionDays: config.runRetentionDays ?? 90,
-    runRetentionMaxPerNight: config.runRetentionMaxPerNight ?? 200,
-    liveLogPersistDefault: (config.liveLogPersistDefault ?? 1) === 1,
-    dashboardLayoutRetentionCount: config.dashboardLayoutRetentionCount ?? 100,
-    dashboardReportAssistEnabled: (config.dashboardReportAssistEnabled ?? 1) === 1,
-  };
+interface ToggleConfig {
+  configKey: FlagSettingKey;
+  label: string;
+  hint: string;
+  /** Names the switch for assistive technology with its label. */
+  named?: true;
 }
 
 export function ExecutionSettingsCard() {
@@ -112,38 +33,11 @@ export function ExecutionSettingsCard() {
   const updateConfig = useUpdateExecutionConfig();
 
   // Form follows the server config; local edits survive until a new config object arrives.
-  const [form, setForm] = useSyncedState<FormState, typeof config>(
+  const [form, setForm] = useSyncedState<ExecutionSettingsForm, typeof config>(
     config, (c, prev) => (c ? toFormState(c) : prev ?? DEFAULT_FORM),
   );
 
-  const hasChanges = config && (
-    form.executionMaxConcurrent !== config.executionMaxConcurrent ||
-    form.claudeMaxConcurrentCalls !== config.claudeMaxConcurrentCalls ||
-    form.claudeReservedForInteractive !== (config.claudeReservedForInteractive ?? 1) ||
-    form.piMaxConcurrentCalls !== (config.piMaxConcurrentCalls ?? 5) ||
-    form.piReservedForInteractive !== (config.piReservedForInteractive ?? 1) ||
-    form.codexMaxConcurrentCalls !== (config.codexMaxConcurrentCalls ?? 5) ||
-    form.codexReservedForInteractive !== (config.codexReservedForInteractive ?? 1) ||
-    form.aiCliMaxConcurrentCalls !== (config.aiCliMaxConcurrentCalls ?? 8) ||
-    form.aiCliReservedForInteractive !== (config.aiCliReservedForInteractive ?? 1) ||
-    form.claudeTimeoutSeconds !== config.claudeTimeoutSeconds ||
-    form.claudeInterCallDelayMs !== config.claudeInterCallDelayMs ||
-    form.chainWorkflowTimeoutMinutes !== config.chainWorkflowTimeoutMinutes ||
-    form.rateLimitEnabled !== (config.rateLimitEnabled === 1) ||
-    form.rateLimitRequestsPerMinute !== config.rateLimitRequestsPerMinute ||
-    form.assistantChatTimeoutSeconds !== (config.assistantChatTimeoutSeconds ?? 240) ||
-    form.schedulerCatchUpOnResume !== ((config.schedulerCatchUpOnResume ?? 1) === 1) ||
-    form.schedulerResumeGraceMinutes !== (config.schedulerResumeGraceMinutes ?? 5) ||
-    form.runAutoResumeEnabled !== ((config.runAutoResumeEnabled ?? 1) === 1) ||
-    form.runAutoResumeDelaySeconds !== (config.runAutoResumeDelaySeconds ?? 30) ||
-    form.summarizationTimeoutSeconds !== (config.summarizationTimeoutSeconds ?? 120) ||
-    form.factoryTimeoutSeconds !== (config.factoryTimeoutSeconds ?? 600) ||
-    form.runRetentionDays !== (config.runRetentionDays ?? 90) ||
-    form.runRetentionMaxPerNight !== (config.runRetentionMaxPerNight ?? 200) ||
-    form.liveLogPersistDefault !== ((config.liveLogPersistDefault ?? 1) === 1) ||
-    form.dashboardLayoutRetentionCount !== (config.dashboardLayoutRetentionCount ?? 100) ||
-    form.dashboardReportAssistEnabled !== ((config.dashboardReportAssistEnabled ?? 1) === 1)
-  );
+  const hasChanges = formHasChanges(form, config);
 
   const fields: FieldConfig[] = [
     { key: 'maxRuns', label: t.settings.executionMaxConcurrentRuns, hint: t.settings.executionMaxConcurrentRunsHint, min: 1, max: 50, configKey: 'executionMaxConcurrent' },
@@ -161,36 +55,18 @@ export function ExecutionSettingsCard() {
     { key: 'dashboardLayoutRetentionCount', label: t.settings.dashboardLayoutRetentionCount, hint: t.settings.dashboardLayoutRetentionCountHint, min: 1, max: 1000, configKey: 'dashboardLayoutRetentionCount' },
   ];
 
-  const handleSave = () => {
-    updateConfig.mutate({
-      executionMaxConcurrent: form.executionMaxConcurrent,
-      claudeMaxConcurrentCalls: form.claudeMaxConcurrentCalls,
-      claudeReservedForInteractive: form.claudeReservedForInteractive,
-      piMaxConcurrentCalls: form.piMaxConcurrentCalls,
-      piReservedForInteractive: form.piReservedForInteractive,
-      codexMaxConcurrentCalls: form.codexMaxConcurrentCalls,
-      codexReservedForInteractive: form.codexReservedForInteractive,
-      aiCliMaxConcurrentCalls: form.aiCliMaxConcurrentCalls,
-      aiCliReservedForInteractive: form.aiCliReservedForInteractive,
-      claudeTimeoutSeconds: form.claudeTimeoutSeconds,
-      claudeInterCallDelayMs: form.claudeInterCallDelayMs,
-      chainWorkflowTimeoutMinutes: form.chainWorkflowTimeoutMinutes,
-      rateLimitEnabled: form.rateLimitEnabled ? 1 : 0,
-      rateLimitRequestsPerMinute: form.rateLimitRequestsPerMinute,
-      assistantChatTimeoutSeconds: form.assistantChatTimeoutSeconds,
-      schedulerCatchUpOnResume: form.schedulerCatchUpOnResume ? 1 : 0,
-      schedulerResumeGraceMinutes: form.schedulerResumeGraceMinutes,
-      runAutoResumeEnabled: form.runAutoResumeEnabled ? 1 : 0,
-      runAutoResumeDelaySeconds: form.runAutoResumeDelaySeconds,
-      summarizationTimeoutSeconds: form.summarizationTimeoutSeconds,
-      factoryTimeoutSeconds: form.factoryTimeoutSeconds,
-      runRetentionDays: form.runRetentionDays,
-      runRetentionMaxPerNight: form.runRetentionMaxPerNight,
-      liveLogPersistDefault: form.liveLogPersistDefault ? 1 : 0,
-      dashboardLayoutRetentionCount: form.dashboardLayoutRetentionCount,
-      dashboardReportAssistEnabled: form.dashboardReportAssistEnabled ? 1 : 0,
-    });
-  };
+  const toggles: ToggleConfig[] = [
+    { configKey: 'rateLimitEnabled', label: t.settings.executionRateLimitEnabled, hint: t.settings.executionRateLimitEnabledHint },
+    { configKey: 'schedulerCatchUpOnResume', label: t.settings.schedulerCatchUpOnResume, hint: t.settings.schedulerCatchUpOnResumeHint },
+    // Automatic resume of interrupted runs (TODO 90d10ba1)
+    { configKey: 'runAutoResumeEnabled', label: t.settings.runAutoResumeEnabled, hint: t.settings.runAutoResumeEnabledHint, named: true },
+    // Editor AI proposal for dashboard-report blocks
+    { configKey: 'dashboardReportAssistEnabled', label: t.settings.dashboardReportAssist, hint: t.settings.dashboardReportAssistHint },
+    // Keep finished runs' live logs; workflows can override it (TODO bbbfcbf8)
+    { configKey: 'liveLogPersistDefault', label: t.settings.liveLogPersistDefault, hint: t.settings.liveLogPersistDefaultHint, named: true },
+  ];
+
+  const handleSave = () => updateConfig.mutate(toPayload(form));
 
   if (isLoading) {
     return (
@@ -233,67 +109,19 @@ export function ExecutionSettingsCard() {
           </div>
         </div>
 
-        {/* Rate limiting toggle */}
-        <div className="flex items-center justify-between py-2">
-          <div>
-            <label className="block text-sm font-medium text-text">{t.settings.executionRateLimitEnabled}</label>
-            <p className="text-xs text-text-tertiary mt-0.5">{t.settings.executionRateLimitEnabledHint}</p>
+        {toggles.map(({ configKey, label, hint, named }) => (
+          <div key={configKey} className="flex items-center justify-between py-2">
+            <div>
+              <label className="block text-sm font-medium text-text">{label}</label>
+              <p className="text-xs text-text-tertiary mt-0.5">{hint}</p>
+            </div>
+            <Toggle
+              enabled={form[configKey]}
+              onChange={(v) => setForm(prev => ({ ...prev, [configKey]: v }))}
+              ariaLabel={named ? label : undefined}
+            />
           </div>
-          <Toggle
-            enabled={form.rateLimitEnabled}
-            onChange={(v) => setForm(prev => ({ ...prev, rateLimitEnabled: v }))}
-          />
-        </div>
-
-        {/* Catch-up on resume toggle */}
-        <div className="flex items-center justify-between py-2">
-          <div>
-            <label className="block text-sm font-medium text-text">{t.settings.schedulerCatchUpOnResume}</label>
-            <p className="text-xs text-text-tertiary mt-0.5">{t.settings.schedulerCatchUpOnResumeHint}</p>
-          </div>
-          <Toggle
-            enabled={form.schedulerCatchUpOnResume}
-            onChange={(v) => setForm(prev => ({ ...prev, schedulerCatchUpOnResume: v }))}
-          />
-        </div>
-
-        {/* Automatic resume of interrupted runs (TODO 90d10ba1) */}
-        <div className="flex items-center justify-between py-2">
-          <div>
-            <label className="block text-sm font-medium text-text">{t.settings.runAutoResumeEnabled}</label>
-            <p className="text-xs text-text-tertiary mt-0.5">{t.settings.runAutoResumeEnabledHint}</p>
-          </div>
-          <Toggle
-            enabled={form.runAutoResumeEnabled}
-            onChange={(v) => setForm(prev => ({ ...prev, runAutoResumeEnabled: v }))}
-            ariaLabel={t.settings.runAutoResumeEnabled}
-          />
-        </div>
-
-        {/* Editor AI proposal for dashboard-report blocks */}
-        <div className="flex items-center justify-between py-2">
-          <div>
-            <label className="block text-sm font-medium text-text">{t.settings.dashboardReportAssist}</label>
-            <p className="text-xs text-text-tertiary mt-0.5">{t.settings.dashboardReportAssistHint}</p>
-          </div>
-          <Toggle
-            enabled={form.dashboardReportAssistEnabled}
-            onChange={(v) => setForm(prev => ({ ...prev, dashboardReportAssistEnabled: v }))}
-          />
-        </div>
-
-        {/* Keep finished runs' live logs; workflows can override it (TODO bbbfcbf8) */}
-        <div className="flex items-center justify-between py-2">
-          <div>
-            <label className="block text-sm font-medium text-text">{t.settings.liveLogPersistDefault}</label>
-            <p className="text-xs text-text-tertiary mt-0.5">{t.settings.liveLogPersistDefaultHint}</p>
-          </div>
-          <Toggle
-            enabled={form.liveLogPersistDefault}
-            onChange={(v) => setForm(prev => ({ ...prev, liveLogPersistDefault: v }))}
-            ariaLabel={t.settings.liveLogPersistDefault}
-          />
-        </div>
+        ))}
 
         {/* AI CLI limits per provider and across all of them (TODO bd5df8d7) */}
         <CliLimitsTable form={form} onChange={(key, value) => setForm(prev => ({ ...prev, [key]: value }))} />
@@ -345,7 +173,7 @@ export function ExecutionSettingsCard() {
   );
 }
 
-type CliLimitKey = Extract<NumericFormKeys, `${string}MaxConcurrentCalls` | `${string}ReservedForInteractive`>;
+type CliLimitKey = Extract<NumericSettingKey, `${string}MaxConcurrentCalls` | `${string}ReservedForInteractive`>;
 
 /** One row per provider plus the overall limit; the bounds match ExecutionSettingKeys in the backend. */
 const CLI_LIMIT_ROWS: { id: string | null; max: CliLimitKey; reserved: CliLimitKey; maxLimit: number }[] = [
@@ -359,7 +187,7 @@ const CLI_LIMIT_ROWS: { id: string | null; max: CliLimitKey; reserved: CliLimitK
  * How many AI CLI processes may run at once, per provider and across all providers, and how many of those
  * slots stay free for the chat. A call needs a slot with its provider and one in the overall limit.
  */
-function CliLimitsTable({ form, onChange }: { form: FormState; onChange: (key: CliLimitKey, value: number) => void }) {
+function CliLimitsTable({ form, onChange }: { form: ExecutionSettingsForm; onChange: (key: CliLimitKey, value: number) => void }) {
   const t = useT();
   const ts = t.settings;
   return (
