@@ -1,55 +1,55 @@
 #!/usr/bin/env python3
-"""arch-findings.py — deterministische Einstufung fuer das Architektur-Review (TODO b8c06b94).
+"""arch-findings.py — deterministic grading for the architecture review (TODO b8c06b94).
 
-Liest die beiden Faktenblaetter (arch-metrics.sh fuer das Backend, frontend-metrics.sh fuer das
-Frontend) und gibt die Befunde samt Schwere aus. Der KI-Block des Reviews uebernimmt ruleKey,
-subject, severity und evidence unveraendert; er erklaert, ordnet ein und priorisiert, stuft aber
-nicht selbst ein. Vorher legte die KI die Schwere fest (WorkflowService HIGH trotz "Groesse nicht
-nachmessbar"), und harte Zeilenkanten erzeugten ein Tretrad.
+Reads the two fact sheets (arch-metrics.sh for the backend, frontend-metrics.sh for the
+frontend) and prints the findings with their severity. The AI block of the review takes over ruleKey,
+subject, severity and evidence unchanged; it explains, orders and prioritises, but does not
+grade by itself. Previously the AI set the severity (WorkflowService HIGH despite "Groesse nicht
+nachmessbar", i.e. size not remeasurable), and hard line limits produced a treadmill.
 
-Regeln (Schwellen unten als Konstanten, kalibriert am 2026-09-26 an der Verteilung von 1048
-Backend-Dateien und 598 Frontend-Modulen; die Begruendung steht an jeder Konstante):
+Rules (thresholds below as constants, calibrated on 2026-09-26 against the distribution of 1048
+backend files and 598 frontend modules; the reasoning is given at each constant):
 
-  Groesse in NCLOC (ncloc.py: ohne Leer-, Kommentar- und Importzeilen), in Baendern statt Kanten:
-    < 250 nichts | 250-400 Beobachtung | > 400 Befund MEDIUM | > 600 HIGH
-    CRITICAL nur Hotspot mit > 600 NCLOC UND > 10 Kollaborateuren.
-  Hotspot: mindestens HOTSPOT_MIN_CHANGES Aenderungen in 90 Tagen (## files, Spalte aenderungen).
-    Groessen- und Abhaengigkeitsbefunde gibt es NUR fuer Hotspots; grosse, stabile Dateien sind
-    hoechstens eine Beobachtung. Damit meldet das Review Dateien unter der 300-Zeilen-Grenze von
-    SourceSizeRatchetTest oder auf dessen ALLOWLIST nie wegen reiner Groesse (der Ratchet deckelt
-    sie schon), sondern nur als Hotspot; die Obergrenze steht dann in der evidence.
-  Abhaengigkeiten (Kollaborateure je Spring-Bean, nur Backend): ab 10 und nur fuer Hotspots ein
-    Befund arch.high-coupling, MEDIUM, HIGH mit Groesse ab dem Beobachtungsband. 5-9 ist kein
-    Befund; ab 10 ohne Hotspot eine Beobachtung.
-  Ein Befund je Datei, severity ist die hoehere Stufe: arch.high-coupling fuer einen reinen
-    Kopplungsbefund und fuer einen Groessenbefund mit mehr als 10 Kollaborateuren (Wechselgrenze wie
-    bis 4.5.2, Identitaet stabil), sonst arch.god-class (Backend) bzw. arch.god-component (Frontend).
-  Frontend: Groessenbefunde nur fuer .tsx-Komponenten; .ts-Module (Daten, i18n, Typen, Hooks)
-    sind hoechstens eine Beobachtung. Eine Kollaborateur-Zahl gibt es dort nicht, CRITICAL also nicht.
-  Paketkopplung (## coupling, Pakete und Verzeichnisse): KEIN Befund mehr, nur Trendzahl im Bericht.
-  Paketzyklen (## cycles + ## ratchet): Komponente > 2 Pakete HIGH, bekannt (alle Pakete in einer
-    Zeile von CYCLE_COMPONENTS) MEDIUM, CRITICAL wenn eines ihrer Paare nicht in ALLOWED_PAIRS steht
-    (nie herabgestuft). Paar ausserhalb einer gemeldeten Komponente: bekannt MEDIUM, sonst HIGH.
-  Schichtkanten (## packages): service -> controller CRITICAL, controller -> repository HIGH.
-  Frontend-Import-Zyklen (## cycles, nur Laufzeitkanten): jede Komponente HIGH, > 3 Module CRITICAL.
+  Size in NCLOC (ncloc.py: without blank, comment and import lines), in bands instead of limits:
+    < 250 nothing | 250-400 observation | > 400 finding MEDIUM | > 600 HIGH
+    CRITICAL only for a hotspot with > 600 NCLOC AND > 10 collaborators.
+  Hotspot: at least HOTSPOT_MIN_CHANGES changes in 90 days (## files, column aenderungen).
+    Size and dependency findings exist ONLY for hotspots; large, stable files are
+    at most an observation. The review therefore never reports files under the 300-line limit of
+    SourceSizeRatchetTest or on its ALLOWLIST for size alone (the ratchet caps
+    them already), only as a hotspot; the ceiling is then given in the evidence.
+  Dependencies (collaborators per Spring bean, backend only): from 10 and only for hotspots a
+    finding arch.high-coupling, MEDIUM, HIGH with size from the observation band on. 5-9 is no
+    finding; from 10 without a hotspot an observation.
+  One finding per file, severity is the higher level: arch.high-coupling for a pure
+    coupling finding and for a size finding with more than 10 collaborators (switch limit as
+    up to 4.5.2, identity stable), otherwise arch.god-class (backend) or arch.god-component (frontend).
+  Frontend: size findings only for .tsx components; .ts modules (data, i18n, types, hooks)
+    are at most an observation. There is no collaborator count there, so no CRITICAL.
+  Package coupling (## coupling, packages and directories): NO finding any more, only a trend number in the report.
+  Package cycles (## cycles + ## ratchet): component > 2 packages HIGH, known (all packages in one
+    line of CYCLE_COMPONENTS) MEDIUM, CRITICAL if one of their pairs is not in ALLOWED_PAIRS
+    (never downgraded). Pair outside a reported component: known MEDIUM, otherwise HIGH.
+  Layer edges (## packages): service -> controller CRITICAL, controller -> repository HIGH.
+  Frontend import cycles (## cycles, runtime edges only): every component HIGH, > 3 modules CRITICAL.
 
-Kandidaten fuer das Urteil (TODO e0e9495f, Review 4.7.0): ## review_candidates nennt die Dateien,
-deren Quelltext die KI im Review liest und beurteilt (Verantwortlichkeiten, lohnt ein Schnitt, passt
-der Ort). Das Skript waehlt aus, die KI urteilt; Urteilsbefunde tragen die ruleKeys aus
-JUDGMENT_RULE_KEYS und als subject genau eine Zeile dieser Liste. Gewaehlt werden nur Backend-Klassen
-(.java) und Frontend-Komponenten (.tsx):
-    hotspot  bis REVIEW_HOTSPOTS Dateien mit mindestens HOTSPOT_MIN_CHANGES Aenderungen, die einen
-             Datei-Befund oder eine Beobachtung haben — Befunde zuerst, dann nach Aenderungen, NCLOC
-    neu      bis REVIEW_NEW Dateien, die in den letzten 7 Tagen angelegt wurden (## recent), ab
-             REVIEW_NEW_MIN_NCLOC NCLOC, nach NCLOC
-    dublette bis REVIEW_DUPLICATES dateiuebergreifende Duplikate aus CPD (--cpd, TODO 67128699), nach
-             Zeilen; subject ist die erste noch nicht gewaehlte Datei, die anderen Stellen stehen in angaben
-Die Spalte aenderungen_7d sagt dem Report, ob sich die Datei seit dem letzten Takt geaendert hat:
-Ein bekanntes Urteil zu einer unveraenderten Datei fuehrt er weiter, statt es neu zu faellen.
+Candidates for the judgment (TODO e0e9495f, review 4.7.0): ## review_candidates names the files
+whose source the AI reads and judges in the review (responsibilities, is a split worth it, does it fit
+the place). The script selects, the AI judges; judgment findings carry the ruleKeys from
+JUDGMENT_RULE_KEYS and exactly one line of this list as subject. Only backend classes
+(.java) and frontend components (.tsx) are chosen:
+    hotspot  up to REVIEW_HOTSPOTS files with at least HOTSPOT_MIN_CHANGES changes that have a
+             file finding or an observation — findings first, then by changes, NCLOC
+    neu      up to REVIEW_NEW files created in the last 7 days (## recent), from
+             REVIEW_NEW_MIN_NCLOC NCLOC, by NCLOC
+    dublette up to REVIEW_DUPLICATES cross-file duplicates from CPD (--cpd, TODO 67128699), by
+             lines; subject is the first file not yet chosen, the other places are in angaben
+The column aenderungen_7d tells the report whether the file has changed since the last cycle:
+It carries a known judgment on an unchanged file forward instead of making it anew.
 
-Nicht gemessene Dimensionen (Blatt fehlt, jdeps/Scan gescheitert, cycles_state != ok,
-unaufgeloeste Importe, kein git oder flacher Klon, NCLOC- oder Kollaborateur-Zaehlung gescheitert) stehen als not_measured= in ## findings_summary; fuer sie gibt
-es keine Befunde, und der Report fuehrt bekannte Befunde dieser Dimension unveraendert weiter.
+Dimensions not measured (sheet missing, jdeps/scan failed, cycles_state != ok,
+unresolved imports, no git or shallow clone, NCLOC or collaborator count failed) are listed as not_measured= in
+## findings_summary; there are no findings for them, and the report carries forward known findings of that dimension unchanged.
 
 Tools (optional, TODO 67128699 and c608cdda, see arch_tools.py): --cpd <language>=<file> (CSV of pmd cpd,
 once per language), --pmd <file> (SARIF fact sheet of pmd check), --jscpd <file> (SARIF fact sheet of jscpd:
@@ -72,13 +72,13 @@ matching FAKT line. A judgment the report carries forward unchanged thus cites a
 its file is no candidate. Of the block only ruleKey, status and a path-like subject are read: it is data
 from AI output and user input.
 
-Aufruf:  arch-findings.py <backend-faktenblatt> [<frontend-faktenblatt>] [--cpd java=<datei>]
-                          [--cpd typescript=<datei>] [--pmd <datei>] [--jscpd <datei>] [--lizard <datei>]
-                          [--known <datei>]
-         Eine fehlende oder leere Datei gilt als nicht gemessen, kein Abbruch.
-Ausgabe: ## findings, ## observations, ## review_candidates, ## known_judgments, ## duplicates,
-         ## complexity, ## bands, ## findings_summary, ## FAKTENBLATT arch — stabil sortiert.
-Exit:    0 immer (Faktenblatt fuer einen nachgelagerten Auswerter, kein Gate); 2 bei falschem Aufruf.
+Usage:   arch-findings.py <backend-sheet> [<frontend-sheet>] [--cpd java=<file>]
+                          [--cpd typescript=<file>] [--pmd <file>] [--jscpd <file>] [--lizard <file>]
+                          [--known <file>]
+         A missing or empty file counts as not measured, no abort.
+Output:  ## findings, ## observations, ## review_candidates, ## known_judgments, ## duplicates,
+         ## complexity, ## bands, ## findings_summary, ## FAKTENBLATT arch — stably sorted.
+Exit:    0 always (fact sheet for a downstream evaluator, no gate); 2 on wrong usage.
 """
 import os
 import re
@@ -86,31 +86,31 @@ import sys
 
 import arch_tools
 
-# NCLOC-Baender. Heute (2026-09-26): Backend 13 Dateien ab 250, 7 ab 300, keine ueber 400 — der
-# Ratchet (300 rohe Zeilen, Obergrenzen bis 450) haelt das Backend unter dem Befundband. Frontend
-# 11 Module ab 250, 7 ueber 400 (davon 2 .tsx), 4 ueber 600 (alles Daten: i18n, Typen, Anleitungen).
-# 250 liegt ueber dem Grossteil (Backend 96 %, Frontend 93 % darunter), 400 trennt die Handvoll
-# echter Brocken ab, 600 die Ausreisser.
-BAND_OBSERVE = 250   # ab hier Beobachtung
-BAND_FINDING = 400   # darueber Befund (MEDIUM), nur Hotspot
-BAND_HIGH = 600      # darueber HIGH; mit > DEPS_CRITICAL Kollaborateuren CRITICAL
+# NCLOC bands. Today (2026-09-26): backend 13 files from 250, 7 from 300, none above 400 — the
+# ratchet (300 raw lines, ceilings up to 450) keeps the backend below the finding band. Frontend
+# 11 modules from 250, 7 above 400 (of which 2 .tsx), 4 above 600 (all data: i18n, types, guides).
+# 250 is above the bulk (backend 96 %, frontend 93 % below), 400 separates the handful
+# of real chunks, 600 the outliers.
+BAND_OBSERVE = 250   # observation from here
+BAND_FINDING = 400   # above: finding (MEDIUM), hotspot only
+BAND_HIGH = 600      # above: HIGH; with > DEPS_CRITICAL collaborators CRITICAL
 
-# Hotspot-Schwelle. 90 Tage = rund 1600 Commits; von den geaenderten Dateien hat die Haelfte
-# 1-2 Aenderungen. Ab 5 Aenderungen bleiben rund 11 % der geaenderten Backend-Dateien (93 von
-# 847) und 15 % der Frontend-Dateien — oft angefasst, aber nicht jede.
+# Hotspot threshold. 90 days = around 1600 commits; of the changed files, half have
+# 1-2 changes. From 5 changes on, around 11 % of the changed backend files remain (93 of
+# 847) and 15 % of the frontend files — often touched, but not every one.
 HOTSPOT_MIN_CHANGES = 5
 
-# Kollaborateure: 4 Beans haben heute 10 oder mehr (16, 16, 14, 10), 8 haben 8-9 — Spring-
-# Orchestratoren mit 6-9 schmalen Services sind der Normalfall, kein Befund.
-DEPS_FINDING = 10    # ab hier Kopplungsbefund (nur Hotspot)
-DEPS_CRITICAL = 10   # darueber (also ab 11) zusammen mit > BAND_HIGH NCLOC: CRITICAL
+# Collaborators: 4 beans have 10 or more today (16, 16, 14, 10), 8 have 8-9 — Spring
+# orchestrators with 6-9 narrow services are the normal case, no finding.
+DEPS_FINDING = 10    # from here a coupling finding (hotspot only)
+DEPS_CRITICAL = 10   # above (so from 11) together with > BAND_HIGH NCLOC: CRITICAL
 
 FRONTEND_CYCLE_CRITICAL = 3  # Frontend-Import-Zyklus mit mehr Modulen: CRITICAL
 
-# Kandidaten fuer das Urteil. Am 2026-10-05 erfuellten 3 Backend-Dateien mit Befund und rund 10
-# Hotspot-Beobachtungen (.java/.tsx) die Hotspot-Regel, und in 7 Tagen kamen 136 Dateien neu dazu,
-# die meisten unter 100 NCLOC. Sechs Hotspots und drei neue Dateien halten das Lesen bei rund
-# 2500 Zeilen Quelltext je Lauf — genug fuer ein Urteil, ohne jede Woche alles zu lesen.
+# Candidates for the judgment. On 2026-10-05, 3 backend files with a finding and around 10
+# hotspot observations (.java/.tsx) met the hotspot rule, and in 7 days 136 files were added,
+# most of them under 100 NCLOC. Six hotspots and three new files keep the reading at around
+# 2500 lines of source per run — enough for a judgment, without reading everything every week.
 REVIEW_HOTSPOTS = 6
 REVIEW_NEW = 3
 REVIEW_NEW_MIN_NCLOC = 100
@@ -121,18 +121,18 @@ REVIEW_DUPLICATES = 3
 DUPLICATES_LISTED = 10
 CPD_LANGUAGES = ("java", "typescript")
 
-# Faktenblatt-Fehler, nach denen Groessen und Hotspots nicht gemessen sind. Ohne Git-Historie (kein
-# Repo, flacher Klon) fehlen die Aenderungen, also jeder Hotspot; ohne NCLOC bzw. Kollaborateur-
-# Zaehlung fehlen Groesse bzw. deps. Die Einstufung saehe sonst sauber aus, und bekannte Befunde
-# liefen still aus.
+# Fact sheet errors after which sizes and hotspots are not measured. Without git history (no
+# repo, shallow clone) the changes are missing, hence every hotspot; without NCLOC or collaborator
+# count, size or deps are missing. The grading would otherwise look clean, and known findings
+# would silently expire.
 BACKEND_SIZE_ERRORS = {"source_missing", "no_git_repo", "shallow_history", "ncloc_failed", "collaborators_failed"}
 FRONTEND_SIZE_ERRORS = {"no_git_repo", "shallow_history", "ncloc_failed"}
 
 SEVERITY_RANK = {"MEDIUM": 1, "HIGH": 2, "CRITICAL": 3}
 RULE_KEYS = ("arch.god-class", "arch.god-component", "arch.high-coupling",
              "arch.cross-layer-violation", "arch.package-cycle")
-# Vergibt nicht das Skript, sondern das Urteil der KI ueber ## review_candidates (hoechstens MEDIUM).
-# Prompt und Katalog muessen beide Listen zusammen fuehren (test-arch-findings.sh, Abschnitt 10).
+# Not assigned by the script, but by the AI's judgment over ## review_candidates (at most MEDIUM).
+# Prompt and catalog must both bring the lists together (test-arch-findings.sh, section 10).
 JUDGMENT_RULE_KEYS = ("arch.mixed-responsibility", "arch.misplaced-logic")
 # Fields of an {{ audit_findings }} row that --known reads; anything else in the row is ignored.
 KNOWN_STATUS = re.compile(r"^[A-Z_]+$")
@@ -140,7 +140,7 @@ KNOWN_SUBJECT = re.compile(r"^[A-Za-z0-9_./-]+$")
 
 
 def read_sheet(path):
-    """{abschnitt: [zeilen ohne Kommentare]}; None, wenn die Datei fehlt oder leer ist."""
+    """{section: [lines without comments]}; None if the file is missing or empty."""
     if not path or path == "-" or not os.path.isfile(path):
         return None
     sections, current = {}, None
@@ -259,8 +259,8 @@ class Classifier:
 
         severity = higher(size_sev, coupling_sev)
         if severity:
-            # Wechselgrenze wie bis 4.5.2: ein Groessenbefund wird erst ab mehr als DEPS_CRITICAL
-            # Kollaborateuren zu arch.high-coupling, damit seine Identitaet bei genau 10 stabil bleibt.
+            # Switch limit as up to 4.5.2: a size finding only becomes arch.high-coupling from more than DEPS_CRITICAL
+            # collaborators, so that its identity stays stable at exactly 10.
             if coupling_sev and (size_sev is None or deps > DEPS_CRITICAL):
                 rule = "arch.high-coupling"
             else:
@@ -432,7 +432,7 @@ class Classifier:
 
     # ------------------------------------------------------------------ Kandidaten
     def candidates(self):
-        """[(art, subject, aenderungen_7d, angaben)]: erst Hotspots, dann neue Dateien."""
+        """[(art, subject, aenderungen_7d, angaben)]: hotspots first, then new files."""
         def reviewable(subject):
             return subject.endswith(".java") or subject.endswith(".tsx")
 
@@ -455,7 +455,7 @@ class Classifier:
         for lines, tokens, places in self.alternating_duplicates():
             if picked >= REVIEW_DUPLICATES:
                 break
-            # .ts zaehlt hier mit: eine doppelte Hook- oder Hilfsfunktion ist genau die Frage "verlagern".
+            # .ts counts here: a duplicated hook or helper function is exactly the "move" question.
             free = [(s, line) for s, line in places if s not in chosen and (s in self.files or s.endswith(".java"))]
             if not free:
                 continue
@@ -651,7 +651,7 @@ def fact_name(subject):
 
 
 def parse_files(lines, backend):
-    """[(ncloc, zeilen, aenderungen, deps|None, pfad)] aus ## files; None ohne verwertbare Zeile."""
+    """[(ncloc, zeilen, aenderungen, deps|None, pfad)] from ## files; None without a usable line."""
     if lines is None:
         return None
     rows = []
@@ -684,7 +684,7 @@ USAGE = ("Aufruf: arch-findings.py <backend-faktenblatt> [<frontend-faktenblatt>
 
 
 def read_text(path):
-    """Inhalt einer Werkzeug-Ausgabe; eine fehlende Datei ist leer (= nicht gemessen)."""
+    """Content of a tool output; a missing file is empty (= not measured)."""
     if not path or not os.path.isfile(path):
         return ""
     with open(path, "r", encoding="utf-8", errors="replace") as handle:

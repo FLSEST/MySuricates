@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
-# Tests fuer scripts/public-readiness/arch-metrics.sh und arch_cycles.py (TODO 29173b90).
-# Run: bash scripts/tests/test-arch-metrics.sh   (exit 0 = alle Checks ok)
+# Tests for scripts/public-readiness/arch-metrics.sh and arch_cycles.py (TODO 29173b90).
+# Run: bash scripts/tests/test-arch-metrics.sh   (exit 0 = all checks ok)
 #
-# Zeitbudget: der Lauf gegen das echte Repo startet bei fehlendem
-# ai-automation-backend/target/classes einmalig `./mvnw -q -DskipTests compile` (~1-2 Minuten).
-# Danach laufen beide Durchgaenge aus dem vorhandenen target/classes (~5 s je Lauf).
-# Die Fixture-Laeufe (Abschnitte 6 und 7) brauchen nur javac und dauern Sekunden.
+# Time budget: the run against the real repo starts, if
+# ai-automation-backend/target/classes is missing, a one-off `./mvnw -q -DskipTests compile` (~1-2 minutes).
+# After that both passes run from the existing target/classes (~5 s per run).
+# The fixture runs (sections 6 and 7) need only javac and take seconds.
 set -uo pipefail
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -13,7 +13,7 @@ REPO="$(cd "$HERE/../.." && pwd)"
 SCRIPT="$REPO/scripts/public-readiness/arch-metrics.sh"
 CYCLES="$REPO/scripts/public-readiness/arch_cycles.py"
 TMP="$(mktemp -d)"; trap 'rm -rf "$TMP"' EXIT
-# Kein Testlauf schreibt in den echten Kompilat-Cache des Entwicklers.
+# No test run writes to the developer's real compile cache.
 export AUTOMATION_ARCH_CACHE="$TMP/arch-cache-default"
 PASS=0; FAIL=0
 TAB="$(printf '\t')"
@@ -22,7 +22,7 @@ check() {  # $1 = label, $2 = shell condition
   if eval "$2"; then echo "  ok   $1"; PASS=$((PASS + 1)); else echo "  FAIL $1"; FAIL=$((FAIL + 1)); fi
 }
 
-expect_cycles() {  # $1 = label, $2 = Kantenliste, $3 = erwartete Ausgabe
+expect_cycles() {  # $1 = label, $2 = edge list, $3 = expected output
   printf '%s' "$2" > "$TMP/edges.tsv"
   python3 "$CYCLES" < "$TMP/edges.tsv" > "$TMP/cycles.out" 2> "$TMP/cycles.err"
   local rc=$?
@@ -35,8 +35,8 @@ expect_cycles() {  # $1 = label, $2 = Kantenliste, $3 = erwartete Ausgabe
   fi
 }
 
-# Alles vor "## run" ist der gemessene, deterministische Teil; "## run" traegt den
-# Laufzeit-Zustand (compile=/jdeps=) und ist ausdruecklich nicht vergleichbar.
+# Everything before "## run" is the measured, deterministic part; "## run" carries the
+# runtime state (compile=/jdeps=) and is explicitly not comparable.
 measured() { sed '/^## run$/,$d' "$1"; }
 
 echo "0) Dateien vorhanden"
@@ -165,7 +165,7 @@ check "Pool-Vertrag (Reihenfolge, Name, Prompt)" 'python3 - "$POOL" <<'"'"'PY'"'
 import json, sys
 wf = json.load(open(sys.argv[1]))
 blocks = wf["blocks"]
-# Nach Namen: seit b8c06b94 ruft auch der Block arch_metrics frontend-metrics.sh auf (fuer die Einstufung).
+# By name: since b8c06b94 the arch_metrics block also calls frontend-metrics.sh (for the grading).
 i_metrics = next(i for i, b in enumerate(blocks) if b.get("name") == "arch_metrics")
 assert "arch-metrics.sh" in blocks[i_metrics]["config"].get("command", ""), "Block arch_metrics ruft arch-metrics.sh nicht auf"
 i_report = next(i for i, b in enumerate(blocks) if b.get("name") == "report")
@@ -176,7 +176,7 @@ assert name, "Metrik-Block braucht einen Namen"
 assert metrics["config"].get("timeout_seconds") == 600
 command = metrics["config"]["command"]
 assert "set -euo pipefail" in command, "Shell-Block ohne set -euo pipefail"
-# b8c06b94: die Einstufung laeuft im selben Block, aus beiden Faktenblaettern.
+# b8c06b94: the grading runs in the same block, from both fact sheets.
 assert "arch-findings.py" in command and "frontend-metrics.sh" in command, "Einstufung fehlt im Metrik-Block"
 assert command.index("arch-findings.py") < command.index("awk"), "## findings muss vor dem Backend-Blatt stehen"
 assert "not_measured=classification" in command, "fehlendes Einstufungsskript muss als nicht gemessen erscheinen"
@@ -186,11 +186,11 @@ assert "mysuricates:audit-result:v1" in prompt, "Envelope fehlt"
 assert "gate_status:" in prompt, "Gate-Marker fehlt"
 assert "Miss nichts selbst" in prompt, "Interpretations-Anweisung fehlt"
 assert "Fehlt das Faktenblatt ganz" in prompt, "Regel fuer fehlendes Faktenblatt fehlt"
-# Rollenteilung: Befunde und Schwere kommen unveraendert aus ## findings, die KI stuft nicht selbst ein.
+# Division of roles: findings and severity come unchanged from ## findings, the AI does not grade by itself.
 assert "## findings" in prompt and "UNVERAENDERT" in prompt, "Uebernahme aus ## findings fehlt"
 assert "keine eigene Schwere" in prompt, "KI darf keine eigene Schwere vergeben"
 assert "not_measured" in prompt, "nicht gemessene Dimensionen fehlen im Prompt"
-# Die alten Kanten sind weg: keine rohen Zeilenkanten, keine Paketkopplung als Befund.
+# The old edges are gone: no raw line edges, no package coupling as a finding.
 for gone in (">200 Zeilen", ">300 Zeilen", ">5 Abhaengigkeiten", ">7 Abhaengigkeiten", "herabstufen",
              "Backend-Paket (Paketkopplung)", "Pakete und Verzeichnisse bekommen arch.high-coupling",
              "arch.duplicated-logic"):
@@ -202,8 +202,8 @@ assert "Regelwechsel 4.6.0" not in prompt, "die einmalige Erklaerung von 4.6.0 i
 assert "NCLOC" in prompt and "Hotspot" in prompt, "NCLOC-Baender und Hotspot-Regel fehlen"
 assert "nur Kollaborateure" in prompt, "Zahl meint Kollaborateure"
 assert wf["version"] == "4.11.0", wf["version"]
-# 67128699: PMD aus automation-agent-analysis misst Duplikate (CPD je Sprache, CSV) und Komplexitaet (SARIF);
-# die Werkzeug-Bloecke laufen vor arch_metrics, das ihre Ausgaben an arch-findings.py reicht.
+# 67128699: PMD from automation-agent-analysis measures duplicates (CPD per language, CSV) and complexity (SARIF);
+# the tool blocks run before arch_metrics, which hands their outputs on to arch-findings.py.
 tool_blocks = {b.get("name"): b for b in blocks if b["config"].get("container_args")}
 # 2c07ce7e: the PMD block is pmd_design, because the evidence check of the platform ignores fact names under 4 characters.
 assert set(tool_blocks) == {"cpd_java", "jscpd", "pmd_design", "lizard"}, set(tool_blocks)
@@ -216,7 +216,7 @@ assert "--no-fail-on-violation" in tool_blocks["cpd_java"]["config"]["container_
 assert tool_blocks["pmd_design"]["config"].get("output_format") == "sarif"
 assert "/workspace/scripts/public-readiness/pmd-architecture.xml" in tool_blocks["pmd_design"]["config"]["container_args"]
 assert "--cpd java=" in command and "--jscpd " in command and "--pmd " in command and "--lizard " in command, "Werkzeug-Fakten fehlen in der Einstufung"
-# c608cdda: jscpd misst das Frontend samt .tsx per SARIF, lizard die Komplexitaet je Frontend-Funktion.
+# c608cdda: jscpd measures the frontend including .tsx via SARIF, lizard the complexity per frontend function.
 assert tool_blocks["jscpd"]["config"].get("output_format") == "sarif" and "tsx" in ",".join(tool_blocks["jscpd"]["config"]["container_args"])
 assert "-i" in tool_blocks["lizard"]["config"]["container_args"], "lizard endet sonst bei Warnungen mit Exit 1"
 for name in ("cpd_java", "jscpd", "pmd_design", "lizard"):
@@ -231,7 +231,7 @@ for marker in ("## known_judgments", "Text hinter \"Beleg: \"", "existiert \"nei
 assert "sonst \"unveraendert seit dem letzten Urteil\"" not in prompt, "carried-forward judgments must keep their evidence"
 for marker in ("## duplicates", "## complexity", "art dublette", "frontend_complexity_state", "nie ein eigener Befund"):
     assert marker in prompt, "Werkzeug-Fakten im Prompt unvollstaendig: " + marker
-# e0e9495f: das Skript waehlt Kandidaten, arch-seams.py misst ihre Schnittkanten, die KI urteilt.
+# e0e9495f: the script chooses candidates, arch-seams.py measures their seams, the AI judges.
 assert "ARCH_METRICS_CLASSES_OUT=" in command and "arch-seams.py" in command, "Seams fehlen im Metrik-Block"
 assert command.index("python3 scripts/public-readiness/arch-findings.py") < command.index("python3 scripts/public-readiness/arch-seams.py"), "Seams brauchen die Kandidaten der Einstufung"
 assert "\"## recent\"" in command, "## recent muss wie ## files aus dem Backend-Blatt gefiltert werden"
@@ -246,15 +246,15 @@ gate = next(b for b in blocks if b["config"].get("label", "").startswith("Gate-V
 assert "{{ block.arch_metrics.output }}" in gate and "review_candidates" in gate, "Gate prueft das Urteil nicht"
 delta = next(b for b in blocks if b.get("name") == "delta_scan")
 assert delta["config"].get("timeout_seconds", 0) >= 180, "Struktur-Scan braucht Luft fuer Last"
-# Die Kollaborateur-Zaehlung und die Ratchet-Listen leben seit 4.6.0 in arch-metrics.sh.
+# The collaborator count and the ratchet lists have lived in arch-metrics.sh since 4.6.0.
 assert "NON_COLLAB_RE" not in delta["config"]["command"], "Kollaborateur-Zaehlung doppelt"
 PY'
 
 echo "5b) Faktenblatt zaehlt je Spring-Bean nur Kollaborateure (59e22c53, seit b8c06b94 in ## files)"
-# Werkzeuge, Konfigurationswerte und Zustand sind keine Abhaengigkeiten: gezaehlt werden nur
-# injizierte "private final <Typ> <name>;"-Felder ausserhalb der Ausschlussliste. Eine List/Map/Set
-# ohne Initialisierer ist eine injizierte Bean-Sammlung und zaehlt mit; Deque, Atomic* und Locks
-# ohne Initialisierer bleiben Zustand, Felder mit Initialisierer zaehlen nie.
+# Tools, configuration values and state are no dependencies: only injected
+# "private final <type> <name>;" fields outside the exclusion list are counted. A List/Map/Set
+# without an initializer is an injected bean collection and counts; Deque, Atomic* and locks
+# without an initializer remain state, fields with an initializer never count.
 SCAN_FIX="$TMP/scan-fixture"
 SCAN_MAIN="$SCAN_FIX/ai-automation-backend/src/main/java/com/automation/service"
 mkdir -p "$SCAN_MAIN"
@@ -286,9 +286,9 @@ mkdir -p "$SCAN_MAIN"
   for i in $(seq 1 200); do echo "    // filler $i"; done
   echo "}"
 } > "$SCAN_MAIN/PlainEvent.java"
-# Nur Felder der aeusseren Klasse (e8226de2): RunStatistics.runs und .totals sind Zustand eines
-# Wertobjekts. Die Klammer hinter https:// im Javadoc, die in Literalen und die im Textblock duerfen
-# die Tiefe nicht verschieben, sonst fiele lateCollaborator als Feld der Bean heraus.
+# Only fields of the outer class (e8226de2): RunStatistics.runs and .totals are the state of a
+# value object. The brace after https:// in the Javadoc, those in literals and the one in the text block must not
+# shift the depth, otherwise lateCollaborator would drop out as a field of the bean.
 { echo "package com.automation.service;"
   echo "/**"
   echo " * Zaehlt Laeufe, Quelle {@code https://example.invalid/runs}."
@@ -309,30 +309,30 @@ mkdir -p "$SCAN_MAIN"
   for i in $(seq 1 200); do echo "    // filler $i"; done
   echo "}"
 } > "$SCAN_MAIN/StatsService.java"
-metrics_on() {  # $1 = Wurzel, $2 = Ausgabe — ohne Kompilieren, nur Quelltext-Abschnitte zaehlen hier
+metrics_on() {  # $1 = root, $2 = output — without compiling, only the source sections count here
   ARCH_METRICS_COMPILE=0 bash "$SCRIPT" "$1" > "$2" 2> /dev/null
 }
-files_row() {  # $1 = Ausgabe, $2 = Pfad unter src/main/java -> Spalte deps der ## files-Zeile
+files_row() {  # $1 = output, $2 = path under src/main/java -> column deps of the ## files line
   sed -n '/^## files$/,/^## ratchet$/p' "$1" | awk -F'\t' -v p="$2" '$5 == p { print $4 }'
 }
 metrics_on "$SCAN_FIX" "$TMP/scan-metrics.out"
-# 6 einzelne Kollaborateure + die injizierte List<BlockExecutor> = 7.
+# 6 individual collaborators + the injected List<BlockExecutor> = 7.
 check "BusyService: 7 Kollaborateure"            '[ "$(files_row "$TMP/scan-metrics.out" com/automation/service/BusyService.java)" = 7 ]'
 check "Nicht-Bean ohne deps (-)"                 '[ "$(files_row "$TMP/scan-metrics.out" com/automation/service/PlainEvent.java)" = - ]'
-# 6 Kollaborateure + lateCollaborator = 7; die zwei Felder der inneren Klasse zaehlen nicht.
+# 6 collaborators + lateCollaborator = 7; the two fields of the inner class do not count.
 check "StatsService: ohne Felder innerer Klassen" '[ "$(files_row "$TMP/scan-metrics.out" com/automation/service/StatsService.java)" = 7 ]'
 check "summary zaehlt zwei Beans"                'grep -qx "beans=2" "$TMP/scan-metrics.out"'
 check "## files nennt NCLOC, Zeilen und Aenderungen je Datei" \
   "sed -n '/^## files\$/,/^## ratchet\$/p' '$TMP/scan-metrics.out' | grep -E '^[0-9]+${TAB}[0-9]+${TAB}[0-9]+${TAB}(-|[0-9]+)${TAB}com/automation/service/BusyService\.java\$' >/dev/null"
-# NCLOC der Bean: 3 Kopfzeilen + 21 Felder + schliessende Klammer; die 200 Filler-Kommentare zaehlen nicht.
+# NCLOC of the bean: 3 header lines + 21 fields + closing brace; the 200 filler comments do not count.
 check "BusyService: NCLOC ohne Kommentarzeilen (25 von 225 Zeilen)" \
   "sed -n '/^## files\$/,/^## ratchet\$/p' '$TMP/scan-metrics.out' | grep -x '25${TAB}225${TAB}0${TAB}7${TAB}com/automation/service/BusyService.java' >/dev/null"
 
 echo "5c) Faktenblatt nennt die Grenzen der Architektur-Tests (810b12e9, seit b8c06b94 in ## ratchet)"
-# PackageCycleRatchetTest haelt jede Zyklus-Komponente mit mehr als zwei Paketen fest. ## ratchet gibt sie
-# aus wie die cycle-Zeilen von ## cycles (Groesse, Mitglieder sortiert), dazu ALLOWED_PAIRS und die
-# ALLOWLIST von SourceSizeRatchetTest — die Einstufung stuft danach herab bzw. nennt die Obergrenze.
-ratchet_lines() {  # $1 = Ausgabe, $2 = Art -> Zeilen dieser Art aus ## ratchet
+# PackageCycleRatchetTest pins every cycle component with more than two packages. ## ratchet prints them
+# like the cycle lines of ## cycles (size, members sorted), plus ALLOWED_PAIRS and the
+# ALLOWLIST of SourceSizeRatchetTest — the grading then downgrades or names the ceiling.
+ratchet_lines() {  # $1 = output, $2 = kind -> lines of this kind from ## ratchet
   sed -n '/^## ratchet$/,/^## summary$/p' "$1" | awk -F'\t' -v k="$2" '$1 == k'
 }
 ARCH_TESTS="ai-automation-backend/src/test/java/com/automation/architecture"
@@ -384,8 +384,8 @@ check "ALLOWLIST mit Obergrenze je Datei" \
 check "state ok und MAX_LINES gelesen" \
   'ratchet_lines "$TMP/ratchet-fix.out" state | grep -x "state${TAB}ok" >/dev/null && ratchet_lines "$TMP/ratchet-fix.out" max_lines | grep -x "max_lines${TAB}300" >/dev/null'
 check "summary nennt ratchet_state=ok" 'grep -qx "ratchet_state=ok" "$TMP/ratchet-fix.out"'
-# Die echten Testdateien: faellt ihre Schreibweise aus dem Muster, faellt es hier auf und nicht erst im
-# Review (dort hiesse ein leerer Abschnitt nur "nicht herabstufen").
+# The real test files: if their spelling falls out of the pattern, it shows up here and not only in the
+# review (where an empty section would just read "nicht herabstufen", i.e. do not downgrade).
 REAL_CYCLES="$REPO/$ARCH_TESTS/PackageCycleRatchetTest.java"
 REAL_SIZES="$REPO/$ARCH_TESTS/SourceSizeRatchetTest.java"
 mkdir -p "$TMP/scan-real/$ARCH_TESTS"
@@ -404,8 +404,8 @@ check "echter Test: jede Zeile nennt so viele Pakete wie ihre Groesse" \
   'awk -F"\t" "{ if (split(\$3, m, \",\") != \$2) bad++ } END { exit (bad > 0) }" "$TMP/real-cycle-lines.txt"'
 check "echter Test: jede ALLOWLIST-Zeile gelesen" \
   '[ "$REAL_ENTRIES" -ge 1 ] && [ "$(ratchet_lines "$TMP/ratchet-real.out" allowlist | wc -l)" -eq "$REAL_ENTRIES" ]'
-# Leere ALLOWED_PAIRS (seit 759b9fba der echte Stand) darf nicht wie ein Muster aussehen, das nicht mehr
-# greift: der Abschnitt nennt dann ausdruecklich "(keine)" (TODO ca0df066).
+# Empty ALLOWED_PAIRS (the real state since 759b9fba) must not look like a pattern that no longer
+# matches: the section then says explicitly "(keine)" (TODO ca0df066).
 REAL_PAIRS="$(sed -n '/ALLOWED_PAIRS = Set.of(/,/);/p' "$REAL_CYCLES" | grep -c '<->')"
 check "echter Test: ALLOWED_PAIRS zeigt Paare oder (keine), nie nichts" \
   'if [ "$REAL_PAIRS" -ge 1 ]; then [ "$(ratchet_lines "$TMP/ratchet-real.out" pair | wc -l)" -eq "$REAL_PAIRS" ];
@@ -427,9 +427,9 @@ check "ohne Testdateien: state missing statt einer leeren Liste" \
   '[ "$(ratchet_lines "$TMP/ratchet-none.out" state)" = "state${TAB}missing" ] && grep -qx "ratchet_state=missing" "$TMP/ratchet-none.out"'
 
 # ---------------------------------------------------------------------------
-# Fixture-Repo: zwei Pakete mit wechselseitiger Abhaengigkeit, eine leere Datei,
-# ein mvnw-Stub, der mit javac nach target/classes baut. Damit laeuft der
-# Selbst-Kompilier-Pfad wirklich durch, statt nur behauptet zu werden.
+# Fixture repo: two packages with a mutual dependency, an empty file,
+# an mvnw stub that builds into target/classes with javac. This way the
+# self-compile path really runs through, instead of merely being claimed.
 # ---------------------------------------------------------------------------
 BE="$TMP/fixture/ai-automation-backend"
 make_fixture() {
@@ -462,17 +462,17 @@ EOF
   printf '<project/>\n' > "$BE/pom.xml"
   cat > "$BE/mvnw" <<'EOF'
 #!/bin/sh
-# Stub statt Maven: baut dieselben Klassen nach target/classes.
+# Stub instead of Maven: builds the same classes into target/classes.
 mkdir -p target/classes
 exec javac -nowarn -d target/classes $(find src/main/java -name '*.java' ! -empty)
 EOF
   chmod 755 "$BE/mvnw"
 }
 
-# Werkzeugkasten: nur die Programme, die das Skript wirklich braucht. So laesst sich
-# "jdeps fehlt" testen, ohne am System-PATH zu drehen.
+# Toolbox: only the programs the script really needs. This way "jdeps missing"
+# can be tested without fiddling with the system PATH.
 TOOLS="bash sh mkdir rm cp mv touch cat mktemp dirname find xargs awk sort uniq cut grep sed head wc tr git python3 javac jdeps"
-make_toolbox() {  # $1 = Zielverzeichnis, $2 = optional auszulassendes Werkzeug
+make_toolbox() {  # $1 = target directory, $2 = optional tool to leave out
   local dir="$1" skip="${2:-}" t p
   mkdir -p "$dir"
   for t in $TOOLS; do
@@ -507,8 +507,8 @@ if ! diff -q "$TMP/fix1.measured" "$TMP/fix2.measured" >/dev/null 2>&1; then
 fi
 
 # Der Aufruf im Pool-Workflow lautet `bash scripts/public-readiness/arch-metrics.sh "$BASE"`.
-# Wird SCRIPT_DIR erst nach dem cd in die gemessene Wurzel aufgeloest, zeigt der relative Pfad
-# ins Leere und die Zyklen gelten still als nicht gemessen.
+# If SCRIPT_DIR is only resolved after the cd into the measured root, the relative path points
+# nowhere and the cycles silently count as not measured.
 ( cd "$REPO" && PATH="$TMP/bin" bash scripts/public-readiness/arch-metrics.sh "$TMP/fixture" ) \
   > "$TMP/relpath.txt" 2>/dev/null
 check "relativer Skriptpfad: cycles_state=ok" 'grep -qx "cycles_state=ok" "$TMP/relpath.txt"'
@@ -568,17 +568,17 @@ if ! diff -q "$TMP/cache1.measured" "$TMP/cache2.measured" >/dev/null 2>&1; then
   diff -u "$TMP/cache1.measured" "$TMP/cache2.measured" | sed -n 1,20p
 fi
 
-# Ein Cache-Treffer auf den Commit-Stand waere bei geaenderten Dateien eine falsche Messung:
-# gemessen wuerde der Commit, gemeldet der Arbeitsstand.
+# A cache hit on the commit state would be a wrong measurement for changed files:
+# the commit would be measured, the working state reported.
 rm -rf "$BE/target"
 printf 'unkommittiert\n' > "$TMP/fixture/dirty.txt"
 AUTOMATION_ARCH_CACHE="$CACHE" PATH="$TMP/bin" bash "$SCRIPT" "$TMP/fixture" > "$TMP/cache3.txt" 2>/dev/null
 check "unkommittierte Aenderung umgeht den Cache" 'grep -qx "compile=compiled" "$TMP/cache3.txt"'
 rm -f "$TMP/fixture/dirty.txt"
 
-# Ein Treffer wird benutzt, also frisch gestempelt: jdeps liest sekundenlang daraus, und der
-# Keep-3-Rang geht nach mtime. Ohne den Stempel raeumt ein paralleler Lauf den Eintrag genau
-# waehrend der Messung weg — exit 0, kein error=, halber Klassenbaum gemessen.
+# A hit is used, so freshly stamped: jdeps reads from it for seconds, and the
+# keep-3 rank goes by mtime. Without the stamp a parallel run removes the entry exactly
+# during the measurement — exit 0, no error=, half a class tree measured.
 rm -rf "$BE/target"
 touch -d '2020-01-01 00:00:00' "$CACHE/$FIX_SHA"
 AUTOMATION_ARCH_CACHE="$CACHE" PATH="$TMP/bin" bash "$SCRIPT" "$TMP/fixture" > "$TMP/cache-touch.txt" 2>/dev/null
@@ -586,8 +586,8 @@ check "Treffer stempelt den Eintrag frisch" \
   '[ -n "$(find "$CACHE" -mindepth 1 -maxdepth 1 -name "$FIX_SHA" -newermt "2021-01-01" 2>/dev/null)" ]'
 check "Treffer bleibt ein Treffer (compile=cached)" 'grep -qx "compile=cached" "$TMP/cache-touch.txt"'
 
-# Derselbe Eintrag, aber drei juengere Fremdeintraege: ohne den Stempel waere er Rang 4 und
-# fiele dem Aufraeumen zum Opfer, obwohl gerade aus ihm gemessen wird.
+# The same entry, but three younger foreign entries: without the stamp it would be rank 4 and
+# fall victim to the cleanup, although it is just being measured from.
 rm -rf "$BE/target"
 touch -d '2020-01-01 00:00:00' "$CACHE/$FIX_SHA"
 for fresh in eee fff ggg; do mkdir -p "$CACHE/$fresh"; : > "$CACHE/$fresh/marker"; done
@@ -595,15 +595,15 @@ AUTOMATION_ARCH_CACHE="$CACHE" PATH="$TMP/bin" bash "$SCRIPT" "$TMP/fixture" > /
 check "benutzter Eintrag ueberlebt juengere Fremdeintraege" '[ -d "$CACHE/$FIX_SHA" ]'
 rm -rf "$CACHE/eee" "$CACHE/fff" "$CACHE/ggg"
 
-# Ein gueltiger Eintrag wird nie ersetzt — sonst zieht ein Schreiber dem Leser die Klassen
-# unter der laufenden Messung weg.
+# A valid entry is never replaced — otherwise a writer pulls the classes away from the reader
+# during the running measurement.
 : > "$CACHE/$FIX_SHA/nicht-ueberschreiben"
 rm -rf "$BE/target"
 AUTOMATION_ARCH_CACHE="$CACHE" PATH="$TMP/bin" bash "$SCRIPT" "$TMP/fixture" > /dev/null 2>&1
 check "gueltiger Cache-Eintrag wird nicht neu geschrieben" '[ -f "$CACHE/$FIX_SHA/nicht-ueberschreiben" ]'
 
-# Ein liegengebliebenes Staging-Verzeichnis eines abgestuerzten Laufs darf beim Aufraeumen
-# nicht als Eintrag mitzaehlen und echte Kompilate verdraengen.
+# A leftover staging directory of a crashed run must not count as an entry during cleanup
+# and must not displace real compiled output.
 mkdir -p "$CACHE/.staging.999"
 rm -rf "$BE/target" "$CACHE/$FIX_SHA"
 for stale in aaa bbb ccc ddd; do mkdir -p "$CACHE/$stale"; : > "$CACHE/$stale/marker"; done
@@ -613,7 +613,7 @@ check "Cache behaelt hoechstens 3 Eintraege" \
 check "der frische Eintrag ueberlebt das Aufraeumen" '[ -d "$CACHE/$FIX_SHA" ]'
 check "fremdes Staging-Verzeichnis bleibt unangetastet" '[ -d "$CACHE/.staging.999" ]'
 
-# Ein unbrauchbares Cache-Verzeichnis darf das Faktenblatt nicht roetlich faerben.
+# An unusable cache directory must not turn the fact sheet red.
 rm -rf "$BE/target"
 : > "$TMP/cache-is-a-file"
 AUTOMATION_ARCH_CACHE="$TMP/cache-is-a-file" PATH="$TMP/bin" bash "$SCRIPT" "$TMP/fixture" > "$TMP/cache5.txt" 2>/dev/null
@@ -622,9 +622,9 @@ check "unbrauchbarer Cache-Pfad: exit 0"            '[ "$RC" -eq 0 ]'
 check "unbrauchbarer Cache-Pfad: trotzdem gemessen" 'grep -qx "cycles=1" "$TMP/cache5.txt"'
 
 echo "9) Seams je Kandidat aus dem Bytecode (arch-seams.py, TODO e0e9495f)"
-# Fixture mit bekannten Zugriffen: zwei Gruppen ueber gemeinsame Kollaborateure, eine dritte allein,
-# eine Ueberladung, ein Lambda, eine innere Klasse, ein nur im Konstruktor benutzter Kollaborateur und
-# zwei Felder, die keine Kollaborateure sind (Konfigurationswert, Zustand mit Initialisierer).
+# Fixture with known accesses: two groups via shared collaborators, a third alone,
+# an overload, a lambda, an inner class, a collaborator used only in the constructor and
+# two fields that are no collaborators (configuration value, state with an initializer).
 SEAMS="$REPO/scripts/public-readiness/arch-seams.py"
 SEAM_SRC="$TMP/seams/src/main/java"; SEAM_CLASSES="$TMP/seams/classes"
 mkdir -p "$SEAM_SRC/com/automation/fix" "$SEAM_CLASSES"
@@ -696,7 +696,7 @@ JAVA
 javac -nowarn -g -d "$SEAM_CLASSES" "$SEAM_SRC/com/automation/fix/Seams.java" 2> "$TMP/seams-javac.err"
 F=com/automation/fix/Seams.java
 python3 "$SEAMS" "$SEAM_SRC" "$SEAM_CLASSES" "$F" frontend/src/pages/X.tsx > "$TMP/seams.out" 2> "$TMP/seams.err"; RC=$?
-seam() {  # $1 = art, $2 = Schluessel im dritten Feld (oder leer) -> die Felder danach, tab-getrennt
+seam() {  # $1 = kind, $2 = key in the third field (or empty) -> the following fields, tab-separated
   awk -F'\t' -v a="$1" -v k="${2:-}" -v f="$F" '$1 == a && $2 == f && (k == "" || $3 == k) {
     s = (k == "") ? 3 : 4; out = ""
     for (i = s; i <= NF; i++) out = out (i > s ? "\t" : "") $i
@@ -722,7 +722,7 @@ check "nur im Konstruktor benutzt: onlyCtor"              '[ "$(awk -F"\t" "\$1 
 check "Frontend-Kandidat wird nicht gemessen und nicht gemeldet" '! grep -q "X.tsx" "$TMP/seams.out"'
 python3 "$SEAMS" "$SEAM_SRC" "$SEAM_CLASSES" "$F" > "$TMP/seams2.out" 2>/dev/null
 check "zwei Laeufe byte-identisch" 'diff -q <(grep -v "^#" "$TMP/seams.out" | grep -v X.tsx) <(grep -v "^#" "$TMP/seams2.out") >/dev/null'
-# Nicht Messbares steht mit Grund da, nie als leere Tabelle.
+# What cannot be measured is listed with its reason, never as an empty table.
 touch -d '+1 minute' "$SEAM_SRC/$F"
 python3 "$SEAMS" "$SEAM_SRC" "$SEAM_CLASSES" "$F" > "$TMP/seams-stale.out" 2>/dev/null
 check "Quelltext juenger als Kompilat: missing stale_classes" 'grep -qx "missing${TAB}$F${TAB}stale_classes" "$TMP/seams-stale.out"'
@@ -733,7 +733,7 @@ check "kein Kompilat: exit 0, state no_classes, Datei als missing" \
   '[ "$RC" -eq 0 ] && grep -qx "state${TAB}no_classes" "$TMP/seams-noclasses.out" && grep -qx "missing${TAB}$F${TAB}no_classes" "$TMP/seams-noclasses.out"'
 python3 "$SEAMS" "$SEAM_SRC" > /dev/null 2>&1; RC=$?
 check "falscher Aufruf endet mit 2" '[ "$RC" -eq 2 ]'
-# arch-metrics.sh nennt das gemessene Kompilat nur auf Wunsch und nur in einer Datei, nie im Blatt.
+# arch-metrics.sh names the measured compiled output only on request and only in one file, never in the sheet.
 ARCH_METRICS_CLASSES_OUT="$TMP/classes-out" bash "$SCRIPT" "$REPO" > "$TMP/run-classes.txt" 2>/dev/null
 check "ARCH_METRICS_CLASSES_OUT bekommt ein vorhandenes Verzeichnis" '[ -d "$(cat "$TMP/classes-out" 2>/dev/null)" ]'
 check "der Pfad steht nicht im Faktenblatt" '! grep -qF "$(cat "$TMP/classes-out" 2>/dev/null)" "$TMP/run-classes.txt"'

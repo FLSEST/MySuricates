@@ -576,7 +576,7 @@ check "duplicates: ohne jscpd ist .tsx ausdruecklich als ungeprueft benannt" 'gr
 check "complexity: nur Kandidaten, je Treffer eine Zeile, Zustand ok" \
   '[ "$(section "$TMP/tools.txt" complexity | cut -f1 | sort -u)" = "$C/CoupledHot.java" ] \
      && [ "$(section "$TMP/tools.txt" complexity | wc -l | tr -d " ")" -eq 2 ] && [ "$(summary "$TMP/tools.txt" complexity_state)" = ok ]'
-# Nicht Gemessenes bleibt sichtbar: fehlende CPD-Ausgabe, NICHT GEMESSEN im Faktenblatt, abgeschnittene Liste.
+# What was not measured stays visible: missing CPD output, NICHT GEMESSEN in the fact sheet, truncated list.
 printf 'Error: something broke\n' > "$TMP/cpd-broken.csv"
 printf '## FAKTENBLATT pmd\nNICHT GEMESSEN: pmd_findings (keine SARIF-Datei)\n' > "$TMP/pmd-missing.txt"
 python3 "$FINDINGS" "$TMP/cand-backend.txt" "$TMP/cand-frontend.txt" --cpd java="$TMP/cpd-broken.csv" --pmd "$TMP/pmd-missing.txt" > "$TMP/tools-gap.txt"

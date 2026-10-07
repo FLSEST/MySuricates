@@ -177,9 +177,9 @@ exit 0
 STUB
 cat > "$TMP/cbin/curl" <<'STUB'
 #!/usr/bin/env bash
-# Antwortet erst, wenn der Container "laeuft" (der docker-Stub legt die Marke an)
+# Answers only once the container is "running" (the docker stub creates the marker)
 [[ "$*" == *"/system/info"* && -e "$UP_MARKER" ]] && exit 0
-# Vite auf :3000 "laeuft", sobald der npm-Stub die Marke angelegt hat
+# Vite on :3000 is "running" as soon as the npm stub has created the marker
 [[ "$*" == *":3000"* && -e "$FE_MARKER" ]] && exit 0
 exit 7
 STUB

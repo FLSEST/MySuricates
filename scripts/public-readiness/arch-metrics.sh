@@ -400,7 +400,7 @@ allowed = sorted(tuple(sorted(p)) for p in re.findall(r'"([^"\s]+)\s*<->\s*([^"\
 for a, b in allowed:
     print('pair\t%s\t%s' % (a, b))
 if not allowed:
-    # Leere Allowlist ausdruecklich nennen, sonst sieht sie aus wie ein Muster, das nicht mehr greift.
+    # Name an empty allowlist explicitly, otherwise it looks like a pattern that no longer matches.
     print('# pair\t(keine)')
 for members in (sorted(re.findall(r'"([^"]+)"', group)) for group in re.findall(r'Set\.of\(([^)]*)\)', pinned.group(1))):
     print('component\t%d\t%s' % (len(members), ','.join(members)))

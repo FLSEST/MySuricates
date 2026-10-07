@@ -97,24 +97,24 @@ scan_context_keys() {
   python3 - "$@" <<'PY'
 import json, re, sys
 
-# Token, nicht Teilstrings: "age" darf nicht in "message" oder "package" treffen.
-# Schluessel werden an _ - . und an camelCase-Grenzen zerlegt, dann Token verglichen.
+# Tokens, not substrings: "age" must not match inside "message" or "package".
+# Keys are split at _ - . and at camelCase boundaries, then tokens are compared.
 PERSONAL = {
-    # Personen und Haushalt
-    # 'age'/'ages' bewusst NICHT einzeln: min_age_days ist ein Aufbewahrungs-
-    # Parameter, kein Personendatum. child_ages greift ueber 'child'.
+    # People and household
+    # 'age'/'ages' deliberately NOT on their own: min_age_days is a retention
+    # parameter, not personal data. child_ages is caught via 'child'.
     'adult', 'adults', 'child', 'children', 'kid', 'kids',
     'spouse', 'partner', 'family', 'birthday', 'birthdate', 'dob',
-    # Kontaktdaten
+    # Contact data
     'address', 'street', 'strasse', 'plz', 'postcode', 'zip', 'city', 'wohnort',
     'phone', 'telefon', 'handy', 'mobile', 'email', 'mail',
-    # Finanzen und Amtliches
+    # Finances and official matters
     'iban', 'konto', 'account', 'salary', 'gehalt', 'steuer', 'tax',
     'insurance', 'versicherung', 'passport', 'ausweis',
-    # Bewerbung und Profil
+    # Job application and profile
     'cv', 'resume', 'lebenslauf', 'bewerbung', 'applicant', 'employer', 'arbeitgeber',
 }
-# Mehrwort-Schluessel, die erst in der Kombination personenbezogen sind.
+# Multi-word keys that are personal only in combination.
 PERSONAL_PAIRS = {('user', 'profile'), ('home', 'address'), ('child', 'ages')}
 
 def tokens(key):
@@ -178,39 +178,39 @@ def env_list(name):
 
 CREDENTIALS = env_list('POOL_CREDENTIAL_MARKERS')
 API_PREFIXES = env_list('POOL_API_PREFIXES') or ['/api/v1/']
-# Die Praefixe ohne Schraegstrich als Alternative: /api/v1|/actuator
+# The prefixes without trailing slash as an alternation: /api/v1|/actuator
 API_BASES = '(?:' + '|'.join(re.escape(p.rstrip('/')) for p in API_PREFIXES) + ')'
 API_CALLERS = env_list('POOL_API_CALLERS')
 API_ALLOWED = env_list('POOL_API_ALLOWED')
 DB_FILES = env_list('POOL_DB_FILES')
 DB_ACCESS = env_list('POOL_DB_ACCESS')
 
-# Wie weit um eine Fundstelle herum nach dem zweiten Kennzeichen gesucht wird.
-# 200 Zeichen sind gut eine Befehlszeile — weit genug fuer "curl ... $URL",
-# eng genug, dass zwei unabhaengige Stellen nicht zusammengezogen werden.
+# How far around a hit the second marker is searched for.
+# 200 characters are about one command line — wide enough for "curl ... $URL",
+# narrow enough that two independent places are not merged.
 WINDOW = 200
 
 VERB_CALL = re.compile(r'\b(GET|POST|PUT|PATCH|DELETE)\s+' + API_BASES + '/')
-# Konkreter Endpunkt: nach dem Praefix muss ein Pfadsegment folgen. Das nackte
-# Praefix ist ein Suchmuster, kein Aufruf — mocking-gap-audit fuehrt '/api/v1/'
-# in einer Liste von Netzwerk-Kennzeichen, direkt neben 'fetch(' und 'axios.'.
+# Concrete endpoint: a path segment must follow the prefix. The bare
+# prefix is a search pattern, not a call — mocking-gap-audit lists '/api/v1/'
+# in a list of network markers, right next to 'fetch(' and 'axios.'.
 PATH_AT = re.compile(API_BASES + r'/[A-Za-z0-9_][A-Za-z0-9/_.{}<>-]*')
 
 
-# Zusammengesetzte Endpunkte (TODO 2a0c9420) — im Shell-Code steht der Pfad dann nie am Stueck:
-#   for E in todos; do curl …/api/v1/$E       Praefix, dahinter eine Variable statt eines Segments
-#   API=http://…/api/v1; curl "$API/todos"     die Basis-URL in einer Variable (auch Python: base = '…')
-# Die Zuweisung ist selbst der Befund, egal wo die Variable spaeter landet; ausser den Sonden liegt unter
-# dem Praefix nichts ohne Key. Das Praefix in einem Ausgabetext ("/api/v1-Routen") bleibt erlaubt.
+# Composed endpoints (TODO 2a0c9420) — in shell code the path then never appears in one piece:
+#   for E in todos; do curl …/api/v1/$E       prefix followed by a variable instead of a segment
+#   API=http://…/api/v1; curl "$API/todos"     the base URL in a variable (Python too: base = '…')
+# The assignment itself is the finding, no matter where the variable ends up later; apart from the probes, nothing under
+# the prefix is reachable without a key. The prefix in an output text ("/api/v1-Routen") stays allowed.
 COMPOSED_AT = re.compile(API_BASES + r'/?["\']?\$\{?[A-Za-z_][A-Za-z0-9_]*\}?')
 BASE_ASSIGNED = re.compile(r'(?m)(?:^|[\s;&(])((?:export\s+)?[A-Za-z_][A-Za-z0-9_]*\s*=\s*["\']?[^\s"\';]*'
                            + API_BASES + r'/?)["\']?(?=[\s;&)]|$)')
 
 
-# Basis-URL nur mit /api in einer Variable, der Rest erst am Aufruf: API=…/api; curl "$API/v1/todos" (auch
-# Python-f-String {api}/v1/…). Die Zuweisung allein ist kein Befund, erst der Aufruf mit einem Endpunkt, der
-# keine Sonde ist — wie BaseUrlVariables im Analyzer. Eine Basis ganz ohne Pfad braucht keine eigene Regel:
-# $BASE/actuator/metrics nennt den Endpunkt am Stueck, das findet PATH_AT.
+# Base URL with only /api in a variable, the rest only at the call: API=…/api; curl "$API/v1/todos" (also
+# Python f-string {api}/v1/…). The assignment alone is no finding, only the call with an endpoint that
+# is not a probe — like BaseUrlVariables in the analyzer. A base without any path needs no rule of its own:
+# $BASE/actuator/metrics names the endpoint in one piece, which PATH_AT finds.
 API_ONLY_ASSIGNED = re.compile(r'(?m)(?:^|[\s;&(])(?:export\s+)?([A-Za-z_][A-Za-z0-9_]*)\s*=\s*["\']?'
                                r'[^\s"\';]*/api/?["\']?(?=[\s;&)]|$)')
 
@@ -245,9 +245,9 @@ def path_of(endpoint):
     """Der Pfad ohne Satzpunkt am Ende: "Heap aus /api/v1/system/jvm-memory." nennt die Sonde selbst."""
     return endpoint.group(0).rstrip('.')
 
-# Schluessel, unter denen ein Block Shell-Code ausfuehrt: der Befehl eines shell-Blocks und, bei
-# execution_mode: shell, auch Bedingung und Zweige (conditional, while, retry, foreach, im switch
-# jeder Block); items_command von foreach laeuft immer in der Shell.
+# Keys under which a block runs shell code: the command of a shell block and, with
+# execution_mode: shell, also the condition and branches (conditional, while, retry, foreach, in switch
+# every block); foreach's items_command always runs in the shell.
 SHELL_KEYS = ('command', 'condition', 'condition_command', 'then_command', 'else_command')
 
 
@@ -319,7 +319,7 @@ for path in sys.argv[1:]:
               f"— Plattformdaten kommen als Kontextvariable, "
               f"TODOs ueber die Bloecke todo-create/todo-update/todo-close")
 
-    # sqlite3 ist fuer sich schon der Zugriff, egal welche Datei gemeint ist.
+    # sqlite3 is access in itself, no matter which file is meant.
     if 'sqlite3' in raw:
         print(f"{path}\tDB-DIRECT\truft sqlite3 auf — das umgeht Hibernate und die "
               f"einzige Connection (pool-size=1)")
@@ -400,14 +400,14 @@ def walk_keys(node, path, out):
         for i, item in enumerate(node):
             walk_keys(item, f"{path}[{i}]", out)
 
-# Config-Schluessel, unter denen wieder Bloecke stehen. Es gibt genau zwei, beide vom
-# switch-Block: cases[].blocks und default (SwitchBlockExecutor.java:37-38,59,67, gespiegelt
-# in ExecutionMode.java:68-76). Die anderen Wrapper verschachteln keine Bloecke, sondern
-# fuehren Strings aus: conditional then_command/else_command, foreach/while/retry command.
+# Config keys under which blocks appear again. There are exactly two, both from the
+# switch block: cases[].blocks and default (SwitchBlockExecutor.java:37-38,59,67, mirrored
+# in ExecutionMode.java:68-76). The other wrappers nest no blocks but
+# execute strings: conditional then_command/else_command, foreach/while/retry command.
 #
-# 'cases' selbst steht bewusst NICHT hier: seine Elemente sind Fall-Objekte ({when, blocks}),
-# keine Bloecke. Die Rekursion erreicht ihr 'blocks' im naechsten Schritt ohnehin — und ein
-# Fall-Objekt mit einem eigenen 'type'-Feld wuerde sonst faelschlich als Block gezaehlt.
+# 'cases' itself is deliberately NOT here: its elements are case objects ({when, blocks}),
+# not blocks. The recursion reaches their 'blocks' in the next step anyway — and a
+# case object with its own 'type' field would otherwise be wrongly counted as a block.
 BLOCK_CONTAINER_KEYS = {'blocks', 'default'}
 
 def collect_types(node, out, is_block=False):

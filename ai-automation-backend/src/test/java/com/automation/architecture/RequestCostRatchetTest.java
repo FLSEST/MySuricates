@@ -169,7 +169,7 @@ class RequestCostRatchetTest {
     private static final int RUNS_PER_WORKFLOW = 2;
     private static final int STEPS_PER_RUN = 3;
     private static final int TODOS = 50;
-    /** Offene TODOs ohne Ziel je Charge – die Kandidaten fuer „Könnte dazugehören“ (TODO c60bf914). */
+    /** Open TODOs without a goal per batch – the candidates for „Könnte dazugehören“ (TODO c60bf914). */
     private static final int CANDIDATES = 5;
     private static final int WISHES = 10;
     private static final int AUDITS_PER_PROJECT = 2;
@@ -468,7 +468,7 @@ class RequestCostRatchetTest {
     /** Target of {@code {audit}} and {@code {auditProject}}: the first seeded audit and its project. */
     private String firstAuditKey;
     private String firstAuditProjectId;
-    /** Das Ziel der ersten Charge; jede Charge ordnet ihm ihre Todos zu (TODO dc0566f8). */
+    /** The goal of the first batch; every batch assigns its todos to it (TODO dc0566f8). */
     private String firstGoalId;
     /** Target of {@code {goalProject}}: the first project of the first batch, assigned to the first goal (TODO c60bf914). */
     private String firstGoalProjectId;
@@ -517,11 +517,11 @@ class RequestCostRatchetTest {
     }
 
     /**
-     * Raeumt die Saat wieder ab. Ohne Testtransaktion rollt nichts mehr zurueck: Was
-     * {@link #seedBatch} committet hat, laege sonst im naechsten Test unter dessen Saat. Geloescht
-     * wird per SQL und in umgekehrter Reihenfolge von {@link #SEEDED_TABLES}, also jede Tabelle vor
-     * der, auf die sie zeigt; per SQL auch deshalb, weil {@code @SQLRestriction} weich geloeschte
-     * Workflows vor dem Repository verbirgt.
+     * Removes the seed again. Without a test transaction nothing is rolled back any more: what
+     * {@link #seedBatch} committed would otherwise sit under the next test's seed. Deletion
+     * happens via SQL and in reverse order of {@link #SEEDED_TABLES}, so every table goes before
+     * the one it points to; also via SQL because {@code @SQLRestriction} hides soft-deleted
+     * workflows from the repository.
      */
     @AfterEach
     void removeTheSeed() {
@@ -531,12 +531,12 @@ class RequestCostRatchetTest {
     }
 
     /**
-     * Stellt den Bestand vor der Saat fest: In den Tabellen, die die Saat beschreibt, darf nichts
-     * stehen. Gezaehlt wird per SQL, damit auch weich geloeschte Workflows auffallen, die
-     * {@code @SQLRestriction} vor dem Repository verbirgt. Schlaegt das fehl, misst die Klasse nicht
-     * mehr gegen ihre eigene Datenbank, {@link #removeTheSeed} hat eine Tabelle vergessen — oder ein
-     * Start-Seeder legt neuerdings Zeilen an; alles das verschiebt jede Obergrenze in
-     * {@link #BASELINE}, ohne dass sich eine Route geaendert haette.
+     * Establishes the state before the seed: the tables the seed writes to must be empty.
+     * Counting is done via SQL so that soft-deleted workflows show up too, which
+     * {@code @SQLRestriction} hides from the repository. If this fails, the class no longer
+     * measures against its own database, {@link #removeTheSeed} forgot a table — or a startup
+     * seeder now creates rows; all of that shifts every ceiling in {@link #BASELINE} without a
+     * route having changed.
      */
     private void nothingButTheSeedIsMeasured() {
         Map<String, Long> foreignRows = new TreeMap<>();
@@ -553,16 +553,16 @@ class RequestCostRatchetTest {
     }
 
     /**
-     * Eine Saat-Charge: {@link #PROJECTS} Projekte mit je {@link #WORKFLOWS_PER_PROJECT}
-     * Workflows, deren Runs und Steps, einem Zeitplan je Workflow, {@link #TODOS} Todos,
-     * {@link #WISHES} Wuensche und {@link #AUDITS_PER_PROJECT} Audits je Projekt.
+     * One seed batch: {@link #PROJECTS} projects with {@link #WORKFLOWS_PER_PROJECT} workflows
+     * each, their runs and steps, one schedule per workflow, {@link #TODOS} todos,
+     * {@link #WISHES} wishes and {@link #AUDITS_PER_PROJECT} audits per project.
      *
-     * <p>Ein zweiter Aufruf verdoppelt jede dieser Tabellen — genau darauf beruht
-     * {@link #statementCountMustNotGrowWithTheNumberOfRows}. Alle Namen und Pfade tragen die
-     * Chargen-Kennung, damit die zweite Charge neue Zeilen anlegt statt die erste zu treffen.
+     * <p>A second call doubles each of these tables — which is exactly what
+     * {@link #statementCountMustNotGrowWithTheNumberOfRows} relies on. All names and paths carry
+     * the batch identifier, so the second batch creates new rows instead of hitting the first.
      *
-     * <p>Die Charge entsteht in einer eigenen Transaktion und wird committet: Gemessen wird danach
-     * ohne Transaktion, gegen das, was wirklich in der Datenbank steht (TODO 5c56b3d1).
+     * <p>The batch is created in its own transaction and committed: measuring happens afterwards
+     * without a transaction, against what is really in the database (TODO 5c56b3d1).
      */
     private void seedBatch(String batch) {
         transactions.executeWithoutResult(status -> writeBatch(batch));
@@ -593,13 +593,13 @@ class RequestCostRatchetTest {
             firstWorkflowId = workflows.get(0).getId();
             busyWorkflowId = workflows.getLast().getId();
         }
-        // Ein Zeitplan je Workflow, wie im Betrieb mit naechstem Termin, und die Runs des Workflows
-        // tragen seine Id: So misst /schedules/{sched}/runs echte Zeitplan-Runs, und der Kalender
-        // findet in seiner Woche beides, die Termine und die vergangenen Runs (TODO 168e3d7f).
-        // Die Route /schedules laedt ueber ScheduledWorkflow.workflow (EAGER) und Workflow.project
-        // (EAGER). Faellt der JOIN FETCH aus findAllWithTargets() weg, loest Hibernate die
-        // Assoziationen wieder Zeile fuer Zeile auf und die Zahl der Statements springt sichtbar
-        // auf ein Vielfaches von 30 (TODO 172a6a67, c9ec9844).
+        // One schedule per workflow, with a next fire time as in production, and the workflow's runs
+        // carry its id: this way /schedules/{sched}/runs measures real schedule runs, and the calendar
+        // finds both in its week, the appointments and the past runs (TODO 168e3d7f).
+        // The /schedules route loads via ScheduledWorkflow.workflow (EAGER) and Workflow.project
+        // (EAGER). If the JOIN FETCH in findAllWithTargets() is dropped, Hibernate resolves the
+        // associations row by row again and the number of statements visibly jumps
+        // to a multiple of 30 (TODO 172a6a67, c9ec9844).
         List<String> runIds = new ArrayList<>();
         for (Workflow workflow : workflows) {
             ScheduledWorkflow schedule = scheduledWorkflowRepository.save(ScheduledWorkflow.builder()
@@ -644,37 +644,37 @@ class RequestCostRatchetTest {
             }
         }
 
-        // Ziele (TODO dc0566f8): jede Charge legt ein Ziel an und ordnet ihre Todos dem ERSTEN zu –
-        // so waechst die Zielansicht mit der zweiten Charge, und /goals zaehlt zwei Ziele. Beide
-        // Routen lesen schlanke Projektionen (GoalStatusCounts, GoalTodoRow); faellt eine davon auf
-        // Entities zurueck, zeigt es sich hier als Vielfaches.
+        // Goals (TODO dc0566f8): every batch creates a goal and assigns its todos to the FIRST one –
+        // so the goal view grows with the second batch, and /goals counts two goals. Both
+        // routes read lean projections (GoalStatusCounts, GoalTodoRow); if one of them falls back
+        // to entities, it shows up here as a multiple.
         String goalId = goalRepository.save(Goal.builder().title("Cost Goal " + batch).build()).getId();
         if (firstGoalId == null) {
             firstGoalId = goalId;
             firstGoalProjectId = projectIds.get(0);
         }
-        // Zielprojekte (TODO c60bf914): jede Charge haengt ihr erstes Projekt an ihr eigenes Ziel und
-        // an das erste – so waechst die Projektliste des ersten Ziels mit der zweiten Charge, und
-        // /goals liest die Projekte beider Ziele. Beide Routen holen sie in EINER Abfrage
-        // (GoalProjectRow); ein Nachschlagen je Ziel oder Projekt faellt als Wachstum auf.
+        // Goal projects (TODO c60bf914): every batch attaches its first project to its own goal and
+        // to the first one – so the first goal's project list grows with the second batch, and
+        // /goals reads the projects of both goals. Both routes fetch them in ONE query
+        // (GoalProjectRow); a lookup per goal or project shows up as growth.
         goalProjectRepository.save(new GoalProject(goalId, projectIds.get(0), 0));
         if (!goalId.equals(firstGoalId)) {
             goalProjectRepository.save(new GoalProject(firstGoalId, projectIds.get(0),
                     goalProjectRepository.findRows(firstGoalId).size()));
         }
-        // Relationskarte (TODO c6ea8f5c): jedes fuenfte Todo stammt aus einem Lauf und hat einen
-        // Fix-Lauf, und ein aktiver Trigger je Charge passt auf alle – so muss /relations Laeufe,
-        // Workflow-Namen und Trigger nachschlagen, und ein Nachschlagen je Todo faellt als Wachstum auf.
+        // Relation map (TODO c6ea8f5c): every fifth todo originates from a run and has a
+        // fix run, and one active trigger per batch matches all of them – so /relations has to look up
+        // runs, workflow names and triggers, and a lookup per todo shows up as growth.
         todoTriggerRepository.save(TodoTrigger.builder()
                 .tagPattern("")
                 .targetWorkflow(workflows.get(0))
                 .description("Cost Trigger " + batch)
                 .build());
-        // Arbeitspakete (TODO 259f4f66, c60bf914): jede Charge legt zwei am ersten Ziel an und ordnet jedes
-        // zehnte Todo einem zu – Detail und Paket-Liste muessen sie mit dem Ziel in einer Abfrage holen.
-        // Dazu je Charge ein Meilenstein, der an beiden Paketen haengt: Detail und Meilenstein-Liste holen
-        // Meilensteine samt Verknuepfungen in EINER Abfrage, die Zielliste den naechsten Meilenstein
-        // aller Ziele in einer mit Paket-Zaehlern als Unterabfragen.
+        // Work packages (TODO 259f4f66, c60bf914): every batch creates two on the first goal and
+        // assigns every tenth todo to one – detail and package list must fetch them with the goal in one query.
+        // In addition one milestone per batch that hangs on both packages: detail and milestone list fetch
+        // milestones including their links in ONE query, the goal list fetches the next milestone
+        // of all goals in one, with package counters as subqueries.
         List<String> workPackageIds = new ArrayList<>();
         for (int w = 0; w < 2; w++) {
             Instant end = RUN_STARTED.plusSeconds(86_400L * (w + 1));
@@ -685,22 +685,22 @@ class RequestCostRatchetTest {
         String milestoneId = milestoneRepository.save(GoalMilestone.builder().goalId(firstGoalId)
                 .title("Cost Milestone " + batch).dueDate(RUN_STARTED.plusSeconds(86_400L * 3)).build()).getId();
         workPackageIds.forEach(id -> milestoneLinkRepository.save(new GoalMilestoneWorkPackage(milestoneId, id)));
-        // Workflows am Ziel (TODO 52bc1e8c): je Charge einer am ersten Ziel und einer an ihrem ersten Paket –
-        // die Liste liest sie samt Workflow-Namen und Paket-Reihenfolge in EINER Abfrage.
+        // Workflows on the goal (TODO 52bc1e8c): per batch one on the first goal and one on its first package –
+        // the list reads them including workflow names and package order in ONE query.
         goalWorkflowRepository.save(GoalWorkflow.builder().goalId(firstGoalId).workflowId(workflows.get(0).getId())
                 .role(GoalWorkflow.Role.STATUS).build());
         goalWorkflowRepository.save(GoalWorkflow.builder().goalId(firstGoalId).workPackageId(workPackageIds.get(0))
                 .workflowId(workflows.get(1).getId()).build());
-        // Kandidaten (TODO c60bf914): offene TODOs ohne Ziel im ersten Projekt der Charge, das am ersten Ziel
-        // haengt; LOW, damit die erste Seite von /todos dieselbe bleibt.
+        // Candidates (TODO c60bf914): open TODOs without a goal in the batch's first project, which hangs
+        // on the first goal; LOW, so the first page of /todos stays the same.
         for (int c = 0; c < CANDIDATES; c++) {
             todoRepository.save(Todo.builder().title("Cost Candidate " + batch + c).description("Seeded candidate")
                     .status(Todo.Status.OPEN).priority(Todo.Priority.LOW).projectId(projectIds.get(0))
                     .tags("performance,testing").build());
         }
-        // Jedes dritte Todo haengt an einem Workflow der Charge und dessen Projekt (TODO 08224ed6): Die
-        // Liste loest beide Namen auf. Ueber findAllById kam je Workflow und je Projekt ein eigenes
-        // select containers dazu – mit der zweiten Charge verdoppelt sich das und faellt als Wachstum auf.
+        // Every third todo hangs on a workflow of the batch and its project (TODO 08224ed6): the
+        // list resolves both names. Via findAllById, one separate select containers per workflow and
+        // per project was added – with the second batch that doubles and shows up as growth.
         for (int t = 0; t < TODOS; t++) {
             boolean fromRun = t % 5 == 0;
             Workflow linked = t % 3 == 0 ? workflows.get(t % workflows.size()) : null;
@@ -727,9 +727,9 @@ class RequestCostRatchetTest {
     }
 
     /**
-     * Ketten (TODO 44db05fd): {@link #CHAINS} je Charge mit je {@link #RUNS_PER_CHAIN} Laeufen.
-     * {@code ChainRun.chain} ist EAGER; laedt die Laufliste die Kette nicht in derselben Abfrage mit,
-     * holt Hibernate jede Kette der Seite einzeln nach – mit der zweiten Charge doppelt so oft.
+     * Chains (TODO 44db05fd): {@link #CHAINS} per batch with {@link #RUNS_PER_CHAIN} runs each.
+     * {@code ChainRun.chain} is EAGER; if the run list does not load the chain in the same query,
+     * Hibernate fetches every chain of the page individually – twice as often with the second batch.
      */
     private void seedChains(String batch, List<Workflow> workflows, List<String> runIds) {
         for (int c = 0; c < CHAINS; c++) {
@@ -763,10 +763,10 @@ class RequestCostRatchetTest {
     }
 
     /**
-     * Wuensche (TODO cda29eab), gleichmaessig ueber die Workflows der Charge und damit ueber ihre
-     * Projekte verteilt: Jeder hat ein Projekt, zwei erzeugte Workflows und eine Vorlage. GET
-     * /wishes loest Projekt- und Workflow-Namen fuer die ganze Liste in je einer Abfrage auf
-     * ({@code WishMapper}, TODO 5bf5a9c8) — ein Nachschlagen je Wunsch faellt als Wachstum auf.
+     * Wishes (TODO cda29eab), spread evenly over the batch's workflows and thus over their
+     * projects: each has a project, two generated workflows and a template. GET
+     * /wishes resolves project and workflow names for the whole list in one query each
+     * ({@code WishMapper}, TODO 5bf5a9c8) — a lookup per wish shows up as growth.
      */
     private void seedWishes(String batch, List<Workflow> workflows) {
         for (int w = 0; w < WISHES; w++) {
@@ -786,11 +786,11 @@ class RequestCostRatchetTest {
     }
 
     /**
-     * Audits (TODO cda29eab): je Projekt {@link #AUDITS_PER_PROJECT}, jedes mit zwei gueltigen
-     * Reports — der neueste und sein Vorgaenger fuer den Trend — und drei Findings, eins davon
-     * erledigt. GET /audits liest zwei schlanke Projektionen, die Reports ohne Markdown und die
-     * Findings als GROUP BY je Audit, Status und Schwere ({@code AuditCenterService.listAudits},
-     * TODO 3d7e3987). Das Markdown ist absichtlich fett: Geraet es in die Liste, zeigen es die Bytes.
+     * Audits (TODO cda29eab): {@link #AUDITS_PER_PROJECT} per project, each with two valid
+     * reports — the newest and its predecessor for the trend — and three findings, one of them
+     * resolved. GET /audits reads two lean projections, the reports without markdown and the
+     * findings as GROUP BY per audit, status and severity ({@code AuditCenterService.listAudits},
+     * TODO 3d7e3987). The markdown is deliberately fat: if it gets into the list, the bytes show it.
      */
     private void seedAudits(String batch, List<Workflow> workflows, List<String> runIds) {
         int nextRun = 0;
@@ -872,37 +872,37 @@ class RequestCostRatchetTest {
     }
 
     /**
-     * Die Routen, deren Statement-Zahl heute noch mit der Zeilenzahl waechst: bekannte, offene
-     * Faelle mit Ticket. Sie sind vom Wachstums-Kriterium ausgenommen, damit dieses fuer die
-     * uebrigen Routen scharf greift, statt als Ganzes rot und damit wertlos zu sein.
+     * The routes whose statement count still grows with the row count today: known, open
+     * cases with a ticket. They are exempt from the growth criterion so that it bites for the
+     * remaining routes instead of being red as a whole and thereby worthless.
      *
-     * <p>Die Ausnahme ist kein Freibrief: Die absoluten Obergrenzen in {@link #BASELINE} gelten
-     * fuer diese Routen weiter, und {@link #knownGrowingRoutesStillGrow} meldet, sobald eine von
-     * ihnen aufhoert zu wachsen — dann gehoert sie aus der Liste heraus, im selben Commit wie der
-     * Fix.
+     * <p>The exemption is no free pass: the absolute ceilings in {@link #BASELINE} still apply
+     * to these routes, and {@link #knownGrowingRoutesStillGrow} reports as soon as one of
+     * them stops growing — then it belongs off the list, in the same commit as the
+     * fix.
      *
-     * <p>Zurzeit leer: {@code /workflows}, {@code /search} und {@code /learning/dashboard} standen
-     * hier, bis ihr {@code select containers} je Zeile behoben war (TODO 13d1e2a2). Seitdem gilt
-     * das Wachstums-Kriterium fuer alle Routen.
+     * <p>Currently empty: {@code /workflows}, {@code /search} and {@code /learning/dashboard} were
+     * listed here until their per-row {@code select containers} was fixed (TODO 13d1e2a2). Since then
+     * the growth criterion applies to all routes.
      */
     static final Map<String, String> KNOWN_GROWING = new TreeMap<>();
 
     /**
-     * Das eigentliche N+1-Kriterium: Dieselbe Route wird gegen zwei Saat-Groessen gemessen, und
-     * die Zahl der Statements darf dabei nicht steigen.
+     * The actual N+1 criterion: the same route is measured against two seed sizes, and
+     * the number of statements must not rise.
      *
-     * <p><b>Warum zusaetzlich zu den Obergrenzen.</b> Eine gepinnte Absolutzahl bestaetigt nur,
-     * dass <em>wenige</em> Zeilen wenig kosten. {@code /api/v1/projects} stand mit einer Obergrenze
-     * von 4 gruen im Gate, waehrend dieselbe Route auf der Dev-Datenbank 37 Statements brauchte —
-     * der Seed kannte drei Projekte, die echte Datenbank dreissig (TODO 6d0ab09f, gemessen
-     * 2026-09-18 ueber {@code GET /api/v1/system/request-metrics}). Ein Kriterium, das die
-     * Statement-Zahl gegen die Zeilenzahl haelt, braucht keine geratene Seed-Groesse: Es findet
-     * jedes N+1 in den gepinnten Routen, unabhaengig davon, wie gross der Seed zufaellig ist.
+     * <p><b>Why in addition to the ceilings.</b> A pinned absolute number only confirms
+     * that <em>few</em> rows cost little. {@code /api/v1/projects} sat green in the gate with a ceiling
+     * of 4, while the same route needed 37 statements on the dev database —
+     * the seed knew three projects, the real database thirty (TODO 6d0ab09f, measured
+     * 2026-09-18 via {@code GET /api/v1/system/request-metrics}). A criterion that holds the
+     * statement count against the row count needs no guessed seed size: it finds
+     * every N+1 in the pinned routes, regardless of how big the seed happens to be.
      *
-     * <p>Gemessen wird erst mit einer Saat-Charge, dann mit zweien, und beide Male ohne
-     * umschliessende Transaktion: Jede Anfrage beginnt ohne Persistenzkontext, die zweite Messung
-     * findet also keine Zeile der ersten im First-Level-Cache, hinter dem sich ein N+1 verstecken
-     * koennte.
+     * <p>Measuring happens first with one seed batch, then with two, and both times without an
+     * enclosing transaction: every request starts without a persistence context, so the second measurement
+     * finds no row of the first in the first-level cache, behind which an N+1 could
+     * hide.
      */
     @Test
     void statementCountMustNotGrowWithTheNumberOfRows() throws Exception {
@@ -930,10 +930,10 @@ class RequestCostRatchetTest {
     }
 
     /**
-     * Haelt {@link #KNOWN_GROWING} ehrlich: Eine Ausnahme, die nicht mehr noetig ist, nimmt die
-     * Route dauerhaft aus dem Wachstums-Kriterium heraus — genau das, was eine Ausnahmeliste
-     * gefaehrlich macht. Hoert eine gelistete Route auf zu wachsen, faellt dieser Test und die
-     * Zeile gehoert geloescht.
+     * Keeps {@link #KNOWN_GROWING} honest: an exception that is no longer needed takes the
+     * route out of the growth criterion permanently — exactly what makes an exception list
+     * dangerous. If a listed route stops growing, this test fails and the
+     * line should be deleted.
      */
     @Test
     void knownGrowingRoutesStillGrow() throws Exception {

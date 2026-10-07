@@ -103,8 +103,8 @@ def extract_controllers(root):
                 if ann in ANN_METHOD:
                     methods = [ANN_METHOD[ann]]
                 else:
-                    # bare @RequestMapping am Klassenkopf (nur Basis-Pfad, keine Methode) wird
-                    # oben schon als "base" behandelt; hier zaehlt nur @RequestMapping(method=...).
+                    # a bare @RequestMapping on the class head (base path only, no method) is
+                    # already handled above as "base"; here only @RequestMapping(method=...) counts.
                     methods = re.findall(r'RequestMethod\.(\w+)', args)
                     if not methods:
                         continue

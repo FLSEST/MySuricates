@@ -17,7 +17,7 @@ import { Sidebar } from '../../components/layout/Sidebar';
 import type { Todo } from '../../types';
 
 // c60bf914 (Flo): „Wird auch sauber durchgetestet, wie die TODO-Seite aussieht, wenn GOALS deaktiviert ist?“ –
-// „Ja, das war damals der Plan, dass es ein richtiges Modul ist.“ Jede Fläche mit Ziel-Anteil wird mit dem
+// „Ja, das war damals der Plan, dass es ein richtiges Modul ist.“ Every surface with a goal part is tested with the
 // module ON and OFF; when off, there must be no call to /goals/** and no planning anymore.
 
 const BASE = '/api/v1';

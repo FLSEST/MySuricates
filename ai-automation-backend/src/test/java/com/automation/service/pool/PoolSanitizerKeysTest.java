@@ -72,7 +72,7 @@ class PoolSanitizerKeysTest {
                 #
                 # Both sides compare normalized keys (lower case, without '_' and '-'), see
                 # PoolExportSanitizer.normalize and normalize_key in scripts/ci/pool-neutrality.sh.
-                # Auch eine Schreibweise, die hier nicht wortwoertlich steht (project-id), zaehlt.
+                # A spelling not listed here verbatim (project-id) counts as well.
                 #
                 # shellcheck shell=bash
 

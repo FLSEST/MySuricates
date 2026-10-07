@@ -10,8 +10,8 @@ import lombok.extern.slf4j.Slf4j;
 final class RunContainerPreparation {
     static String ensureRunning(Project project, String runId, ContainerService containerService,
                                 ExecutionBroadcaster broadcaster) {
-        // Ohne eingerichtetes Docker gar nicht erst versuchen: der Run laeuft ohnehin auf dem Host,
-        // und jeder gescheiterte Versuch schrieb einen Activity-Log-ERROR (a0e85182).
+        // Without Docker set up, do not even try: the run executes on the host anyway, and every
+        // failed attempt wrote an activity log ERROR (a0e85182).
         if (!containerService.isDockerConfigured()) {
             log.debug("Docker not configured — run {} executes on the host", runId);
             return null;

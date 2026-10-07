@@ -171,9 +171,9 @@ check "a scalar automation.modules aborts (rc=$RC)"     '[ "$RC" -eq 5 ] && diff
 CRLF="$TMP/crlf.yml"
 printf 'automation:\r\n  modules:\r\n    preset: core\r\n' > "$CRLF"; cp "$CRLF" "$TMP/crlf.orig"
 module_preset_update "$CRLF" full; RC=$?
-# CRLF darf nicht dazu fuehren, dass keine Zeile als Schluessel erkannt wird und ein zweiter
-# automation:-Block angehaengt wird — Spring liest mit allowDuplicateKeys(false) und startet dann
-# nicht mehr (Review Fix-Runde 1).
+# CRLF must not lead to no line being recognised as a key and a second automation: block being
+# appended — Spring reads with allowDuplicateKeys(false) and would then no longer start
+# (review fix round 1).
 check "CRLF: nur die Preset-Zeile geaendert (rc=$RC)"   '[ "$RC" -eq 0 ] && [ "$(grep -c "^automation:" "$CRLF")" -eq 1 ]'
 check "CRLF: der neue Wert steht drin"                  'grep -q "preset: full" "$CRLF"'
 check "CRLF: ein Parser liest das neue Preset"          'yaml_expect "$CRLF" full'
@@ -185,13 +185,13 @@ check "Inhalt ohne erkennbaren Schluessel bricht ab (rc=$RC)" '[ "$RC" -eq 5 ] &
 EMPTYVAL="$TMP/emptyval.yml"
 printf 'automation:\n  modules:\n    preset:\n' > "$EMPTYVAL"
 module_preset_update "$EMPTYVAL" research; RC=$?
-# Ohne Leerzeichen entstuende "preset:research" — YAML liest das als Schluessel-Skalar.
+# Without a space the result would be "preset:research" — YAML reads that as a key scalar.
 check "leerer Preset-Wert bekommt ein Leerzeichen (rc=$RC)" '[ "$RC" -eq 0 ] && grep -q "^    preset: research$" "$EMPTYVAL"'
 check "und ein Parser liest research"                       'yaml_expect "$EMPTYVAL" research'
 EMPTYCOMMENT="$TMP/emptycomment.yml"
 printf 'automation:\n  modules:\n    preset:   # spaeter setzen\n' > "$EMPTYCOMMENT"
 module_preset_update "$EMPTYCOMMENT" full; RC=$?
-# Leerzeichen vor dem Wert und vor dem # — sonst waere der Wert "full#..." statt "full".
+# A space before the value and before the # — otherwise the value would be "full#..." instead of "full".
 check "leerer Wert mit Kommentar bleibt lesbar (rc=$RC)"    '[ "$RC" -eq 0 ] && grep -q "^    preset:  *full  *# spaeter setzen$" "$EMPTYCOMMENT"'
 check "und ein Parser liest full, nicht full#..."           'yaml_expect "$EMPTYCOMMENT" full'
 RO="$TMP/readonly.yml"
@@ -211,7 +211,7 @@ FORCED="$TMP/forced/config/application.yml"; mkdir -p "$(dirname "$FORCED")"
 write_existing "$FORCED"; cp "$FORCED" "$TMP/forced.orig"
 check "--help documents --force"                       'bash "$SETUP" --help | grep -- "--force" >/dev/null'
 check "--force without --preset exits 2 and says why"  'out="$(bash "$SETUP" --force 2>&1 >/dev/null)"; [ $? -eq 2 ] && [[ "$out" == *"--preset"* ]]'
-# Ohne Flag bleibt es beim alten Verhalten: module_preset_write fasst die Datei nicht an.
+# Without the flag the old behaviour stays: module_preset_write leaves the file alone.
 module_preset_write "$FORCED" full; RC=$?
 check "without the flag the file is untouched (rc=$RC)" '[ "$RC" -eq 3 ] && diff "$TMP/forced.orig" "$FORCED" >/dev/null'
 

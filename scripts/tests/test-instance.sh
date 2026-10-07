@@ -9,9 +9,9 @@ mkdir -p "$TMP/bin" "$TMP/inst" "$TMP/home"
 cat > "$TMP/bin/docker" <<'STUB'
 #!/usr/bin/env bash
 echo "$*" >> "$DOCKER_LOG"
-# Die Namen gibt instance.sh compose ueber die Umgebung mit — eigenes Log, DOCKER_LOG bleibt eine Zeile je Aufruf
+# instance.sh compose passes the names via the environment — own log, DOCKER_LOG stays one line per call
 [ "$1" = compose ] && echo "${MYSURICATES_CONTAINER:-} ${MYSURICATES_IMAGE:-}" >> "${DOCKER_ENV_LOG:-/dev/null}"
-# docker build … - : der Build-Kontext kommt als tar ueber stdin — aufheben, damit der Test ihn prueft
+# docker build … - : the build context arrives as tar on stdin — keep it so the test can check it
 [ "$1" = build ] && { cat > "${DOCKER_CTX:-/dev/null}"; exit 0; }
 case "$*" in
   *"compose"*"config"*) exit 0 ;;

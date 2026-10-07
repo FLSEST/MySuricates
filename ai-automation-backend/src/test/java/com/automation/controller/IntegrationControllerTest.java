@@ -84,7 +84,7 @@ class IntegrationControllerTest {
                 .andExpect(jsonPath("$[0].verifiedAgainst").doesNotExist());
     }
 
-    /** Ein Anbieter ohne Pflicht-Verbindung sagt es der Oberflaeche (TODO cdccc1e5); die uebrigen nicht. */
+    /** A provider without a required connection tells the UI so (TODO cdccc1e5); the others do not. */
     @Test
     void listProviders_saysWhetherAProviderRunsWithoutAConnection() throws Exception {
         IntegrationProvider feed = provider("feed");

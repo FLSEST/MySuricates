@@ -135,34 +135,34 @@ MODULE_EXT = (".ts", ".tsx")
 TEST_DIR = re.compile(r"(^|/)(__tests__|__mocks__|test)/")
 TEST_FILE = re.compile(r"\.(test|spec)\.[jt]sx?$")
 
-# Anker am Zeilenanfang, Mittelteil ohne Semikolon (so endet ein Seiteneffekt-Import
-# nicht am from der naechsten Anweisung) und ueber Zeilen hinweg, damit mehrzeilige
-# Import-Listen mitgezaehlt werden. Gruppe 1 ist die Klausel (fuer die Typerkennung),
-# Gruppe 2 der Spezifizierer.
+# Anchored at the line start, middle part without a semicolon (so a side-effect import does
+# not end at the from of the next statement) and across lines, so that multi-line import
+# lists are counted too. Group 1 is the clause (for type detection), group 2 the
+# specifier.
 SPEC = r"""^%s(\s(?:[^;'"]|'[^']*'|"[^"]*")*?)from\s*['"]([^'"]+)['"]"""
 IMPORT_RE = re.compile(SPEC % "import", re.M)
 EXPORT_RE = re.compile(SPEC % "export", re.M)
-# Dynamischer Import: `import('…')`, auch hinter await/lazy() und mitten in der Zeile.
-# Kollidiert nicht mit den statischen Mustern oben — dort folgt auf `import` ein
-# Leerzeichen, hier eine Klammer.
+# Dynamic import: `import('…')`, also after await/lazy() and in the middle of a line.
+# Does not collide with the static patterns above — there `import` is followed by a
+# space, here by a parenthesis.
 DYNAMIC_RE = re.compile(r"""import\s*\(\s*['"]([^'"]+)['"]\s*\)""")
 
-# Typ-Query: `typeof import('m')` und `import('m').Typ` stehen in Typposition, tsc loescht
-# beides restlos — das ist eine Typkante, keine dynamische (TODO 26b3da40). Vorher zaehlten
-# beide Formen als dynamischer Import, wodurch type_edges, dynamic_edges und dynamic_imports
-# je um die Zahl dieser Stellen daneben lagen.
+# Type query: `typeof import('m')` and `import('m').Type` sit in type position, tsc erases
+# both completely — that is a type edge, not a dynamic one (TODO 26b3da40). Before, both
+# forms counted as dynamic imports, so type_edges, dynamic_edges and dynamic_imports were
+# each off by the number of such places.
 #
-# Die Abgrenzung zum echten Laufzeit-Import haengt daran, was auf die Klammer folgt: bei
-# einer Typ-Query ein Typname, bei einem Laufzeit-Import eine Promise-Methode
-# (`import('m').then(…)`). Deshalb sind then/catch/finally ausgenommen; ein Zugriff auf eine
-# andere Eigenschaft der Promise waere sinnlos. `(await import('m')).default` trifft das
-# Muster nicht, dort steht die Klammer dazwischen.
+# What separates it from a real runtime import is what follows the parenthesis: a type name
+# for a type query, a promise method for a runtime import (`import('m').then(…)`). Hence
+# then/catch/finally are excluded; accessing any other property of the promise would make
+# no sense. `(await import('m')).default` does not match the pattern, the parenthesis sits
+# in between.
 TYPE_QUERY_RE = re.compile(
     r"""typeof\s+import\s*\(\s*['"]([^'"]+)['"]\s*\)"""
     r"""|import\s*\(\s*['"]([^'"]+)['"]\s*\)\s*\.\s*(?!then\b|catch\b|finally\b)[A-Za-z_$]""")
 
-# Eine Kante je (von, nach); trifft dasselbe Paar in mehreren Formen zu, gewinnt die
-# staerkste Bindung: statisch zur Laufzeit > dynamisch (aufgeschoben) > nur Typ (geloescht).
+# One edge per (from, to); if the same pair occurs in several forms, the strongest binding
+# wins: static at runtime > dynamic (deferred) > type only (erased).
 EDGE_RANK = {"runtime": 3, "dynamic": 2, "type": 1}
 
 
@@ -293,8 +293,8 @@ for rel in sorted(MODULES):
     emit("module", rel, lines, directory)
     for clause, spec in IMPORT_RE.findall(text) + EXPORT_RE.findall(text):
         record(rel, spec, "type" if type_only(clause) else "runtime")
-    # Typ-Queries zuerst: ihre Fundstellen sind danach fuer den dynamischen Durchgang gesperrt,
-    # sonst zaehlte dieselbe Stelle zweimal (einmal als Typ-, einmal als dynamische Kante).
+    # Type queries first: their spans are then blocked for the dynamic pass, otherwise the
+    # same place would count twice (once as a type edge, once as a dynamic edge).
     type_query_spans = []
     for match in TYPE_QUERY_RE.finditer(text):
         record(rel, match.group(1) or match.group(2), "type")

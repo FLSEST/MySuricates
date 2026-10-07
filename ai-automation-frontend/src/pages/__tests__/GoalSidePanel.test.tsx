@@ -18,7 +18,7 @@ import { useToastStore } from '../../stores/toastStore';
 import type { GoalDetail as GoalDetailData, GoalTodoItem } from '../../types';
 
 // c60bf914 (Flo): „Beim Anklicken eines Milestones sollten die TODOs und Workflows in der Ansicht rechts
-// sein. Und man sollte auch besser zu den TODOs kommen … anklickbar.“ – und: „ziehbar und verschiebbar
+// sein. Und man sollte auch besser zu den TODOs kommen … anklickbar.“ – and: „ziehbar und verschiebbar
 // und größenänderbar … bei den tieferen nicht alles erkennbar“.
 
 beforeAll(() => server.listen({ onUnhandledRequest: failOnUnhandledRequest }));
