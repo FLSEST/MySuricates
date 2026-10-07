@@ -11,8 +11,9 @@ translation itself happens here, so it is testable and costs no tokens:
               [--sample N] [--batch-size B]  the trailer step, put English-only ones straight into the
                                              map and write the German ones as translation batches
   check       --state S --run ID --batch NN  verify one batch answer (stdin or --answer FILE) against
-              [--answer FILE]                its source; accepted messages go into the map, the rest
-                                             into rejects.jsonl with the reason
+              [--answer FILE] [--stored]     its source; accepted messages go into the map, the rest
+                                             into rejects.jsonl with the reason. The raw answer is
+                                             kept, so --stored re-checks it after a rule change
   report      --state S --run ID             summary plus a side-by-side review page (review.html)
   callback    --map FILE                     body for `git filter-repo --commit-callback`
 
@@ -149,8 +150,11 @@ TRANSLITERATED = re.compile(r'\b(?:fuer|ueber|koennen|muessen|muesste|aender\w*|
                             r'waere|waeren|naechste\w*|moeglich\w*|zurueck\w*|ueberall|loesch\w*|schliess\w*)\b', re.I)
 
 
+FILE_OR_PATH = re.compile(r'\S*[/.]\S*')
+
+
 def is_german_text(text):
-    text = QUOTED.sub(' ', text)
+    text = FILE_OR_PATH.sub(' ', QUOTED.sub(' ', text))
     if UMLAUT.search(text) or TRANSLITERATED.search(text):
         return True
     words = {w.lower() for w in WORD.findall(text)}
@@ -168,12 +172,35 @@ TOKEN_PATTERNS = [
     re.compile(r'`[^`\n]+`'),                                   # code spans
     re.compile(r'https?://\S+'),                                # URLs
     re.compile(r'\b[0-9a-f]{7,40}\b(?=[^0-9a-f]|$)'),           # hashes / short ids (filtered below)
-    re.compile(r'(?<![\w/.-])(?:[\w.-]+/)+[\w.-]+'),            # paths
+    re.compile(r'(?<![\w/.-])(?:[\w.-]+/)+[\w.-]+'),            # paths (filtered by is_path)
     re.compile(r'\b[\w-]+\.(?:java|tsx?|py|sh|md|ya?ml|json|sql|xml|html|css|js)\b'),
     re.compile(r'\b[a-z]+[A-Z]\w*\b|\b[A-Z][a-z]+[A-Z]\w*\b'),  # camelCase / CamelCase identifiers
     re.compile(r'\b\w+_\w+\b'),                                 # snake_case identifiers
     re.compile(r'\bV\d+\b|\b\d+(?:[.,]\d+)*\b'),                # numbers, migration names
 ]
+
+
+PATH_ROOTS = frozenset('''
+    scripts docs src lib config deploy workflow-pool templates reports api tests test frontend backend
+    ai-automation-backend ai-automation-frontend .github .claude node_modules target playwright cypress
+'''.split())
+FILE_EXT = re.compile(r'\.[A-Za-z][A-Za-z0-9]{0,5}$')
+
+
+def is_path(token):
+    """A slash token is a path if a segment has a file extension, it starts at a root, or it has
+    lower-case segments below a known top-level directory. German writes word pairs and compounds
+    with slashes ("Aktionen/Einstellungen", "Maven-/Spring-Logzeilen") - those are no paths."""
+    if token.startswith(('/', './', '../', '~/')):
+        return True
+    segments = token.split('/')
+    if any(FILE_EXT.search(seg) for seg in segments):
+        return True
+    if any(seg.endswith('-') or seg.startswith('-') or not seg for seg in segments):
+        return False
+    if not all(re.fullmatch(r'[a-z0-9._-]+', seg) for seg in segments):
+        return False
+    return segments[0] in PATH_ROOTS or len(segments) >= 3
 
 
 def preserved_tokens(text):
@@ -183,6 +210,8 @@ def preserved_tokens(text):
             token = m.group(0).rstrip('.,;:)')
             if pattern is TOKEN_PATTERNS[2] and not re.search(r'\d', token):
                 continue  # a word like "deadbeef" without digits is no id
+            if pattern is TOKEN_PATTERNS[3] and not is_path(token):
+                continue  # "Aktionen/Einstellungen" is a word pair, not a path
             if len(token) > 1:
                 found.add(token)
     return found
@@ -362,7 +391,7 @@ def problems(source, translated, terms):
     s_subj, s_body, s_trailers = split_message(source)
     t_subj, t_body, t_trailers = split_message(translated)
     if t_trailers != s_trailers:
-        errors.append('trailers changed')
+        errors.append('trailers changed')  # check() restores them before calling this
     src_text, out_text = s_subj + '\n' + s_body, t_subj + '\n' + t_body
     missing = sorted(t for t in preserved_tokens(src_text) if t not in out_text)
     if missing:
@@ -389,7 +418,17 @@ def problems(source, translated, terms):
 def cmd_check(args):
     state, run = Path(args.state), Path(args.state) / 'runs' / args.run
     source = {c['hash']: c for c in json.loads((run / 'batches' / f'{args.batch}.source.json').read_text(encoding='utf-8'))}
-    raw = Path(args.answer).read_text(encoding='utf-8') if args.answer else sys.stdin.read()
+    stored = run / 'answers' / f'{args.batch}.txt'
+    if args.stored:
+        raw = stored.read_text(encoding='utf-8')
+    else:
+        raw = Path(args.answer).read_text(encoding='utf-8') if args.answer else sys.stdin.read()
+        stored.parent.mkdir(parents=True, exist_ok=True)
+        stored.write_text(raw, encoding='utf-8')
+    # A re-check replaces this batch's earlier verdicts.
+    for name in ('accepted.jsonl', 'rejects.jsonl'):
+        kept = [e for e in read_jsonl(run / name) if e.get('batch') != args.batch]
+        (run / name).write_text(''.join(json.dumps(e, ensure_ascii=False) + '\n' for e in kept), encoding='utf-8')
     answer = json_object(raw) or {}
     got = {m.get('hash'): m.get('message', '') for m in answer.get('messages', []) if isinstance(m, dict)}
     terms = private_terms()
@@ -400,7 +439,15 @@ def cmd_check(args):
             rejected.append({'hash': sha, 'batch': args.batch, 'reasons': ['missing in answer']})
             continue
         text = text.rstrip('\n') + '\n'
+        restored = []
+        s_subj, s_body, s_trailers = split_message(item['message'])
+        t_subj, t_body, t_trailers = split_message(text)
+        if t_trailers != s_trailers:
+            # Trailers are never translated: put the original ones back instead of rejecting.
+            text = join_message(t_subj, t_body, s_trailers)
+            restored = ['trailers restored']
         errors, warnings = problems(item['message'], text, terms)
+        warnings = restored + warnings
         if errors:
             rejected.append({'hash': sha, 'batch': args.batch, 'reasons': errors, 'warnings': warnings,
                              'translation': text})
@@ -502,6 +549,7 @@ def main(argv=None):
     p.add_argument('--batch', required=True)
     p.add_argument('--answer')
     p.add_argument('--probe', action='store_true', help='keep accepted messages out of the map')
+    p.add_argument('--stored', action='store_true', help='re-check the stored answer (no new AI call)')
     p = sub.add_parser('report')
     p.add_argument('--state', required=True)
     p.add_argument('--run', required=True)

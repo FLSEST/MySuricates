@@ -109,6 +109,44 @@ class Checks(unittest.TestCase):
         self.assertEqual(hm.json_object(raw), {"messages": [{"hash": "a", "message": "x {y}"}]})
 
 
+class ProbeFindings(unittest.TestCase):
+    """False alarms and one real slip from the 50-commit probe of 2026-10-07 (run 20261007-162524)."""
+
+    def test_german_word_pairs_with_slashes_are_no_paths(self):
+        for pair in ("Aktionen/Einstellungen", "Maven-/Spring-Logzeilen", "Records/Interfaces",
+                     "erklaert/priorisiert", "Memory/Kontext/Action", "GitHub-/OpenAI-/AWS-/Slack-Tokens"):
+            self.assertFalse(hm.is_path(pair), pair)
+
+    def test_real_paths_still_have_to_survive(self):
+        for path in ("scripts/tests", "docs/en/konzepte", "service/workflow/RunCompletionHandler.java",
+                     "api/v1/todos", "./mvnw", "~/.config/mysuricates"):
+            self.assertTrue(hm.is_path(path), path)
+        src = "fix: Prüfung in scripts/tests und docs/plans ergänzt\n"
+        self.assertTrue(any(e.startswith("lost:") for e in hm.problems(src, "fix: check added to tests and plans\n", [])[0]))
+
+    def test_file_names_do_not_count_as_german(self):
+        self.assertFalse(hm.is_german_text("docs: drop duplicates in entwicklung.md and docs/deployment.md"))
+
+    def test_changed_trailers_are_restored_not_rejected(self):
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        run = Path(tmp.name) / "runs" / "r" / "batches"
+        run.mkdir(parents=True)
+        src = "docs: Betriebsart beim Dev-Start erklaert\n\nTodo: deadbee1 (warum Dev laeuft)\n"
+        (run / "001.source.json").write_text(json.dumps([{"hash": "h1", "source": src, "message": src}]))
+        answer = json.dumps({"messages": [{"hash": "h1", "message": "docs: explain the operating mode at dev start\n\nTodo: deadbee1 (warum Dev läuft)\n"}]})
+        out = subprocess.run([sys.executable, str(SCRIPT), "check", "--state", tmp.name, "--run", "r", "--batch", "001", "--probe"],
+                             input=answer, capture_output=True, text=True, check=True).stdout
+        self.assertIn("1 accepted, 0 rejected", out)
+        accepted = json.loads((Path(tmp.name) / "runs/r/accepted.jsonl").read_text())
+        self.assertTrue(accepted["message"].endswith("Todo: deadbee1 (warum Dev laeuft)\n"))
+        self.assertIn("trailers restored", accepted["warnings"])
+        # The raw answer is kept; a re-check replaces the verdict instead of adding a second one.
+        subprocess.run([sys.executable, str(SCRIPT), "check", "--state", tmp.name, "--run", "r", "--batch", "001", "--probe", "--stored"],
+                       capture_output=True, text=True, check=True)
+        self.assertEqual(len((Path(tmp.name) / "runs/r/accepted.jsonl").read_text().splitlines()), 1)
+
+
 class NeedsTranslation(unittest.TestCase):
     def test_english_message_with_german_todo_title_needs_none(self):
         msg = f"test(scripts): green again\n\nBody in English.\n\nTodo: {UUID_A} (Rote Shell-Suiten auf main beheben)\n"
