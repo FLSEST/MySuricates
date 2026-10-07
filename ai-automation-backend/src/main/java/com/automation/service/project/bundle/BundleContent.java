@@ -34,8 +34,9 @@ final class BundleContent {
     }
 
     static ProjectBundle rewrite(ProjectBundle bundle, Rewriter rewriter) {
+        // null entries pass through: the validator walks the content too and reports them as problems
         List<BundleWorkflow> workflows = bundle.workflows().stream()
-                .map(w -> new BundleWorkflow(w.key(), rewrite(w.definition(), rewriter)))
+                .map(w -> w == null ? null : new BundleWorkflow(w.key(), rewrite(w.definition(), rewriter)))
                 .toList();
         List<BundleChain> chains = bundle.chains().stream().map(c -> rewrite(c, rewriter)).toList();
         List<BundleSchedule> schedules = bundle.schedules().stream().map(s -> rewrite(s, rewriter)).toList();
@@ -65,7 +66,7 @@ final class BundleContent {
     }
 
     private static BundleChain rewrite(BundleChain chain, Rewriter rewriter) {
-        if (chain.entries() == null) {
+        if (chain == null || chain.entries() == null) {
             return chain;
         }
         List<BundleChainEntry> entries = new ArrayList<>();
