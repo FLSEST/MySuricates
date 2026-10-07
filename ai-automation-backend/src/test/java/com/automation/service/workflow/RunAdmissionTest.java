@@ -434,4 +434,16 @@ class RunAdmissionTest {
         }
         verifyNoInteractions(activityLog);
     }
+
+    // TODO 9525820a: the process sandbox spares only runs a person started, directly or as their origin
+    @Test
+    void attended_onlyForRunsAPersonStarted() {
+        assertThat(RunAdmission.attended(TriggerSource.MANUAL, Map.of())).isTrue();
+        assertThat(RunAdmission.attended(TriggerSource.SCHEDULE, Map.of())).isFalse();
+        assertThat(RunAdmission.attended(TriggerSource.SUB_WORKFLOW,
+                Map.of(TriggerSource.PARENT_CONTEXT_KEY, "MANUAL"))).isTrue();
+        assertThat(RunAdmission.attended(TriggerSource.SUB_WORKFLOW,
+                Map.of(TriggerSource.PARENT_CONTEXT_KEY, "SCHEDULE"))).isFalse();
+        assertThat(RunAdmission.attended(TriggerSource.SUB_WORKFLOW, Map.of())).as("unknown origin").isFalse();
+    }
 }

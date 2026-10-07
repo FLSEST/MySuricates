@@ -22,8 +22,10 @@ import java.util.Set;
  * provider ({@code CLAUDE_CODE_OAUTH_TOKEN}, {@code ANTHROPIC_API_KEY}, {@code OPENAI_API_KEY}, …)
  * are not touched.
  *
- * <p>This only closes the environment path. The key file in the user's home stays readable for
- * every process of the same user — see TODO 9525820a.
+ * <p>The environment is only one path. The key files and the database in the user's home stay readable
+ * for every process of the same user; outside attended runs {@link ProcessSandbox} hides them when
+ * {@code automation.hardening.unattended-sandbox} is on (TODO 9525820a). Both go through
+ * {@link #scrub(ProcessBuilder)}, so every spawn site that scrubs is sandboxed as well.
  */
 public final class ChildProcessEnv {
 
@@ -48,9 +50,13 @@ public final class ChildProcessEnv {
         return pb;
     }
 
-    /** Removes the backend's own secrets from the environment a child process is started with. */
+    /**
+     * Removes the backend's own secrets from the environment a child process is started with, and puts
+     * the {@linkplain ProcessSandbox process sandbox} in front of its command when that is active.
+     */
     public static void scrub(ProcessBuilder pb) {
         scrub(pb.environment());
+        ProcessSandbox.apply(pb);
     }
 
     static void scrub(Map<String, String> environment) {

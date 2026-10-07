@@ -30,6 +30,9 @@ automation:
     require-signed-seal: true
     # Unsealing is not possible over the API any more — only by changing this file. Requires sealing.
     seal-immutable: true
+    # AI CLIs and shell blocks outside runs a person started cannot read, change or replace the key files
+    # or the database (Linux Landlock); without Landlock they do not start at all.
+    unattended-sandbox: true
     # HMAC-SHA256 signing secret per webhook (header X-Signature). Requires the webhooks module.
     webhook-signatures: true
     # iCal/RSS feeds only fetch public addresses (resolved IPs, every redirect hop).

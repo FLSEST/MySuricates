@@ -103,6 +103,10 @@
     "name": "Entsiegeln gesperrt",
     "description": "Entsiegeln ist über die Oberfläche und die API nicht mehr möglich; ein Siegel löst nur, wer die Startkonfiguration ändern kann."
   },
+  "unattended-sandbox": {
+    "name": "Schutz unbeaufsichtigter Prozesse",
+    "description": "KI-CLIs und Shell-Blöcke außerhalb von Hand gestarteter Läufe können API-Schlüsseldatei, Siegel- und Integrationsschlüssel und die Datenbank weder lesen noch ändern oder ersetzen (Linux Landlock). Ohne Landlock starten solche Prozesse gar nicht."
+  },
   "webhook-signatures": {
     "name": "Webhook-Signaturen (HMAC)",
     "description": "Signatur-Secret je Webhook (HMAC-SHA256 im Header X-Signature); ein gespeichertes Secret gilt immer, der Schalter regelt nur Setzen und Entfernen."

@@ -103,6 +103,10 @@
     "name": "Unsealing locked",
     "description": "Unsealing is no longer possible through the UI or the API; a seal is released only by someone who can change the startup configuration."
   },
+  "unattended-sandbox": {
+    "name": "Unattended process sandbox",
+    "description": "AI CLIs and shell blocks outside runs started by a person can neither read nor change or replace the API key file, the seal and integration keys or the database (Linux Landlock). Without Landlock such processes do not start at all."
+  },
   "webhook-signatures": {
     "name": "Webhook signatures (HMAC)",
     "description": "Per-webhook signing secret (HMAC-SHA256 in the X-Signature header); a stored secret is always enforced, the switch only gates setting and removing it."

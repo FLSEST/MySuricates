@@ -13,6 +13,7 @@ import com.automation.repository.WorkflowRunRepository;
 import com.automation.service.activitylog.ActivityLogService;
 import com.automation.service.project.ContainerService;
 import com.automation.service.workflow.WorkflowSnapshotLoader.WorkflowSnapshot;
+import com.automation.util.ProcessSandbox;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -116,7 +117,8 @@ public class WorkflowExecutor {
         final String runId = run.getId();
         final String workflowId = workflow.getId();
         final String workflowName = workflow.getName();
-        submitExecution(runId, () -> executeBlocks(runId, workflowId, workflowName, wf, contextVars, ResumePlan.FRESH, null));
+        submitExecution(runId, RunAdmission.attended(triggerSource, inputContext),
+                () -> executeBlocks(runId, workflowId, workflowName, wf, contextVars, ResumePlan.FRESH, null));
 
         return run;
     }
@@ -150,13 +152,9 @@ public class WorkflowExecutor {
             executionSemaphore.acquire();
             semaphoreAcquired = true;
             run = runRepository.findById(runId).orElseThrow();
-            if (resume.resuming()) {
-                // Resuming: keep existing completed steps from DB
-                run.setSteps(new ArrayList<>(stepResultRepository.findByWorkflowRunIdOrderByStepIndexAsc(runId)));
-            } else {
-                // Fresh run: start with empty step list
-                run.setSteps(new ArrayList<>());
-            }
+            // Resuming keeps the completed steps from the DB, a fresh run starts with an empty list
+            run.setSteps(resume.resuming()
+                    ? new ArrayList<>(stepResultRepository.findByWorkflowRunIdOrderByStepIndexAsc(runId)) : new ArrayList<>());
 
             if (executionRegistry.cancelRequested(runId)) {   // cancel arrived while still queued
                 run.setStatus(RunStatus.CANCELLED);           // finally: save, broadcast, unregister
@@ -292,11 +290,12 @@ public class WorkflowExecutor {
 
     /**
      * Hands the run to the executor. If the pool rejects it (shutdown in progress), the run would
-     * otherwise stay RUNNING in the DB with no thread ever finishing it — so fail it right away.
+     * otherwise stay RUNNING in the DB with no thread ever finishing it — so fail it right away. Processes
+     * of an attended run start without the process sandbox, all others behind it (TODO 9525820a).
      */
-    private void submitExecution(String runId, Runnable execution) {
+    private void submitExecution(String runId, boolean attended, Runnable execution) {
         try {
-            virtualThreadExecutor.submit(execution);
+            virtualThreadExecutor.submit(ProcessSandbox.attended(attended, execution));
         } catch (Throwable t) {
             executionRegistry.unregister(runId); // no thread will reach executeBlocks' finally
             boolean rejected = t instanceof java.util.concurrent.RejectedExecutionException;
@@ -349,7 +348,8 @@ public class WorkflowExecutor {
         }
         try {
             broadcaster.broadcastRunStatus(runId, RunStatus.RUNNING);
-            submitExecution(runId, () -> executeBlocks(runId, start.run().getWorkflow().getId(), start.run().getWorkflow().getName(),
+            submitExecution(runId, RunAdmission.attended(source, start.context().variables()), () -> executeBlocks(runId,
+                    start.run().getWorkflow().getId(), start.run().getWorkflow().getName(),
                     start.wf(), start.context().variables(), start.plan(), start.context().previousOutput()));
         } catch (Throwable t) {
             executionRegistry.unregister(runId); // no thread took over — do not leave it registered

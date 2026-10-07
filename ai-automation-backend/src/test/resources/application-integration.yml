@@ -51,6 +51,7 @@ automation:
     require-sealed-for-unattended: false
     require-signed-seal: false
     seal-immutable: false
+    unattended-sandbox: false
     webhook-signatures: false
     private-network-guard: true
     private-network-guard-http-api: false

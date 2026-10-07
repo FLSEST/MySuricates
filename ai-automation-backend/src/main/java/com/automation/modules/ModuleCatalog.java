@@ -98,6 +98,10 @@ public enum ModuleCatalog {
             "Unsealing is no longer possible over REST — a seal is then released only by turning this "
                     + "switch off in the startup configuration and restarting. Protects against anyone "
                     + "(including an agent) who holds the API key."),
+    UNATTENDED_SANDBOX("unattended-sandbox", HARDENING, EXPERIMENTAL, false, Set.of(), List.of(),
+            "AI CLIs and shell blocks outside runs started by a person cannot read, change or replace the "
+                    + "API key file, the seal and integration keys or the database (Linux Landlock). Without "
+                    + "Landlock such processes do not start at all."),
     WEBHOOK_SIGNATURES("webhook-signatures", HARDENING, EXPERIMENTAL, false, Set.of(), List.of("webhooks"),
             "Per-webhook HMAC-SHA256 signing secret (X-Signature). A stored secret is always enforced; "
                     + "the switch gates setting and removing it."),

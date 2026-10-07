@@ -12,7 +12,10 @@ report — security included.
 - Workflow steps can execute arbitrary shell commands and invoke AI CLIs
   (`claude`, `codex`, `pi`) **with the privileges of the host user running the
   backend** — there is no container sandbox between a workflow step and the
-  host.
+  host. The startup switch `automation.hardening.unattended-sandbox` (Linux,
+  off by default) keeps steps outside runs a person started away from the
+  instance's own key files and database (Landlock); everything else the host
+  user can reach stays reachable.
 - API access is protected by a single static API key (`X-API-Key`), compared
   in constant time; a handful of endpoints (health/info/auth-status, webhook
   ingestion) are reachable without one.
@@ -52,7 +55,9 @@ MySuricates ist ein Forschungs-/Hobbyprojekt eines einzelnen Entwicklers,
 kein betreutes Produkt — es gibt keinen Support und keine Zusage zu
 Reaktionszeiten, auch nicht bei Sicherheitsmeldungen. Workflow-Schritte
 führen Shell-Befehle und KI-CLIs mit den Rechten des Host-Benutzers aus, ohne
-Container-Sandbox; der API-Zugriff läuft über einen einzelnen statischen
+Container-Sandbox (der Startschalter `automation.hardening.unattended-sandbox`
+hält unter Linux Schritte außerhalb von Hand gestarteter Läufe von den
+Schlüsseldateien und der Datenbank der Instanz fern); der API-Zugriff läuft über einen einzelnen statischen
 API-Key, einzelne Endpunkte (Health/Info/Auth-Status, Webhook-Eingang) sind
 unauthentifiziert erreichbar. Details:
 [Vertrauensmodell und Netzwerk-Exposition](docs/deployment.md#vertrauensmodell-und-netzwerk-exposition).

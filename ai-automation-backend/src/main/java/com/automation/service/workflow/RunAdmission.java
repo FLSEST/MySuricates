@@ -77,6 +77,11 @@ public class RunAdmission {
         }
     }
 
+    /** Whether a person started the run (directly or as the origin of its chain or parent run). */
+    static boolean attended(TriggerSource source, Map<String, Object> inputContext) {
+        return unattendedOrigin(source, inputContext) == null;
+    }
+
     /** The effective origin when nobody started the run — {@code "unknown"} counts as unattended — else null. */
     private static String unattendedOrigin(TriggerSource source, Map<String, Object> inputContext) {
         TriggerSource effective = source.effective(inputContext);
