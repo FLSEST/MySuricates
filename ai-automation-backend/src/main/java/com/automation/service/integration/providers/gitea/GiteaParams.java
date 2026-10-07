@@ -2,8 +2,6 @@ package com.automation.service.integration.providers.gitea;
 
 import com.automation.service.integration.providers.IntegrationParams;
 
-import java.net.URLEncoder;
-import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -39,8 +37,7 @@ final class GiteaParams {
     }
 
     static String paramString(Map<String, Object> params, String key, String defaultValue) {
-        Object val = params.get(key);
-        return val != null ? val.toString() : defaultValue;
+        return IntegrationParams.paramString(params, key, defaultValue);
     }
 
     /** Missing or blank → {@code defaultValue}; a number is read like its text ({@link IntegrationParams}). */
@@ -54,9 +51,7 @@ final class GiteaParams {
     }
 
     static String requireParam(Map<String, Object> params, String key) {
-        Object val = params.get(key);
-        if (val == null || val.toString().isBlank()) throw IntegrationParams.missing(key);
-        return val.toString().trim();
+        return IntegrationParams.requireNonBlank(params, key).trim();
     }
 
     /**
@@ -70,6 +65,6 @@ final class GiteaParams {
     }
 
     static String urlEncode(String value) {
-        return URLEncoder.encode(value, StandardCharsets.UTF_8);
+        return IntegrationParams.urlEncode(value);
     }
 }

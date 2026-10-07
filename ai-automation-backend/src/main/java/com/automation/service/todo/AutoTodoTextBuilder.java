@@ -10,13 +10,15 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 
 /**
  * Builds the text parts of auto-todos: description (gate description or the run's report step),
- * granular-item description, source footer and the tags JSON.
+ * granular-item description, source footer, the track-mode update entry and the tags JSON.
  *
  * <p>Extracted from {@code AutoTodoService} (Audit-TODO 9b4845ab). Reads step outputs, writes
  * nothing.
@@ -27,6 +29,9 @@ import java.util.Locale;
 public class AutoTodoTextBuilder {
 
     private static final int MAX_DESCRIPTION_LENGTH = 4000;
+    /** Cap of a track-mode description, so repeated updates cannot grow it without bound. */
+    static final int MAX_TRACK_DESCRIPTION_LENGTH = 8000;
+    private static final DateTimeFormatter TRACK_UPDATE_TIMESTAMP = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
 
     private final StepResultRepository stepResultRepository;
 
@@ -99,6 +104,31 @@ public class AutoTodoTextBuilder {
             log.warn("Could not load step outputs for run {}: {}", runId, e.getMessage());
         }
         return null;
+    }
+
+    /**
+     * Track mode: appends an update entry (timestamp, run id, the run's report or else the gate
+     * description) to the current description. When the result exceeds
+     * {@link #MAX_TRACK_DESCRIPTION_LENGTH}, the oldest part is dropped and the text restarts at the
+     * next update separator behind a {@code ...} marker.
+     */
+    String appendTrackUpdate(String currentDescription, WorkflowRunCompletedEvent event, GateResult gate) {
+        return appendTrackUpdate(currentDescription, event, gate, LocalDateTime.now());
+    }
+
+    String appendTrackUpdate(String currentDescription, WorkflowRunCompletedEvent event, GateResult gate,
+                             LocalDateTime timestamp) {
+        String newReport = loadReportFromSteps(event.getRunId());
+        String updateEntry = String.format("\n\n---\n### Update %s\n*Run: `%s`*\n\n%s",
+                timestamp.format(TRACK_UPDATE_TIMESTAMP),
+                event.getRunId(),
+                newReport != null ? newReport : gate.description());
+        String merged = (currentDescription != null ? currentDescription : "") + updateEntry;
+        if (merged.length() > MAX_TRACK_DESCRIPTION_LENGTH) {
+            merged = merged.substring(merged.length() - MAX_TRACK_DESCRIPTION_LENGTH);
+            merged = "...\n" + merged.substring(merged.indexOf("\n---\n") + 1);
+        }
+        return merged;
     }
 
     String buildTagsJson(GateResult gate) {

@@ -73,4 +73,61 @@ class KnowledgeSummarizerTest {
         assertThat(str).contains("MyContent");
         assertThat(str).contains("alpha");
     }
+
+    @Test
+    void parse_fullFormat_readsTitleTagsAndContent() {
+        String response = """
+                TITLE: Spring Boot API Conventions
+                TAGS: spring, api, testing, docker
+                ---
+                ## Project conventions
+                - Build: `mvn clean package`
+
+                ## Successful strategies
+                - Always run tests before commit
+                """;
+
+        SummarizationResult result = SummarizationResult.parse(response);
+
+        assertThat(result.title()).isEqualTo("Spring Boot API Conventions");
+        assertThat(result.tags()).containsExactly("spring", "api", "testing", "docker");
+        assertThat(result.content()).startsWith("## Project conventions").endsWith("- Always run tests before commit");
+    }
+
+    @Test
+    void parse_missingFormat_fallsBackToDefaultTitleNoTagsAndWholeResponse() {
+        String response = "Just some plain text without the expected format.";
+
+        SummarizationResult result = SummarizationResult.parse(response);
+
+        assertThat(result.title()).isEqualTo("Workflow Knowledge");
+        assertThat(result.tags()).isEmpty();
+        assertThat(result.content()).isEqualTo(response);
+    }
+
+    @Test
+    void parse_longTitle_isCutAt60Characters() {
+        SummarizationResult result = SummarizationResult.parse("TITLE: " + "A".repeat(80) + "\nTAGS: a\n---\ncontent");
+
+        assertThat(result.title()).isEqualTo("A".repeat(60));
+        assertThat(result.content()).isEqualTo("content");
+    }
+
+    @Test
+    void parse_emptyTagEntries_areDropped() {
+        SummarizationResult result = SummarizationResult.parse("TITLE: T\nTAGS: a, , b,\n---\nbody");
+
+        assertThat(result.tags()).containsExactly("a", "b");
+    }
+
+    @Test
+    void parse_withoutSeparator_keepsTitleButNoTagsAndWholeResponse() {
+        String response = "TITLE: Only title\nTAGS: a, b\nno separator here";
+
+        SummarizationResult result = SummarizationResult.parse(response);
+
+        assertThat(result.title()).isEqualTo("Only title");
+        assertThat(result.tags()).isEmpty();
+        assertThat(result.content()).isEqualTo(response);
+    }
 }

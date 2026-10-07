@@ -23,11 +23,7 @@ final class SlackParams {
     }
 
     static String requireParam(Map<String, Object> params, String key) {
-        Object val = params.get(key);
-        if (val == null || val.toString().isBlank()) {
-            throw IntegrationParams.missing(key);
-        }
-        return val.toString().trim();
+        return IntegrationParams.requireNonBlank(params, key).trim();
     }
 
     static String optionalString(Map<String, Object> params, String key) {

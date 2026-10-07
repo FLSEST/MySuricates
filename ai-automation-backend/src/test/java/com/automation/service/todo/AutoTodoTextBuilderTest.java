@@ -14,6 +14,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 
@@ -149,5 +150,53 @@ class AutoTodoTextBuilderTest {
                 .isEqualTo("Fix it\n\n---\n*Source: [Test Workflow](/workflows/wf-1) · [Run →](/workflows/wf-1/run/run-1)*");
         assertThat(builder.buildGranularDescription("  ", event("wf-1", "run-1")))
                 .isEqualTo("\n\n---\n*Source: [Test Workflow](/workflows/wf-1) · [Run →](/workflows/wf-1/run/run-1)*");
+    }
+
+    private static final LocalDateTime TRACK_TIME = LocalDateTime.of(2026, 10, 7, 9, 5);
+
+    @Test
+    void appendTrackUpdate_noReportStep_appendsGateDescriptionWithTimestampAndRun() {
+        when(stepResultRepository.findByWorkflowRunIdOrderByStepIndexAsc("run-2")).thenReturn(List.of());
+        GateResult gate = new GateResult(GateStatus.YELLOW, "tests", "2 flaky tests");
+
+        String d = builder.appendTrackUpdate("old text", event("wf-1", "run-2"), gate, TRACK_TIME);
+
+        assertThat(d).isEqualTo("old text\n\n---\n### Update 2026-10-07 09:05\n*Run: `run-2`*\n\n2 flaky tests");
+    }
+
+    @Test
+    void appendTrackUpdate_reportStepWins_overGateDescription() {
+        when(stepResultRepository.findByWorkflowRunIdOrderByStepIndexAsc("run-2")).thenReturn(List.of(
+                step(0, StepStatus.COMPLETED, ""), step(1, StepStatus.COMPLETED, longOutput("REPORT")), step(2, StepStatus.COMPLETED, "")));
+        GateResult gate = new GateResult(GateStatus.RED, "build", "gate text");
+
+        String d = builder.appendTrackUpdate("old", event("wf-1", "run-2"), gate, TRACK_TIME);
+
+        assertThat(d).startsWith("old\n\n---\n### Update 2026-10-07 09:05\n*Run: `run-2`*\n\nREPORT ");
+        assertThat(d).doesNotContain("gate text");
+    }
+
+    @Test
+    void appendTrackUpdate_nullCurrentDescription_isTreatedAsEmpty() {
+        when(stepResultRepository.findByWorkflowRunIdOrderByStepIndexAsc("run-2")).thenReturn(List.of());
+
+        String d = builder.appendTrackUpdate(null, event("wf-1", "run-2"),
+                new GateResult(GateStatus.GREEN, "ok", "fine"), TRACK_TIME);
+
+        assertThat(d).isEqualTo("\n\n---\n### Update 2026-10-07 09:05\n*Run: `run-2`*\n\nfine");
+    }
+
+    @Test
+    void appendTrackUpdate_overCap_dropsOldestPartAndRestartsAtUpdateSeparator() {
+        when(stepResultRepository.findByWorkflowRunIdOrderByStepIndexAsc("run-2")).thenReturn(List.of());
+        String older = ("\n\n---\n### Update old\n" + "z".repeat(990)).repeat(9);
+        assertThat(older.length()).isGreaterThan(AutoTodoTextBuilder.MAX_TRACK_DESCRIPTION_LENGTH);
+
+        String d = builder.appendTrackUpdate(older, event("wf-1", "run-2"),
+                new GateResult(GateStatus.RED, "build", "newest"), TRACK_TIME);
+
+        assertThat(d).startsWith("...\n---\n### Update ");
+        assertThat(d).endsWith("### Update 2026-10-07 09:05\n*Run: `run-2`*\n\nnewest");
+        assertThat(d.length()).isLessThanOrEqualTo(AutoTodoTextBuilder.MAX_TRACK_DESCRIPTION_LENGTH + "...\n".length());
     }
 }

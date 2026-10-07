@@ -13,7 +13,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 import java.net.URI;
-import java.net.URLEncoder;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
@@ -27,6 +26,10 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+
+import static com.automation.service.integration.providers.IntegrationParams.paramString;
+import static com.automation.service.integration.providers.IntegrationParams.requireNonBlank;
+import static com.automation.service.integration.providers.IntegrationParams.urlEncode;
 
 @Component
 @RequiredArgsConstructor
@@ -161,7 +164,7 @@ public class GoogleGmailProvider implements IntegrationProvider {
     }
 
     private Object getMessage(Map<String, Object> params, String accessToken) {
-        String messageId = requireParam(params, "messageId");
+        String messageId = requireNonBlank(params, "messageId");
         String format = paramString(params, "format", "full");
         JsonNode message = httpGet(BASE_URL + "/messages/" + urlEncode(messageId) + "?format=" + urlEncode(format), accessToken);
         return normalizeFullMessage(message, format);
@@ -285,17 +288,6 @@ public class GoogleGmailProvider implements IntegrationProvider {
         }
     }
 
-    private static String requireParam(Map<String, Object> params, String key) {
-        Object val = params.get(key);
-        if (val == null || val.toString().isBlank()) throw IntegrationParams.missing(key);
-        return val.toString();
-    }
-
-    private static String paramString(Map<String, Object> params, String key, String defaultValue) {
-        Object val = params.get(key);
-        return val != null ? val.toString() : defaultValue;
-    }
-
     private static List<String> paramStringList(Map<String, Object> params, String key) {
         Object value = params.get(key);
         if (!(value instanceof List<?> list)) {
@@ -316,9 +308,5 @@ public class GoogleGmailProvider implements IntegrationProvider {
         } catch (NumberFormatException e) {
             return internalDate;
         }
-    }
-
-    private static String urlEncode(String value) {
-        return URLEncoder.encode(value, StandardCharsets.UTF_8);
     }
 }

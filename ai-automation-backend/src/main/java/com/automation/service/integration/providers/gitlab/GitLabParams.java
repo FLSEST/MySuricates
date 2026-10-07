@@ -83,8 +83,7 @@ final class GitLabParams {
     }
 
     static String paramString(Map<String, Object> params, String key, String defaultValue) {
-        Object val = params.get(key);
-        return val != null ? val.toString() : defaultValue;
+        return IntegrationParams.paramString(params, key, defaultValue);
     }
 
     /** Missing or blank → {@code defaultValue}; a number is read like its text ({@link IntegrationParams}). */
@@ -98,9 +97,7 @@ final class GitLabParams {
     }
 
     static String requireParam(Map<String, Object> params, String key) {
-        Object val = params.get(key);
-        if (val == null || val.toString().isBlank()) throw IntegrationParams.missing(key);
-        return val.toString().trim();
+        return IntegrationParams.requireNonBlank(params, key).trim();
     }
 
     /**
@@ -114,6 +111,6 @@ final class GitLabParams {
     }
 
     static String urlEncode(String value) {
-        return URLEncoder.encode(value, StandardCharsets.UTF_8);
+        return IntegrationParams.urlEncode(value);
     }
 }
