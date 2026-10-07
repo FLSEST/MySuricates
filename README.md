@@ -172,7 +172,8 @@ The installer asks for the route – one instance in a container (recommended), 
 or staged Dev · Test · Prod – and for the modules, installs missing tools after asking, and starts the
 instance. At the end it shows the address: the instance listens only on `127.0.0.1`, on port 9090 or
 the next free one; when staged, each stage gets its own port. `scripts/instance.sh key --name main`
-shows the API key. Step by step, also on Windows via WSL2: [Getting Started](docs/en/GETTING-STARTED.md).
+shows the API key. Step by step: [Getting Started](docs/en/GETTING-STARTED.md) – it also gives the
+state for macOS (prepared) and Windows via WSL2, neither tried on real hardware yet.
 
 **AI blocks** need at least one logged-in command line – `claude`, `codex`, or `pi`. The installer
 shows which ones it finds but requires none; without one, only the deterministic blocks run.
@@ -199,4 +200,4 @@ Please do **not** report security vulnerabilities as public issues; use the repo
 
 > 🌍 **README.de.md is the source, `README.md` the translation.** Content changes belong in the German file. The author generates the English version from it in their MySuricates instance using the "README DE↔EN Sync" workflow; the repository holds only the result, not the workflow. So if you contribute from outside, change the German source and adjust `README.md` by hand in the same commit — or change only the German one and note in the pull request that the translation still needs to follow.
 
-<!-- synced-from: 401ca4330546 sha256:a7daed9bf950f4c7e76320385163d7a0b2cb22cc490e1801127465f67e6ecbd8 -->
+<!-- synced-from: 71109653546e sha256:7996860cfa88f357bc4b5484afaf68e08fdc14c1498e564c63e29d3a04f19244 -->
