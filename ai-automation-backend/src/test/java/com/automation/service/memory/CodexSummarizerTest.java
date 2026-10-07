@@ -33,34 +33,6 @@ class CodexSummarizerTest {
     }
 
     @Test
-    void parseResponse_fullFormat() {
-        String response = """
-                TITLE: React Frontend Patterns
-                TAGS: react, typescript, testing
-                ---
-                ## Project Conventions
-                - Build: `npm run build`
-                """;
-
-        var result = summarizer.parseResponse(response);
-
-        assertThat(result.title()).isEqualTo("React Frontend Patterns");
-        assertThat(result.tags()).containsExactly("react", "typescript", "testing");
-        assertThat(result.content()).contains("## Project Conventions");
-    }
-
-    @Test
-    void parseResponse_fallbackOnMissingFormat() {
-        String response = "Plain text without format.";
-
-        var result = summarizer.parseResponse(response);
-
-        assertThat(result.title()).isEqualTo("Workflow Knowledge");
-        assertThat(result.tags()).isEmpty();
-        assertThat(result.content()).isEqualTo(response);
-    }
-
-    @Test
     void summarize_callsCodexWithWorkDir() throws IOException {
         Path workDir = Path.of("/tmp/test-summarization/codex");
         when(setupService.getCodexWorkDir()).thenReturn(workDir);

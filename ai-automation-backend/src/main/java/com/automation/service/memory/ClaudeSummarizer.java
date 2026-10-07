@@ -6,8 +6,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 import java.io.IOException;
-import java.util.Arrays;
-import java.util.List;
 
 /**
  * Summarizes workflow execution data using the Claude CLI on the host.
@@ -38,42 +36,11 @@ public class ClaudeSummarizer implements KnowledgeSummarizer {
             long durationMs = System.currentTimeMillis() - start;
             log.info("Claude summarization completed in {}s (response length: {} chars)",
                     durationMs / 1000, result.text().length());
-            return parseResponse(result.text());
+            return SummarizationResult.parse(result.text());
         } catch (IOException e) {
             long durationMs = System.currentTimeMillis() - start;
             log.error("Claude summarization failed after {}s: {}", durationMs / 1000, e.getMessage());
             throw e;
         }
-    }
-
-    SummarizationResult parseResponse(String response) {
-        String title = "Workflow Knowledge";
-        List<String> tags = List.of();
-        String content = response;
-
-        int titleIdx = response.indexOf("TITLE:");
-        int tagsIdx = response.indexOf("TAGS:");
-        int separatorIdx = response.indexOf("\n---\n");
-
-        if (titleIdx >= 0 && tagsIdx > titleIdx) {
-            title = response.substring(titleIdx + 6, tagsIdx).trim();
-            if (title.length() > 60) {
-                title = title.substring(0, 60);
-            }
-        }
-
-        if (tagsIdx >= 0 && separatorIdx > tagsIdx) {
-            String tagsLine = response.substring(tagsIdx + 5, separatorIdx).trim();
-            tags = Arrays.stream(tagsLine.split(","))
-                    .map(String::trim)
-                    .filter(s -> !s.isEmpty())
-                    .toList();
-        }
-
-        if (separatorIdx >= 0 && separatorIdx + 5 < response.length()) {
-            content = response.substring(separatorIdx + 5).trim();
-        }
-
-        return new SummarizationResult(title, content, tags);
     }
 }
