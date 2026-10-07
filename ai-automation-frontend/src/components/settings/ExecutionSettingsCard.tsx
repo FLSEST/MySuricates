@@ -23,8 +23,6 @@ interface ToggleConfig {
   configKey: FlagSettingKey;
   label: string;
   hint: string;
-  /** Names the switch for assistive technology with its label. */
-  named?: true;
 }
 
 export function ExecutionSettingsCard() {
@@ -59,11 +57,11 @@ export function ExecutionSettingsCard() {
     { configKey: 'rateLimitEnabled', label: t.settings.executionRateLimitEnabled, hint: t.settings.executionRateLimitEnabledHint },
     { configKey: 'schedulerCatchUpOnResume', label: t.settings.schedulerCatchUpOnResume, hint: t.settings.schedulerCatchUpOnResumeHint },
     // Automatic resume of interrupted runs (TODO 90d10ba1)
-    { configKey: 'runAutoResumeEnabled', label: t.settings.runAutoResumeEnabled, hint: t.settings.runAutoResumeEnabledHint, named: true },
+    { configKey: 'runAutoResumeEnabled', label: t.settings.runAutoResumeEnabled, hint: t.settings.runAutoResumeEnabledHint },
     // Editor AI proposal for dashboard-report blocks
     { configKey: 'dashboardReportAssistEnabled', label: t.settings.dashboardReportAssist, hint: t.settings.dashboardReportAssistHint },
     // Keep finished runs' live logs; workflows can override it (TODO bbbfcbf8)
-    { configKey: 'liveLogPersistDefault', label: t.settings.liveLogPersistDefault, hint: t.settings.liveLogPersistDefaultHint, named: true },
+    { configKey: 'liveLogPersistDefault', label: t.settings.liveLogPersistDefault, hint: t.settings.liveLogPersistDefaultHint },
   ];
 
   const handleSave = () => updateConfig.mutate(toPayload(form));
@@ -109,7 +107,7 @@ export function ExecutionSettingsCard() {
           </div>
         </div>
 
-        {toggles.map(({ configKey, label, hint, named }) => (
+        {toggles.map(({ configKey, label, hint }) => (
           <div key={configKey} className="flex items-center justify-between py-2">
             <div>
               <label className="block text-sm font-medium text-text">{label}</label>
@@ -118,7 +116,7 @@ export function ExecutionSettingsCard() {
             <Toggle
               enabled={form[configKey]}
               onChange={(v) => setForm(prev => ({ ...prev, [configKey]: v }))}
-              ariaLabel={named ? label : undefined}
+              ariaLabel={label}
             />
           </div>
         ))}
