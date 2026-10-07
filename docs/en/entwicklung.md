@@ -834,6 +834,13 @@ of one's own) and consists of four blocks without AI:
 In the public repo, `.github/workflows/release.yml` then creates the GitHub release from the
 supplied notes file.
 
+**Gate before the push:** the "Public Readiness" chain can measure the public clone instead of the
+working repo — started with the context `{"readiness_repo": "<path to the public clone>"}`, which
+the chain passes on to evidence and claims. The shell blocks only read there; the `stand` block then
+reports, instead of "commits ahead of origin/main", the working repo's commits since the last
+handover (newest `v*` tag in the clone) and whether the handover has been pushed yet. Without the
+value (default: empty) both workflows measure the run's isolated clone as before.
+
 **Way back** (contributions from the public repo, per `CONTRIBUTING.md` only after agreement):
 since every handed-over file has the same blob as in the tag, a patch from the public clone applies
 in the working repo with a three-way merge:
