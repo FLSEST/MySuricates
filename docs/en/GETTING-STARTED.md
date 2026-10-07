@@ -1,8 +1,9 @@
 # Getting Started — MySuricates on a new machine
 
-This guide takes MySuricates from `git clone` to "running in the browser" — on a fresh **Linux** or
-**macOS** machine that may not have Java, Node or Docker yet. On **Windows** the same way runs in
-WSL2 (Ubuntu), see section 5.
+This guide takes MySuricates from `git clone` to "running in the browser" — on a fresh **Linux**
+machine that may not have Java, Node or Docker yet. **macOS** is prepared in the installer (Homebrew,
+bash 3.2) but not yet tried on a real Mac; run directly on a Mac, some shipped workflows also expect
+GNU tools. On **Windows** the same way runs in WSL2 (Ubuntu), see section 5.
 
 > **Before you start — the trust model in three sentences.** Shell blocks and AI calls run with
 > *your* permissions (on the machine, or with your mounted folders in the container); the AI CLIs do
@@ -248,7 +249,8 @@ before and says so. `scripts/instance.sh down` names how many runs it aborts bef
 
 On Windows MySuricates runs in **WSL2**: `wsl --install -d Ubuntu`, then section 2 in the Ubuntu
 shell. The browser on Windows reaches `http://localhost:9090` directly. Native Windows is not
-supported yet (shell blocks need bash).
+supported yet (shell blocks need bash). This way has not yet been tried on a real Windows
+machine.
 
 ---
 

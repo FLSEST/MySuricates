@@ -1,8 +1,10 @@
 # Getting Started — MySuricates auf einem neuen Rechner
 
 Diese Anleitung bringt MySuricates von `git clone` bis „läuft im Browser" — auf einem frischen
-**Linux**- oder **macOS**-Rechner, auf dem evtl. noch kein Java, Node oder Docker installiert ist.
-Unter **Windows** läuft derselbe Weg in WSL2 (Ubuntu), siehe Abschnitt 5.
+**Linux**-Rechner, auf dem evtl. noch kein Java, Node oder Docker installiert ist.
+**macOS** ist im Installer vorbereitet (Homebrew, bash 3.2), aber noch nicht auf einem echten Mac
+durchgespielt; direkt auf dem Mac setzen einige mitgelieferte Workflows außerdem GNU-Werkzeuge
+voraus. Unter **Windows** läuft derselbe Weg in WSL2 (Ubuntu), siehe Abschnitt 5.
 
 > **Bevor du startest — das Vertrauensmodell in drei Sätzen.** Shell-Blöcke und KI-Aufrufe laufen
 > mit *deinen* Rechten (auf dem Rechner bzw. mit deinen eingebundenen Ordnern im Container); die
@@ -253,7 +255,8 @@ nennt den Befehl für später. Antwortet die Instanz nicht, geht es weiter wie b
 
 Unter Windows läuft MySuricates in **WSL2**: `wsl --install -d Ubuntu`, dann in der Ubuntu-Shell
 Abschnitt 2. Der Browser unter Windows erreicht `http://localhost:9090` direkt. Ein nativer
-Windows-Betrieb fehlt noch (Shell-Blöcke setzen bash voraus).
+Windows-Betrieb fehlt noch (Shell-Blöcke setzen bash voraus). Auf einem echten Windows-Rechner
+ist dieser Weg noch nicht durchgespielt.
 
 ---
 
