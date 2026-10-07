@@ -233,19 +233,7 @@ public class AutoTodoService {
                 String mode = getMode(event);
                 if ("track".equals(mode)) {
                     // Track mode: append update entry instead of overwriting
-                    String newReport = textBuilder.loadReportFromSteps(event.getRunId());
-                    String updateEntry = String.format("\n\n---\n### Update %s\n*Run: `%s`*\n\n%s",
-                            java.time.LocalDateTime.now().format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")),
-                            event.getRunId(),
-                            newReport != null ? newReport : gate.description());
-                    String currentDesc = todo.getDescription() != null ? todo.getDescription() : "";
-                    // Cap total length to avoid unbounded growth
-                    String merged = currentDesc + updateEntry;
-                    if (merged.length() > 8000) {
-                        merged = merged.substring(merged.length() - 8000);
-                        merged = "...\n" + merged.substring(merged.indexOf("\n---\n") + 1);
-                    }
-                    todo.setDescription(merged);
+                    todo.setDescription(textBuilder.appendTrackUpdate(todo.getDescription(), event, gate));
                 } else {
                     todo.setDescription(textBuilder.buildDescription(event, gate));
                 }
