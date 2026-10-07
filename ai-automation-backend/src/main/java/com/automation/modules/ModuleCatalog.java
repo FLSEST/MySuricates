@@ -65,6 +65,11 @@ public enum ModuleCatalog {
             "Interactive terminal into a run's container over WebSocket."),
     STAGING("staging", ADVANCED, EXPERIMENTAL, false, Set.of(HOST_ACCESS, NETWORK), List.of(),
             "Stable and test instances in Docker, definition sync between instances."),
+    MCP("mcp", ADVANCED, EXPERIMENTAL, false, Set.of(NETWORK), List.of(),
+            "MCP server: AI clients (Claude Code, Cursor, VS Code, ...) use this instance through the Model Context "
+                    + "Protocol — discover templates, build, check and run workflows, answer approvals, TODOs. Only "
+                    + "switchable in the startup configuration.",
+            StartupOnly.YES),
 
     // ── Advanced: low use / legacy ───────────────────────────────────────────
     CONVERSION("conversion", ADVANCED, LEGACY, false, Set.of(), List.of(),
@@ -131,9 +136,19 @@ public enum ModuleCatalog {
     private final Set<ModuleRisk> risks;
     private final List<String> requiresKeys;
     private final String description;
+    private final boolean startupOnly;
+
+    /** Marker for {@link #startupOnly()} — reads better at the constant than a bare {@code true}. */
+    private enum StartupOnly { YES }
 
     ModuleCatalog(String key, ModuleTier tier, ModuleMaturity maturity, boolean defaultEnabled,
                   Set<ModuleRisk> risks, List<String> requiresKeys, String description) {
+        this(key, tier, maturity, defaultEnabled, risks, requiresKeys, description, null);
+    }
+
+    ModuleCatalog(String key, ModuleTier tier, ModuleMaturity maturity, boolean defaultEnabled,
+                  Set<ModuleRisk> risks, List<String> requiresKeys, String description, StartupOnly startupOnly) {
+        this.startupOnly = startupOnly == StartupOnly.YES;
         this.key = key;
         this.tier = tier;
         this.maturity = maturity;
@@ -179,6 +194,16 @@ public enum ModuleCatalog {
 
     public String description() {
         return description;
+    }
+
+    /**
+     * A feature module that is decided by the startup configuration alone — never switched at runtime,
+     * not even with {@code automation.modules.ui-editable}. For modules that open a new way to control
+     * the instance: a leaked API key must not be able to turn them on. Hardening switches are always
+     * startup-only.
+     */
+    public boolean startupOnly() {
+        return startupOnly || kind() == ModuleKind.HARDENING;
     }
 
     /** Fully qualified property, e.g. {@code automation.modules.remote-access}. */

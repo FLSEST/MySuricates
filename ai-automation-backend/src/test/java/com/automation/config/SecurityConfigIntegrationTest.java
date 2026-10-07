@@ -98,6 +98,18 @@ class SecurityConfigIntegrationTest {
 
     // --- Group 2: Protected endpoints require auth ---
 
+    /** The MCP endpoint is no public path: an AI client needs the API key like every other caller. */
+    @Test
+    void mcpEndpoint_withoutKey_returns403_withKey_answers() throws Exception {
+        String ping = "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"ping\"}";
+        mockMvc.perform(post("/api/v1/mcp").contentType(MediaType.APPLICATION_JSON).content(ping))
+                .andExpect(status().isForbidden());
+        mockMvc.perform(post("/api/v1/mcp").header(API_KEY_HEADER, VALID_API_KEY)
+                        .contentType(MediaType.APPLICATION_JSON).content(ping))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.result").isMap());
+    }
+
     @Test
     void protectedEndpoint_apiWithoutAuth_returns403() throws Exception {
         mockMvc.perform(get("/api/v1/projects"))

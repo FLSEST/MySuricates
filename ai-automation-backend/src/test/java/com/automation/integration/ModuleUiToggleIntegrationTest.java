@@ -16,6 +16,7 @@ import java.util.Map;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -65,6 +66,16 @@ class ModuleUiToggleIntegrationTest {
         mockMvc.perform(put("/api/v1/system/modules/sealing").contentType(MediaType.APPLICATION_JSON).content("{\"enabled\":true}"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("INVALID_ARGUMENT"));
+        // The MCP server is a feature module, but only the startup configuration may turn it on.
+        mockMvc.perform(put("/api/v1/system/modules/mcp").contentType(MediaType.APPLICATION_JSON).content("{\"enabled\":true}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_ARGUMENT"));
+        mockMvc.perform(post("/api/v1/mcp").contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"ping\"}"))
+                .andExpect(status().isNotFound());
+        mockMvc.perform(get("/api/v1/system/capabilities"))
+                .andExpect(jsonPath("$.modules[?(@.name=='mcp')].startupOnly").value(true))
+                .andExpect(jsonPath("$.modules[?(@.name=='mcp')].enabled").value(false));
         mockMvc.perform(put("/api/v1/system/modules/wishes").contentType(MediaType.APPLICATION_JSON).content("{\"enabled\":true}"))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.code").value("STATE_CONFLICT"));

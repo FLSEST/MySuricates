@@ -79,12 +79,15 @@ public record SystemCapabilitiesResponse(
             String envVar,
             String description,
             boolean configured,
-            boolean overridden
+            boolean overridden,
+            /** Decided by the startup configuration alone, even with {@code ui-editable} (hardening, mcp). */
+            boolean startupOnly
     ) {
         public ModuleCapabilityResponse(String name, String kind, boolean enabled, String tier, String maturity,
                                         List<String> risks, List<String> requires, String property, String envVar,
                                         String description) {
-            this(name, kind, enabled, tier, maturity, risks, requires, property, envVar, description, enabled, false);
+            this(name, kind, enabled, tier, maturity, risks, requires, property, envVar, description, enabled, false,
+                    "hardening".equals(kind));
         }
     }
 

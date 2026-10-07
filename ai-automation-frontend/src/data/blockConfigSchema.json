@@ -252,6 +252,14 @@
             "en": "Timeout in seconds for the AI call. Unset ⇒ `automation.host-claude.timeout-seconds` applies."
           },
           "minimum": 1
+        },
+        "user_mcp_servers": {
+          "type": "boolean",
+          "doc": {
+            "de": "Nur wenn das Modul `mcp` an ist: Die KI-Aufrufe dieses Blocks dürfen die MCP-Server aus der Claude-Konfiguration des Benutzers nutzen (z. B. Playwright). Ohne den Schlüssel laufen sie dann ohne sie, damit ein Lauf nicht den MCP-Server dieser Instanz erreicht.",
+            "en": "Only while the module `mcp` is on: this block's AI calls may use the MCP servers of the user's Claude configuration (e.g. Playwright). Without the key they then run without them, so a run cannot reach this instance's own MCP server."
+          },
+          "default": false
         }
       }
     },
@@ -476,6 +484,14 @@
             "en": "Timeout in seconds for the AI call. Unset ⇒ `automation.host-claude.timeout-seconds` applies."
           },
           "minimum": 1
+        },
+        "user_mcp_servers": {
+          "type": "boolean",
+          "doc": {
+            "de": "Nur wenn das Modul `mcp` an ist: Die KI-Aufrufe dieses Blocks dürfen die MCP-Server aus der Claude-Konfiguration des Benutzers nutzen (z. B. Playwright). Ohne den Schlüssel laufen sie dann ohne sie, damit ein Lauf nicht den MCP-Server dieser Instanz erreicht.",
+            "en": "Only while the module `mcp` is on: this block's AI calls may use the MCP servers of the user's Claude configuration (e.g. Playwright). Without the key they then run without them, so a run cannot reach this instance's own MCP server."
+          },
+          "default": false
         }
       }
     },

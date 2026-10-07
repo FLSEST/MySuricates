@@ -4,6 +4,8 @@
 
 Anleitung für OpenAI Codex CLI, um eigenständig Workflows und Chains über die REST API anzulegen und auf der Test-Instanz zu validieren.
 
+> **MCP statt REST:** Ist das Modul `mcp` eingeschaltet (nur Startkonfiguration), bietet die Instanz dieselben Kernaufgaben als MCP-Server unter `POST /api/v1/mcp` an (Schlüssel im Header `X-API-Key`), siehe [docs/architektur.md → MCP-Server](docs/architektur.md#mcp-server-optional-experimentell).
+
 ## Voraussetzungen
 
 - **Dev-Instanz** läuft auf `localhost:9090`

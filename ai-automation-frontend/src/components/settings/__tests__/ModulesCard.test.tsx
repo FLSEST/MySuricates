@@ -122,6 +122,22 @@ describe('ModulesCard', () => {
       expect(within(screen.getByTestId('module-webhooks')).getByRole('switch')).toHaveAttribute('aria-checked', 'true');
     });
 
+    it('gives a startup-only feature module no switch, but a lock and the config snippet', async () => {
+      serve(['mcp'], true);
+      renderWithProviders(<ModulesCard />);
+
+      const row = await screen.findByTestId('module-mcp');
+      expect(within(row).queryByRole('switch')).not.toBeInTheDocument();
+      expect(within(row).getByTestId('module-mcp-startup-only')).toHaveTextContent('Only in the startup configuration');
+      // Ordinary feature modules keep their switch
+      expect(within(screen.getByTestId('module-webhooks')).getByRole('switch')).toBeInTheDocument();
+
+      fireEvent.click(within(row).getByRole('button', { expanded: false }));
+      expect(within(row).getByText('Enable')).toBeInTheDocument();
+      expect(within(row).getByText(/mcp: true/)).toBeInTheDocument();
+      expect(within(row).getByText('AUTOMATION_MODULES_MCP=true')).toBeInTheDocument();
+    });
+
     it('resets an override to the configuration', async () => {
       const fixture = modulesFixture('core', [], true);
       fixture.modules = fixture.modules.map((m) => (m.name === 'chains' ? { ...m, configured: false, overridden: true } : m));

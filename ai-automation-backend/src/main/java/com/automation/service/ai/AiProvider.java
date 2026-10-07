@@ -94,8 +94,20 @@ public interface AiProvider {
             boolean readOnly,
             List<String> allowedTools,
             List<String> disallowedTools,
-            String effort
+            String effort,
+            /**
+             * The block opted in ({@code user_mcp_servers: true}) to the MCP servers of the user's CLI
+             * configuration. Without it, Claude calls run without them while the module {@code mcp} is on.
+             */
+            boolean userMcpServers
     ) {
+        public ActionRequest(String prompt, String model, String systemPrompt, String workingDirectory,
+                             Integer timeoutSeconds, boolean priority, boolean readOnly,
+                             List<String> allowedTools, List<String> disallowedTools, String effort) {
+            this(prompt, model, systemPrompt, workingDirectory, timeoutSeconds, priority, readOnly,
+                    allowedTools, disallowedTools, effort, false);
+        }
+
         public ActionRequest(String prompt, String model, String systemPrompt, String workingDirectory) {
             this(prompt, model, systemPrompt, workingDirectory, null, false, true, null, null, null);
         }

@@ -2,6 +2,7 @@ package com.automation.service.ai;
 
 import com.automation.config.CliPermissionsConfig;
 import com.automation.config.HostClaudeConfig;
+import com.automation.modules.ModuleRegistry;
 import com.automation.service.cli.claude.ClaudeCliOutcome;
 import com.automation.service.cli.claude.ClaudeJsonResponse;
 import com.automation.service.cli.claude.ClaudeOutputParser;
@@ -10,6 +11,7 @@ import com.automation.service.live.LiveOutput;
 import com.automation.util.ChildProcessEnv;
 import com.automation.util.ProcessDrain;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.io.IOException;
@@ -29,11 +31,19 @@ public class HostClaudeService {
     private final HostClaudeConfig config;
     private final CliPermissionsConfig permissionsConfig;
     private final AiCliThrottles throttles;
+    private final ModuleRegistry modules; // null when built by hand in tests: module mcp counts as off
 
     public HostClaudeService(HostClaudeConfig config, CliPermissionsConfig permissionsConfig, AiCliThrottles throttles) {
+        this(config, permissionsConfig, throttles, null);
+    }
+
+    @Autowired
+    public HostClaudeService(HostClaudeConfig config, CliPermissionsConfig permissionsConfig, AiCliThrottles throttles,
+                             ModuleRegistry modules) {
         this.config = config;
         this.permissionsConfig = permissionsConfig;
         this.throttles = throttles;
+        this.modules = modules;
     }
 
     /**
@@ -76,7 +86,8 @@ public class HostClaudeService {
     public ReasoningResult reasonStructured(String prompt, String systemPrompt, String model,
                                              String workingDirectory, Integer maxTurns,
                                              Integer timeoutSeconds, String effort) throws IOException {
-        List<String> cmd = buildReasonCommand(prompt, systemPrompt, model, maxTurns, effort);
+        List<String> cmd = ClaudeToolFlags.isolateFromUserMcpServers(
+                buildReasonCommand(prompt, systemPrompt, model, maxTurns, effort), modules, false);
         var result = executeProcess(cmd, prompt, workingDirectory, timeoutSeconds, "Host Claude reasoning");
         return new ReasoningResult(CliExit.answerOrThrow("Host Claude reasoning", result.exitCode, result.text,
                 result.parsed.failed()), result.parsed);
@@ -119,12 +130,21 @@ public class HostClaudeService {
                 allowedTools, disallowedTools, null);
     }
 
-    public ActionResult executeAction(String prompt, String model,
-                                       String systemPrompt, String workingDirectory,
-                                       Integer timeoutSeconds, boolean priority,
-                                       List<String> allowedTools, List<String> disallowedTools,
-                                       String effort) throws IOException {
-        List<String> cmd = buildActionCommand(prompt, model, systemPrompt, allowedTools, disallowedTools, effort);
+    public ActionResult executeAction(String prompt, String model, String systemPrompt, String workingDirectory,
+                                       Integer timeoutSeconds, boolean priority, List<String> allowedTools,
+                                       List<String> disallowedTools, String effort) throws IOException {
+        return executeAction(prompt, model, systemPrompt, workingDirectory, timeoutSeconds, priority,
+                allowedTools, disallowedTools, effort, false);
+    }
+
+    /** @param userMcpServers the block opted in to the user's MCP servers ({@link ClaudeToolFlags#isolateFromUserMcpServers}) */
+    public ActionResult executeAction(String prompt, String model, String systemPrompt, String workingDirectory,
+                                       Integer timeoutSeconds, boolean priority, List<String> allowedTools,
+                                       List<String> disallowedTools, String effort, boolean userMcpServers)
+            throws IOException {
+        List<String> cmd = ClaudeToolFlags.isolateFromUserMcpServers(
+                buildActionCommand(prompt, model, systemPrompt, allowedTools, disallowedTools, effort), modules,
+                userMcpServers);
         var result = executeProcess(cmd, prompt, workingDirectory, timeoutSeconds, "Host Claude action", priority);
         return new ActionResult(result.text, result.exitCode, result.parsed);
     }

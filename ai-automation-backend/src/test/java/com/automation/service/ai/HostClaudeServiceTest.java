@@ -2,6 +2,7 @@ package com.automation.service.ai;
 
 import com.automation.config.CliPermissionsConfig;
 import com.automation.config.HostClaudeConfig;
+import com.automation.modules.ModuleRegistry;
 import com.automation.service.live.LiveOutput;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -12,6 +13,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -576,5 +578,66 @@ class HostClaudeServiceTest {
             }
         })).hasRootCauseMessage("Host Claude action timed out after 1 seconds");
         assertThat(lines).containsExactly("TOOL:Read: pom.xml");
+    }
+
+    // --- MCP isolation (module mcp) ---
+
+    private static final ModuleRegistry MCP_ON = ModuleRegistry.of(Map.of("mcp", "true"), Map.of());
+
+    @Test
+    void mcpModuleOn_callsRunWithoutUserMcpServers() {
+        HostClaudeService service = createService(null, true, List.of());
+
+        assertThat(ClaudeToolFlags.isolateFromUserMcpServers(service.buildActionCommand("p", null, null), MCP_ON, false))
+                .contains("--strict-mcp-config");
+        assertThat(ClaudeToolFlags.isolateFromUserMcpServers(service.buildReasonCommand("p", null), MCP_ON, false))
+                .contains("--strict-mcp-config");
+    }
+
+    @Test
+    void mcpModuleOn_blockOptInKeepsUserMcpServers() {
+        List<String> cmd = createService(null, true, List.of()).buildActionCommand("p", null, null);
+
+        assertThat(ClaudeToolFlags.isolateFromUserMcpServers(cmd, MCP_ON, true)).doesNotContain("--strict-mcp-config");
+    }
+
+    @Test
+    void mcpModuleOffOrUnknown_commandsUnchanged() {
+        List<String> cmd = createService(null, true, List.of()).buildActionCommand("p", null, null);
+
+        assertThat(ClaudeToolFlags.isolateFromUserMcpServers(cmd, ModuleRegistry.of(Map.of(), Map.of()), false)).isSameAs(cmd);
+        assertThat(ClaudeToolFlags.isolateFromUserMcpServers(cmd, null, false)).isSameAs(cmd);
+    }
+
+    @Test
+    void mcpModuleOn_toolLessCallCarriesTheFlagOnlyOnce() {
+        List<String> cmd = ClaudeToolFlags.isolateFromUserMcpServers(
+                createService(null, true, List.of()).buildActionCommand("p", null, null, AiProvider.NO_TOOLS, null, null),
+                MCP_ON, false);
+
+        assertThat(cmd.stream().filter("--strict-mcp-config"::equals).count()).isEqualTo(1);
+    }
+
+    /** The flag reaches the spawned process: the scripted CLI echoes the arguments appended to its command. */
+    @Test
+    void executeAction_appliesTheIsolationToTheSpawnedCommand() throws IOException {
+        HostClaudeConfig config = new HostClaudeConfig();
+        config.setTimeoutSeconds(30);
+        List<String> script = List.of("/bin/sh", "-c",
+                "cat >/dev/null; printf '{\"type\":\"result\",\"subtype\":\"success\",\"is_error\":false,"
+                        + "\"result\":\"args:%s\"}\\n' \"$*\"", "sh");
+        HostClaudeService service = new HostClaudeService(config, new CliPermissionsConfig(), AiCliThrottles.defaults(),
+                MCP_ON) {
+            @Override
+            List<String> buildActionCommand(String prompt, String model, String systemPrompt,
+                                            List<String> callAllowedTools, List<String> callDisallowedTools,
+                                            String effort) {
+                return script;
+            }
+        };
+
+        assertThat(service.executeAction("x", null, null, null).text()).isEqualTo("args:--strict-mcp-config");
+        assertThat(service.executeAction("x", null, null, null, null, false, null, null, null, true).text())
+                .isEqualTo("args:");
     }
 }

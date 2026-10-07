@@ -78,4 +78,9 @@ public record HostExecutionRequest(
             throw new IllegalArgumentException("Either command or block must be provided");
         }
     }
+
+    /** The block opted in to the user's MCP servers ({@link BlockDefinition#userMcpServers()}). */
+    public boolean userMcpServers() {
+        return block != null && block.userMcpServers();
+    }
 }

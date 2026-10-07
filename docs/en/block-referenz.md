@@ -46,6 +46,7 @@ Plus the [common fields](#common-fields) and the [AI fields](#ai-fields).
 |---|---|---|---|---|---|
 | `command` | string | yes |  |  | The prompt sent to the AI. Placeholders like `{{ previous_output }}` are resolved. |
 | `timeout_seconds` | integer |  |  | ≥ 1 | Timeout in seconds for the AI call. Unset ⇒ `automation.host-claude.timeout-seconds` applies. |
+| `user_mcp_servers` | boolean |  | `false` |  | Only while the module `mcp` is on: this block's AI calls may use the MCP servers of the user's Claude configuration (e.g. Playwright). Without the key they then run without them, so a run cannot reach this instance's own MCP server. |
 
 ## `shell`
 
@@ -82,6 +83,7 @@ Plus the [common fields](#common-fields) and the [AI fields](#ai-fields).
 | `max_repeated_actions` | integer |  | `3` | ≥ 1 | Stop when the same action repeats this many times. |
 | `require_approval` | boolean |  | `false` |  | Ask for approval before every action. |
 | `timeout_seconds` | integer |  |  | ≥ 1 | Timeout in seconds for the AI call. Unset ⇒ `automation.host-claude.timeout-seconds` applies. |
+| `user_mcp_servers` | boolean |  | `false` |  | Only while the module `mcp` is on: this block's AI calls may use the MCP servers of the user's Claude configuration (e.g. Playwright). Without the key they then run without them, so a run cannot reach this instance's own MCP server. |
 
 ## `retry`
 

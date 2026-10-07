@@ -79,4 +79,14 @@ public class BlockDefinition {
         Object onFailure = config == null ? null : config.get("on_failure");
         return !(onFailure instanceof String value && "continue".equalsIgnoreCase(value.trim()));
     }
+
+    /**
+     * Whether the block's AI calls may use the MCP servers of the user's CLI configuration
+     * ({@code user_mcp_servers: true}) while the module {@code mcp} is on — otherwise they run without
+     * them, so a run cannot reach this instance's own MCP server. Only an explicit boolean {@code true}
+     * opts in. The one place that reads the key.
+     */
+    public boolean userMcpServers() {
+        return config != null && Boolean.TRUE.equals(config.get("user_mcp_servers"));
+    }
 }

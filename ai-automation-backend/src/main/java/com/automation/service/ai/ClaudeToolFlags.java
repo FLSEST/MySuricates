@@ -1,7 +1,10 @@
 package com.automation.service.ai;
 
 import com.automation.config.CliPermissionsConfig;
+import com.automation.modules.ModuleCatalog;
+import com.automation.modules.ModuleRegistry;
 
+import java.util.ArrayList;
 import java.util.List;
 
 /** Tool-related flags of a Claude CLI action call; split out of HostClaudeService (source-size ratchet). */
@@ -55,5 +58,25 @@ final class ClaudeToolFlags {
                 cmd.add(tool);
             }
         }
+    }
+
+    /**
+     * While the module {@code mcp} is on, a user may have registered this instance's own MCP server in the
+     * CLI configuration — every AI call of a run could then control the platform. The call then runs
+     * without any MCP server of the user's configuration (user, project, plugin and claude.ai connectors;
+     * verified with the real CLI: the init event lists none), unless its block opted in
+     * ({@code user_mcp_servers}). Applied to the built command, so the builders stay the seam tests replace.
+     *
+     * @param modules null (hand-built service in tests) counts as module off
+     * @return {@code cmd} itself when nothing changes, else a copy with {@code --strict-mcp-config}
+     */
+    static List<String> isolateFromUserMcpServers(List<String> cmd, ModuleRegistry modules, boolean userMcpServers) {
+        if (modules == null || !modules.isEnabled(ModuleCatalog.MCP) || userMcpServers
+                || cmd.contains("--strict-mcp-config")) {
+            return cmd;
+        }
+        List<String> isolated = new ArrayList<>(cmd);
+        isolated.add("--strict-mcp-config");
+        return isolated;
     }
 }

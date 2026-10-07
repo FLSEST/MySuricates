@@ -39,4 +39,16 @@ describe('ModuleDisabled', () => {
 
     expect(await screen.findByTestId('module-disabled-ui-hint')).toHaveTextContent('Settings → Modules & hardening');
   });
+
+  it('does not point to the settings switch for a startup-only module, even when UI-editable', async () => {
+    server.use(
+      http.get('/api/v1/system/capabilities', () => HttpResponse.json(modulesFixture('core', ['mcp'], true))),
+    );
+
+    renderWithProviders(<ModuleDisabled module="mcp" />);
+
+    expect(await screen.findByText('AUTOMATION_MODULES_MCP=true')).toBeInTheDocument();
+    expect(screen.getByText(/mcp: true/)).toBeInTheDocument();
+    expect(screen.queryByTestId('module-disabled-ui-hint')).not.toBeInTheDocument();
+  });
 });

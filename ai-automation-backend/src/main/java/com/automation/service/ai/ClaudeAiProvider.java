@@ -78,7 +78,8 @@ public class ClaudeAiProvider implements AiProvider {
                 request.priority(),
                 request.allowedTools(),
                 request.disallowedTools(),
-                request.effort()
+                request.effort(),
+                request.userMcpServers()
         );
         return new ActionResult(
                 result.text(),

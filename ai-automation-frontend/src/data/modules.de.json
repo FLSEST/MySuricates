@@ -55,6 +55,10 @@
     "name": "Stable- & Test-Instanzen",
     "description": "Stable- und Test-Instanz in Docker, samt Abgleich der Definitionen zwischen den Instanzen."
   },
+  "mcp": {
+    "name": "MCP-Server",
+    "description": "KI-Clients wie Claude Code, Cursor oder VS Code nutzen diese Instanz über das Model Context Protocol: Vorlagen finden, Workflows bauen, prüfen und starten, Freigaben beantworten, TODOs. Nur in der Startkonfiguration umschaltbar."
+  },
   "conversion": {
     "name": "Run → Workflow-Konvertierung",
     "description": "Macht aus einem abgeschlossenen Run einen wiederverwendbaren Workflow."

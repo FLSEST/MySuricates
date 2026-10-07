@@ -83,7 +83,7 @@ class ClaudeAiProviderTest {
         var hostResult = new HostClaudeService.ActionResult("output", 0, null);
         when(hostClaudeService.executeAction(
                 eq("prompt"), eq("model"), eq("system"), eq("/path"), eq(300), eq(false),
-                any(), any(), isNull()))
+                any(), any(), isNull(), eq(false)))
                 .thenReturn(hostResult);
 
         var request = new AiProvider.ActionRequest("prompt", "model", "system", "/path", 300, false);
@@ -98,7 +98,7 @@ class ClaudeAiProviderTest {
         var hostResult = new HostClaudeService.ActionResult("output", 0, null);
         when(hostClaudeService.executeAction(
                 eq("prompt"), isNull(), isNull(), isNull(), isNull(), eq(false),
-                any(), any(), eq("xhigh")))
+                any(), any(), eq("xhigh"), eq(false)))
                 .thenReturn(hostResult);
 
         var request = new AiProvider.ActionRequest("prompt", null, null, null, null, false, true, null, null, "xhigh");
@@ -106,7 +106,23 @@ class ClaudeAiProviderTest {
 
         verify(hostClaudeService).executeAction(
                 eq("prompt"), isNull(), isNull(), isNull(), isNull(), eq(false),
-                any(), any(), eq("xhigh"));
+                any(), any(), eq("xhigh"), eq(false));
+    }
+
+    @Test
+    void executeAction_forwardsTheBlockOptInForUserMcpServers() throws IOException {
+        var hostResult = new HostClaudeService.ActionResult("output", 0, null);
+        when(hostClaudeService.executeAction(
+                eq("prompt"), isNull(), isNull(), isNull(), isNull(), eq(false),
+                any(), any(), isNull(), eq(true)))
+                .thenReturn(hostResult);
+
+        provider.executeAction(new AiProvider.ActionRequest("prompt", null, null, null, null, false, true, null, null,
+                null, true));
+
+        verify(hostClaudeService).executeAction(
+                eq("prompt"), isNull(), isNull(), isNull(), isNull(), eq(false),
+                any(), any(), isNull(), eq(true));
     }
 
     @Test

@@ -61,7 +61,7 @@ public class CommandExecutorService {
                     new AiProvider.ActionRequest(request.command(), request.model(),
                             request.systemPrompt(), request.projectPath(), request.timeoutSeconds(),
                             request.priority(), true, request.allowedTools(), request.disallowedTools(),
-                            request.effort()));
+                            request.effort(), request.userMcpServers()));
             return new CliSession.EnrichedCommandResult(result.text(), result.exitCode(), null,
                     hostCallMetadata(request, provider, result));
         } catch (IOException e) {
@@ -101,7 +101,7 @@ public class CommandExecutorService {
             AiProvider.ActionResult providerResult = provider.executeAction(
                     new AiProvider.ActionRequest(command, request.model(), request.systemPrompt(),
                             request.projectPath(), request.timeoutSeconds(), request.priority(),
-                            true, request.allowedTools(), request.disallowedTools(), request.effort()));
+                            true, request.allowedTools(), request.disallowedTools(), request.effort(), request.userMcpServers()));
             step.setOutput(providerResult.text());
             step.setStatus(providerResult.exitCode() == 0 ? StepStatus.COMPLETED : StepStatus.FAILED);
 

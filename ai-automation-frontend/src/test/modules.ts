@@ -1,6 +1,6 @@
 import type { ModuleInfo, ModuleName, ModulePreset, SystemModules } from '../types';
 
-const FEATURES: Array<Pick<ModuleInfo, 'name' | 'tier' | 'maturity' | 'risks' | 'requires'>> = [
+const FEATURES: Array<Pick<ModuleInfo, 'name' | 'tier' | 'maturity' | 'risks' | 'requires' | 'startupOnly'>> = [
   { name: 'dashboard-report', tier: 'standard', maturity: 'stable', risks: [], requires: [] },
   { name: 'goals', tier: 'standard', maturity: 'stable', risks: [], requires: [] },
   { name: 'chains', tier: 'research', maturity: 'stable', risks: [], requires: [] },
@@ -15,6 +15,7 @@ const FEATURES: Array<Pick<ModuleInfo, 'name' | 'tier' | 'maturity' | 'risks' | 
   { name: 'remote-access', tier: 'advanced', maturity: 'stable', risks: ['network'], requires: [] },
   { name: 'terminal', tier: 'advanced', maturity: 'stable', risks: ['host-access'], requires: [] },
   { name: 'staging', tier: 'advanced', maturity: 'experimental', risks: ['host-access', 'network'], requires: [] },
+  { name: 'mcp', tier: 'advanced', maturity: 'experimental', risks: ['network'], requires: [], startupOnly: true },
   { name: 'conversion', tier: 'advanced', maturity: 'legacy', risks: [], requires: [] },
   { name: 'dialog-import', tier: 'advanced', maturity: 'legacy', risks: [], requires: ['conversion'] },
   { name: 'onboarding-profiles', tier: 'advanced', maturity: 'legacy', risks: [], requires: [] },
@@ -55,6 +56,7 @@ export function modulesFixture(
       enabled: !off.has(f.name),
       configured: !off.has(f.name),
       overridden: false,
+      startupOnly: f.startupOnly ?? false,
       property: `automation.modules.${f.name}`,
       envVar: envName('automation.modules', f.name),
       description: `${f.name} description`,
@@ -66,6 +68,7 @@ export function modulesFixture(
       maturity: 'experimental' as const,
       risks: [],
       enabled: !off.has(h.name),
+      startupOnly: true,
       property: `automation.hardening.${h.name}`,
       envVar: envName('automation.hardening', h.name),
       description: `${h.name} description`,

@@ -17,6 +17,11 @@ public enum TriggerSource {
     TODO_RESOLUTION(false, false),
     /** The assistant started the run after the user confirmed the tool call. */
     ASSISTANT(false, false),
+    /**
+     * An AI client started the run through the MCP server (module {@code mcp}). Attended like a REST
+     * execute with the API key: the client asks its user before a tool call that runs a workflow.
+     */
+    MCP(false, false),
     SCHEDULE(true, false),
     WEBHOOK(true, false),
     TODO_TRIGGER(true, false),

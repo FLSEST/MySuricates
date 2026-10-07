@@ -35,7 +35,7 @@ public class AgenticActionRunner {
             AiProvider.ActionResult actResult = provider.executeAction(
                     new AiProvider.ActionRequest(action, model,
                             context.getInstructionPrefix(), context.getProjectPath(),
-                            cfg.claudeTimeout(), false, false, null, null, effort));
+                            cfg.claudeTimeout(), false, false, null, null, effort, cfg.userMcpServers()));
             String output = actResult.text() != null ? actResult.text() : "";
             tokenTracker.captureActMeta(iterData, actResult.metadata(), action, output, iteration);
             return new ActOutcome(action, output, actResult.exitCode());

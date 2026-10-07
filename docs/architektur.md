@@ -88,7 +88,7 @@ Env-Form: `AUTOMATION_MODULES_PRESET`, `AUTOMATION_MODULES_<NAME>`, `AUTOMATION_
 |---|---|---|
 | `standard` (alle Presets) | `dashboard-report`, `goals` (Ziele mit Projekten, Arbeitspaketen, Meilensteinen, TODO-Planung, Workflows am Ziel, Ziel-Wächter) | stabil |
 | `research` | `chains`, `assistant`, `learning` (Analyse-Endpunkte; Dashboard-Daten bleiben Kern), `memory`, `audit`, `bpmn` | chains stabil, Rest experimentell |
-| `advanced` (nach außen) | `integrations` (inkl. TODO-Tracker-Export, Kalender-Adapter), `http-api` (allgemeine HTTP-API-Verbindung, braucht `integrations`), `webhooks`, `remote-access` (Tailscale), `terminal` (Run-Terminal per WebSocket), `staging` | stabil / staging experimentell |
+| `advanced` (nach außen) | `integrations` (inkl. TODO-Tracker-Export, Kalender-Adapter), `http-api` (allgemeine HTTP-API-Verbindung, braucht `integrations`), `webhooks`, `remote-access` (Tailscale), `terminal` (Run-Terminal per WebSocket), `staging`, `mcp` ([MCP-Server](#mcp-server-optional-experimentell), nur Startkonfiguration) | stabil / staging, mcp experimentell |
 | `advanced` (wenig genutzt) | `conversion`, `dialog-import` (benötigt conversion), `onboarding-profiles`, `skills`, `debug`, `factory` (inkl. Auto-Repair), `wishes` (benötigt chains) | Altlast / experimentell |
 | `hardening` | `provenance` (Default an), `sealing`, `require-sealed-for-unattended`, `require-signed-seal`, `seal-immutable`, `unattended-sandbox`, `unattended-in-container`, `webhook-signatures`, `private-network-guard` (Default an), `private-network-guard-http-api`, `private-network-guard-own-services` | experimentell |
 
@@ -110,8 +110,38 @@ damit die Skripte ohne Backend auskommen — erzeugt, nicht gepflegt, siehe
 - Die Änderung wirkt **sofort** (`ModuleRegistry` ist zur Laufzeit veränderbar; alle Prüfungen laufen pro Aufruf, der Terminal-WebSocket prüft je Handshake, `TailscaleService` je Aufruf) und bleibt über Neustarts erhalten (`app_settings` → `modules.ui-overrides`).
 - UI-Werte gehen der Konfigurationsdatei vor; ein Wert gleich dem Config-Wert wird nicht gespeichert, „Auf Konfiguration zurücksetzen“ entfernt ihn. Abhängigkeiten (`requires`) werden wie beim Start geprüft (409 mit Hinweis, was vorher nötig ist). Passen gespeicherte Werte nach einer Config-Änderung nicht mehr, werden sie beim Start übersprungen statt den Start abzubrechen.
 - Jede Änderung erzeugt einen WARN-`SECURITY`-Eintrag im Activity-Log. Ist der Schalter aus, antworten `PUT/DELETE /api/v1/system/modules/…` mit **403 `MODULES_NOT_EDITABLE`**, gespeicherte UI-Werte werden ignoriert.
-- **Härtungs-Schalter bleiben immer Startkonfiguration** (400): Sie schützen gegen genau den Aufrufer, der den API-Key hat.
+- **Härtungs-Schalter und `mcp` bleiben immer Startkonfiguration** (400): Sie schützen gegen genau den Aufrufer, der den API-Key hat.
 - Abwägung: Mit `ui-editable` kann jeder mit API-Key Webhooks (öffentlicher Endpunkt), Integrationen (Tokens), Fernzugriff oder das Run-Terminal (Host-Zugriff) einschalten — für öffentlich erreichbare Instanzen aus lassen. Laufende Runs, die einen Block eines gerade abgeschalteten Moduls erreichen, schlagen mit der bekannten Meldung fehl.
+
+## MCP-Server (optional, experimentell)
+
+Modul `mcp` (Stufe `advanced`, experimentell): KI-Clients wie Claude Code, Cursor oder VS Code bedienen die Instanz über das [Model Context Protocol](https://modelcontextprotocol.io) — Vorlagen finden, Workflows bauen, prüfen und starten, Rückfragen beantworten, TODOs. Für Tester ist das der kürzeste Weg: Der eigene KI-Client spricht die Plattform direkt an, ohne REST-Pfade zu kennen.
+
+**Einschalten nur in der Startkonfiguration** — `automation.modules.mcp: true` oder Preset `full`; `scripts/setup.sh` bietet das Modul in Schritt 4 an (`--modules mcp`). Auch mit `ui-editable: true` ist es zur Laufzeit nicht schaltbar (`ModuleCatalog.startupOnly()`, 400 beim Versuch; die Settings zeigen ein Schloss): Ein geleakter API-Key darf keine neue Fernsteuerung einschalten.
+
+**Verbinden** — Endpunkt `POST /api/v1/mcp` (Streamable HTTP, zustandslos), Schlüssel im Header wie bei jeder anderen Anfrage:
+
+```bash
+claude mcp add --transport http mysuricates http://localhost:9090/api/v1/mcp --header "X-API-Key: <key>"
+```
+
+**Settings → KI-Clients (MCP)** zeigt den Befehl und den JSON-Block für Cursor/VS Code mit dem eingetragenen Schlüssel.
+
+**Was der Server anbietet** — die aktuelle Liste liefert der Server selbst (`tools/list`, `resources/list`, `prompts/list`); hier nur die Aufteilung:
+
+- *Tools* (`service/mcp/Mcp*Tools`, je Gruppe ein `McpToolset`): Projekte, Workflows, Vorlagen/Blaupausen/Pool und Installieren; Workflow anlegen, ändern, prüfen (`analyze_workflow`); starten (wartet auf Wunsch bis Ende oder Rückfrage), Läufe lesen und abbrechen; offene Rückfragen auflisten und beantworten; TODOs. Aufgabenförmig statt 1:1 REST: jede Tool-Beschreibung kostet den Client bei jeder Anfrage Kontext. Hinweise `readOnlyHint`/`destructiveHint` lassen den Client vor Starten, Ändern und Abbrechen nachfragen.
+- *Resources*: die Leitfäden (`mysuricates://docs/{de|en}/{workflow-guide|block-reference|building-blocks}`), dazu Workflows und Läufe als URI-Vorlagen (`mysuricates://workflows/{id}`, `mysuricates://runs/{id}`). `read_guide` liest dieselben Dateien für Clients ohne Resources — erst die Gliederung, dann einen Abschnitt.
+- *Prompts*: `design_workflow`, `review_workflow`, `audit_workflow` — geführte Abläufe, die auf die Abschnitte des WORKFLOW-GUIDE verweisen statt sie zu wiederholen.
+- *Instructions* (`mcp/instructions.md`, beim `initialize`): ein kurzer Index der Leitideen — deterministisch wo möglich, erst Vorlagen, Mensch entscheidet über Folgenreiches, Audits messen vor dem Urteil.
+
+**Absicherung**
+
+- Kein öffentlicher Pfad: API-Key wie überall, Ratenlimit und Größenlimit der übrigen API. Ein fremder Browser-`Origin` bekommt 403 (Schutz gegen DNS-Rebinding, wie die MCP-Spezifikation verlangt); Clients außerhalb des Browsers schicken keinen.
+- Änderungen laufen über `WorkflowService` mit `ChangeSource.MCP` (Versionszeile, Siegel-Prüfung), Läufe über `WorkflowExecutor` mit `TriggerSource.MCP` — **beaufsichtigt** wie ein REST-Start, weil der Client vor dem Tool-Aufruf fragt. Jeder schreibende Tool-Aufruf landet im Activity-Log.
+- **Kein Selbstzugriff aus Läufen:** Ist das Modul an, laufen die Claude-Aufrufe der Plattform mit `--strict-mcp-config` — ohne die MCP-Server aus der Benutzerkonfiguration (Benutzer, Projekt, Plugins, claude.ai-Connectoren; mit der echten CLI geprüft). Sonst könnte jeder KI-Block über einen dort eingetragenen MySuricates-Server die Plattform steuern, an der Regel `self-api-call` vorbei. Ein `simple`- oder `agentic`-Block, der bewusst MCP-Server braucht (etwa Playwright), setzt `user_mcp_servers: true`. Ist das Modul aus, ändert sich an den Aufrufen nichts.
+- Was ein Tool zurückgibt (Run-Ausgaben, TODO-Texte, Workflow-Inhalte), geht an den Modell-Anbieter des Clients.
+
+Nicht enthalten: Ereignisstrom (`GET` → 405), Sitzungen, Elicitation, OAuth für entfernte Connectoren.
 
 ## Workflow-Härtung (optional)
 

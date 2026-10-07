@@ -15,8 +15,9 @@ export function ModuleDisabled({ module }: { module: ModuleName }) {
   const info = useModuleInfo(module);
   const { data } = useSystemModules();
   const property = info?.property ?? `automation.modules.${module}`;
-  // With automation.modules.ui-editable the settings switch is the quicker way
-  const switchable = !!data?.uiEditable && info?.kind !== 'hardening';
+  // With automation.modules.ui-editable the settings switch is the quicker way — except for
+  // hardening and startup-only modules, which only the startup configuration decides
+  const switchable = !!data?.uiEditable && info?.kind !== 'hardening' && !info?.startupOnly;
 
   return (
     <EmptyState

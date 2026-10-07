@@ -59,6 +59,11 @@ public class ExecutionQueryService {
                 result.getTotalPages());
     }
 
+    /** Status of one run without loading it; 404 for an unknown id. */
+    public RunStatus statusOf(String id) {
+        return runRepository.findStatusById(id).orElseThrow(() -> new ResourceNotFoundException("Execution", id));
+    }
+
     @Transactional(readOnly = true)
     public WorkflowRunResponse getExecutionResponse(String id) {
         return workflowMapper.toRunResponse(findById(id));

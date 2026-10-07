@@ -21,8 +21,17 @@ public record AgenticBlockConfig(
         int maxTotalTokens,
         int maxRepeatedActions,
         boolean requireApproval,
-        Integer claudeTimeout
+        Integer claudeTimeout,
+        /** {@code user_mcp_servers}: ACT calls may use the user's MCP servers while the module {@code mcp} is on. */
+        boolean userMcpServers
 ) {
+
+    public AgenticBlockConfig(String goal, String successCriteria, int maxIterations, int iterationTimeoutSeconds,
+                              int totalTimeoutSeconds, int maxTotalTokens, int maxRepeatedActions,
+                              boolean requireApproval, Integer claudeTimeout) {
+        this(goal, successCriteria, maxIterations, iterationTimeoutSeconds, totalTimeoutSeconds, maxTotalTokens,
+                maxRepeatedActions, requireApproval, claudeTimeout, false);
+    }
 
     /**
      * Extracts and validates agentic block config from raw config map + execution context.
@@ -65,7 +74,7 @@ public record AgenticBlockConfig(
         return new AgenticBlockConfig(
                 goal, successCriteria, maxIterations, iterationTimeoutSeconds,
                 totalTimeoutSeconds, maxTotalTokens, maxRepeatedActions,
-                requireApproval, claudeTimeout);
+                requireApproval, claudeTimeout, Boolean.TRUE.equals(config.get("user_mcp_servers")));
     }
 
     private static String requireString(Map<String, Object> config, String key) {

@@ -655,7 +655,7 @@ export interface WorkflowRunListItem extends Omit<WorkflowRun, 'steps'> {
 export type TriggerSource =
   | 'MANUAL' | 'RETRY' | 'RESUME' | 'TODO_RESOLUTION' | 'ASSISTANT'
   | 'SCHEDULE' | 'WEBHOOK' | 'TODO_TRIGGER' | 'COMPLETION_TRIGGER' | 'AUTO_REPAIR' | 'AUTO_RESUME' | 'WISH'
-  | 'CHAIN' | 'SUB_WORKFLOW';
+  | 'CHAIN' | 'SUB_WORKFLOW' | 'MCP';
 
 export interface StepResult {
   id: string;
@@ -2268,7 +2268,8 @@ export type FeatureModuleName =
   | 'dashboard-report' | 'goals'
   | 'chains' | 'assistant' | 'learning' | 'memory' | 'audit' | 'bpmn'
   | 'integrations' | 'http-api' | 'webhooks' | 'remote-access' | 'terminal' | 'staging'
-  | 'conversion' | 'dialog-import' | 'onboarding-profiles' | 'skills' | 'debug' | 'factory' | 'wishes';
+  | 'conversion' | 'dialog-import' | 'onboarding-profiles' | 'skills' | 'debug' | 'factory' | 'wishes'
+  | 'mcp';
 
 export type HardeningModuleName =
   | 'provenance' | 'sealing' | 'require-sealed-for-unattended' | 'require-signed-seal' | 'seal-immutable'
@@ -2299,6 +2300,11 @@ export interface ModuleInfo {
   configured?: boolean;
   /** A settings-UI switch decides the state (only with automation.modules.ui-editable) */
   overridden?: boolean;
+  /**
+   * Only the startup configuration decides this module — never a settings-UI switch, not even with
+   * automation.modules.ui-editable (true for `mcp` and every hardening switch). Absent on older backends.
+   */
+  startupOnly?: boolean;
 }
 
 export interface SystemModules {

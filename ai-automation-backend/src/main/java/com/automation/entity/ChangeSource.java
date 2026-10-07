@@ -9,6 +9,8 @@ public enum ChangeSource {
     /** A person through the REST API / UI. */
     USER("user"),
     ASSISTANT("assistant"),
+    /** An AI client through the MCP server (module {@code mcp}). */
+    MCP("mcp"),
     /** Workflow factory: generated workflows and LLM auto-fixes (including auto-repair). */
     FACTORY("factory"),
     WISH("wish"),

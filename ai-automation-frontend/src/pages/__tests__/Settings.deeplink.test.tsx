@@ -7,6 +7,7 @@ import { renderWithProviders } from '../../test/utils';
 import { useI18nStore } from '../../i18n';
 import { en } from '../../i18n/en';
 import { useSettingsStore } from '../../stores/settingsStore';
+import { modulesFixture } from '../../test/modules';
 import { Settings } from '../Settings';
 
 // The cards load their own data and are tested on their own; here only the page's sections count
@@ -31,6 +32,7 @@ vi.mock('../../components/settings/ExecutionSettingsCard', () => ({ ExecutionSet
 vi.mock('../../components/settings/WishSettingsCard', () => ({ WishSettingsCard: () => null }));
 vi.mock('../../components/settings/ModulesCard', () => ({ ModulesCard: () => null }));
 vi.mock('../../components/settings/StartupConfigCard', () => ({ StartupConfigCard: () => null }));
+vi.mock('../../components/settings/McpConnectCard', () => ({ McpConnectCard: () => <div data-testid="mcp-connect-card" /> }));
 vi.mock('../../components/dashboard/ApiLatencyCard', () => ({ ApiLatencyCard: () => null }));
 
 beforeAll(() => server.listen({ onUnhandledRequest: failOnUnhandledRequest }));
@@ -118,6 +120,46 @@ describe('Settings — sections and #hash deep link', () => {
     await waitFor(() => expect(document.getElementById('environments')).not.toBeNull());
     expect(sectionToggle('environments')).toHaveAttribute('aria-expanded', 'true');
     expect(within(document.getElementById('environments')!).getByTestId('staged-targets')).toHaveTextContent('test,prod');
+  });
+
+  it('shows the MCP connect section only while the mcp module is on', async () => {
+    window.history.replaceState(null, '', '/settings#mcp');
+    renderWithProviders(<Settings />, { route: '/settings' });
+
+    await waitFor(() => expect(document.getElementById('mcp')).not.toBeNull());
+    expect(sectionToggle('mcp')).toHaveAttribute('aria-expanded', 'true');
+    expect(within(document.getElementById('mcp')!).getByTestId('mcp-connect-card')).toBeInTheDocument();
+  });
+
+  it('leaves the MCP connect section out when the mcp module is off', async () => {
+    localStorage.clear();
+    let asked = false;
+    server.use(http.get('/api/v1/system/capabilities', () => {
+      asked = true;
+      return HttpResponse.json({ apiVersion: 'v1', routes: [], blockTypes: [], ...modulesFixture('full', ['mcp']) });
+    }));
+    renderWithProviders(<Settings />, { route: '/settings' });
+
+    await waitFor(() => expect(asked).toBe(true));
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    expect(document.getElementById('mcp')).toBeNull();
+    expect(document.querySelector('[data-testid="mcp-connect-card"]')).toBeNull();
+  });
+
+  it('leaves the MCP connect section out for an older backend that does not report the module', async () => {
+    localStorage.clear();
+    let asked = false;
+    server.use(http.get('/api/v1/system/capabilities', () => {
+      asked = true;
+      const fixture = modulesFixture('full');
+      fixture.modules = fixture.modules.filter((m) => m.name !== 'mcp');
+      return HttpResponse.json({ apiVersion: 'v1', routes: [], blockTypes: [], ...fixture });
+    }));
+    renderWithProviders(<Settings />, { route: '/settings' });
+
+    await waitFor(() => expect(asked).toBe(true));
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    expect(document.getElementById('mcp')).toBeNull();
   });
 
   it('keeps the environments section hidden without targets or with an older backend', async () => {

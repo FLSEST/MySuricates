@@ -340,4 +340,36 @@ class ModuleRegistryTest {
         }
         assertThat(ModuleRegistry.of(Map.of("preset", "full", "goals", "false"), Map.of()).isEnabled(ModuleCatalog.GOALS)).isFalse();
     }
+
+    /** The MCP server opens a new way to control the instance: only the startup configuration decides it. */
+    @Test
+    void mcpIsAnExperimentalAdvancedModuleSwitchableOnlyAtStartup() {
+        assertThat(ModuleCatalog.MCP.kind()).isEqualTo(ModuleKind.FEATURE);
+        assertThat(ModuleCatalog.MCP.tier()).isEqualTo(ModuleTier.ADVANCED);
+        assertThat(ModuleCatalog.MCP.maturity()).isEqualTo(ModuleMaturity.EXPERIMENTAL);
+        assertThat(ModuleCatalog.MCP.startupOnly()).isTrue();
+        assertThat(ModuleRegistry.of(Map.of(), Map.of()).isEnabled(ModuleCatalog.MCP)).as("core").isFalse();
+        assertThat(ModuleRegistry.of(Map.of("preset", "research"), Map.of()).isEnabled(ModuleCatalog.MCP)).isFalse();
+        assertThat(ModuleRegistry.of(Map.of("preset", "full"), Map.of()).isEnabled(ModuleCatalog.MCP)).isTrue();
+        assertThat(ModuleRegistry.of(Map.of("mcp", "true"), Map.of()).isEnabled(ModuleCatalog.MCP)).isTrue();
+    }
+
+    @Test
+    void startupOnlyFeatureModuleIsRefusedAtRuntimeEvenWhenUiEditable() {
+        ModuleRegistry registry = ModuleRegistry.of(Map.of("ui-editable", "true"), Map.of());
+
+        assertThatThrownBy(() -> registry.applyUiOverrides(Map.of(ModuleCatalog.MCP, true)))
+                .isInstanceOf(ModuleChangeException.class)
+                .hasMessageContaining("automation.modules.mcp");
+        assertThat(registry.isEnabled(ModuleCatalog.MCP)).isFalse();
+        assertThat(registry.uiOverrides()).isEmpty();
+    }
+
+    @Test
+    void onlyMcpAndHardeningSwitchesAreStartupOnly() {
+        for (ModuleCatalog module : ModuleCatalog.values()) {
+            boolean expected = module == ModuleCatalog.MCP || module.kind() == ModuleKind.HARDENING;
+            assertThat(module.startupOnly()).as(module.key()).isEqualTo(expected);
+        }
+    }
 }

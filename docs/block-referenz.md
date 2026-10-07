@@ -46,6 +46,7 @@ Dazu die [gemeinsamen Felder](#gemeinsame-felder) und die [KI-Felder](#ki-felder
 |---|---|---|---|---|---|
 | `command` | string | ja |  |  | Der Prompt, den die KI bekommt. Platzhalter wie `{{ previous_output }}` werden aufgelöst. |
 | `timeout_seconds` | integer |  |  | ≥ 1 | Timeout in Sekunden für den KI-Aufruf. Ohne Angabe gilt `automation.host-claude.timeout-seconds`. |
+| `user_mcp_servers` | boolean |  | `false` |  | Nur wenn das Modul `mcp` an ist: Die KI-Aufrufe dieses Blocks dürfen die MCP-Server aus der Claude-Konfiguration des Benutzers nutzen (z. B. Playwright). Ohne den Schlüssel laufen sie dann ohne sie, damit ein Lauf nicht den MCP-Server dieser Instanz erreicht. |
 
 ## `shell`
 
@@ -82,6 +83,7 @@ Dazu die [gemeinsamen Felder](#gemeinsame-felder) und die [KI-Felder](#ki-felder
 | `max_repeated_actions` | integer |  | `3` | ≥ 1 | Abbruch, wenn dieselbe Aktion so oft hintereinander kommt. |
 | `require_approval` | boolean |  | `false` |  | Vor jeder Aktion eine Freigabe einholen. |
 | `timeout_seconds` | integer |  |  | ≥ 1 | Timeout in Sekunden für den KI-Aufruf. Ohne Angabe gilt `automation.host-claude.timeout-seconds`. |
+| `user_mcp_servers` | boolean |  | `false` |  | Nur wenn das Modul `mcp` an ist: Die KI-Aufrufe dieses Blocks dürfen die MCP-Server aus der Claude-Konfiguration des Benutzers nutzen (z. B. Playwright). Ohne den Schlüssel laufen sie dann ohne sie, damit ein Lauf nicht den MCP-Server dieser Instanz erreicht. |
 
 ## `retry`
 

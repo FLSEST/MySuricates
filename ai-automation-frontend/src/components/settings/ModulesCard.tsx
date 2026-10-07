@@ -20,7 +20,7 @@ const UI_EDITABLE_PROPERTY = 'automation.modules.ui-editable';
 /**
  * Optional modules and hardening switches. Read-only unless the backend runs with
  * automation.modules.ui-editable — then feature modules get a switch (effective immediately).
- * Hardening is never switchable here.
+ * Hardening and startup-only feature modules (`startupOnly`, e.g. mcp) are never switchable here.
  */
 export function ModulesCard() {
   const t = useT();
@@ -122,7 +122,17 @@ function ModuleRow({ module: m, editable }: { module: ModuleInfo; editable: bool
             {m.risks.map((r) => <Badge key={r} variant="danger">{t.modules.risk[r]}</Badge>)}
           </span>
         </button>
-        {editable && (
+        {editable && m.startupOnly && (
+          <span
+            className="flex shrink-0 items-center gap-1 text-xs text-text-tertiary"
+            title={t.modules.startupOnly}
+            data-testid={`module-${m.name}-startup-only`}
+          >
+            <Lock className="w-3.5 h-3.5" aria-hidden="true" />
+            {t.modules.startupOnly}
+          </span>
+        )}
+        {editable && !m.startupOnly && (
           <Toggle
             enabled={m.enabled}
             ariaLabel={t.modules.switchLabel.replace('{name}', moduleName(m.name))}

@@ -36,7 +36,7 @@ public enum TriggerCategory {
             return todoTriggerRun ? TODO_TRIGGER : MANUAL;
         }
         return switch (source) {
-            case MANUAL, RETRY, RESUME, TODO_RESOLUTION, ASSISTANT -> MANUAL;
+            case MANUAL, RETRY, RESUME, TODO_RESOLUTION, ASSISTANT, MCP -> MANUAL;
             case SCHEDULE -> SCHEDULED;
             case WEBHOOK -> WEBHOOK;
             case COMPLETION_TRIGGER -> COMPLETION_TRIGGER;

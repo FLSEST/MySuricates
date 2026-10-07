@@ -24,7 +24,8 @@ import { SettingsNav, type NavSection } from '../components/settings/SettingsNav
 import { SettingsSection } from '../components/settings/SettingsSection';
 import { ModulesCard } from '../components/settings/ModulesCard';
 import { StartupConfigCard } from '../components/settings/StartupConfigCard';
-import { useModuleEnabled } from '../hooks/useModules';
+import { McpConnectCard } from '../components/settings/McpConnectCard';
+import { useModuleEnabled, useModuleInfo } from '../hooks/useModules';
 import { useRequestMetrics } from '../hooks/useRequestMetrics';
 import { ApiLatencyCard } from '../components/dashboard/ApiLatencyCard';
 import { ProHandoff } from '../components/simple/ProHandoff';
@@ -37,6 +38,9 @@ export function Settings() {
   const stagingModule = useModuleEnabled('staging');
   const remoteAccessModule = useModuleEnabled('remote-access');
   const wishesModule = useModuleEnabled('wishes');
+  // Strict, unlike useModuleEnabled: an older backend that does not report `mcp` has no MCP endpoint,
+  // so the connect instructions would point nowhere
+  const mcpModule = useModuleInfo('mcp')?.enabled === true;
 
   const { data: staging } = useStagingStatus();
   const stagingStart = useStagingStart();
@@ -91,6 +95,7 @@ export function Settings() {
     { id: 'infrastructure', label: t.settings.settingsNavInfrastructure, visible: !simpleMode },
     { id: 'environments', label: t.settings.settingsNavEnvironments, visible: showEnvironments },
     { id: 'modules', label: t.modules.navTitle, visible: true },
+    { id: 'mcp', label: t.mcpConnect.navTitle, visible: mcpModule },
     { id: 'system', label: t.settings.settingsNavSystem, visible: true },
   ];
 
@@ -187,6 +192,12 @@ export function Settings() {
             <StartupConfigCard />
             <ModulesCard />
           </SettingsSection>
+
+          {mcpModule && (
+            <SettingsSection id="mcp" title={t.mcpConnect.navTitle} collapsible open={!!openSections['mcp']} onToggle={() => toggleSection('mcp')}>
+              <McpConnectCard />
+            </SettingsSection>
+          )}
 
           <SettingsSection id="system" title={t.settings.settingsNavSystem} collapsible open={!!openSections['system']} onToggle={() => toggleSection('system')}>
             <SystemInfoCard />

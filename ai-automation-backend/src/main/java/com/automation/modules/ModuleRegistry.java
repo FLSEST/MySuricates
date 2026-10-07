@@ -147,6 +147,10 @@ public final class ModuleRegistry {
                         + "' is a hardening switch and can only be changed in the startup configuration ("
                         + module.property() + ")");
             }
+            if (module.startupOnly()) {
+                throw new ModuleChangeException(ErrorCode.INVALID_ARGUMENT, "'" + module.key()
+                        + "' can only be switched in the startup configuration (" + module.property() + ")");
+            }
             if (!entry.getValue().equals(configured.get(module))) {
                 normalized.put(module, entry.getValue());
             }

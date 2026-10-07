@@ -55,6 +55,10 @@
     "name": "Stable & test instances",
     "description": "Stable and test instances in Docker, including definition sync between instances."
   },
+  "mcp": {
+    "name": "MCP server",
+    "description": "AI clients such as Claude Code, Cursor or VS Code use this instance through the Model Context Protocol: discover templates, build, check and run workflows, answer approvals, TODOs. Only switchable in the startup configuration."
+  },
   "conversion": {
     "name": "Run → workflow conversion",
     "description": "Turns a finished run into a reusable workflow."

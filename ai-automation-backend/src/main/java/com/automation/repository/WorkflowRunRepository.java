@@ -40,6 +40,10 @@ public interface WorkflowRunRepository extends JpaRepository<WorkflowRun, String
 
     long countByStatus(RunStatus status);
 
+    /** Only the status of one run — for polling without loading steps. */
+    @Query("SELECT wr.status FROM WorkflowRun wr WHERE wr.id = :id")
+    Optional<RunStatus> findStatusById(@org.springframework.data.repository.query.Param("id") String id);
+
     long countByStartedAtAfter(Instant since);
 
     List<WorkflowRun> findAllByOrderByStartedAtDesc();

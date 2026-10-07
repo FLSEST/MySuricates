@@ -42,7 +42,8 @@ public final class ModuleCapabilityMapper {
                 m.envVar(),
                 m.description(),
                 status.configured(),
-                status.overridden());
+                status.overridden(),
+                m.startupOnly());
     }
 
     /** HOST_ACCESS → host-access */
