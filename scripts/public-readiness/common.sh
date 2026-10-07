@@ -17,7 +17,8 @@ tool_section() {
   if [ -n "$tool" ]; then
     if command -v "$tool" >/dev/null 2>&1; then
       local version
-      version=$("$tool" --version 2>/dev/null | head -n 1 | redact || echo "unknown")
+      # Some tools (Maven) colour their version line even without a terminal; strip ANSI escape sequences.
+      version=$("$tool" --version 2>/dev/null | head -n 1 | sed -E $'s/\033\\[[0-9;]*[A-Za-z]//g' | redact || echo "unknown")
       printf 'tool: %s\ntool_available: yes\ntool_version: %s\n' "$tool" "$version"
     else
       printf 'tool: %s\ntool_available: no\n' "$tool"
