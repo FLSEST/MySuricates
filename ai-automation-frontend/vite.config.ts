@@ -25,10 +25,31 @@ function normalizeWsProxyTarget(url: string): string {
   return url.replace(/^ws(s?):\/\//, 'http$1://').replace(/\/$/, '');
 }
 
+// Address the dev server listens on: loopback unless MYSURICATES_DEV_BIND opens it (e.g. 0.0.0.0 or one
+// Tailscale IP) — the same switch scripts/start-mysuricates-dev.sh passes to the backend as
+// --server.address (cd7c53f9). Same check as there: only characters of an IP address.
+function devBindAddress(): string {
+  const bind = process.env.MYSURICATES_DEV_BIND?.trim() || '127.0.0.1';
+  if (/[^0-9a-fA-F.:]/.test(bind)) {
+    throw new Error(`Ungueltiges MYSURICATES_DEV_BIND '${bind}' (eine IP-Adresse, z. B. 127.0.0.1 oder 0.0.0.0).`);
+  }
+  return bind;
+}
+
+// Host under which this machine reaches a server bound to `bind`: localhost for 127.0.0.1 and all
+// interfaces, otherwise that address — a dev backend bound to one Tailscale IP does not answer on
+// localhost. Same rule as netaddr_local_url in scripts/lib/netaddr.sh.
+function localHostFor(bind: string): string {
+  if (['127.0.0.1', '0.0.0.0', '::'].includes(bind)) return 'localhost';
+  return bind.includes(':') ? `[${bind}]` : bind;
+}
+
 export default defineConfig(() => {
+  const devBind = devBindAddress();
+  const devBackendHost = localHostFor(devBind);
   const e2eTarget = process.env.CYPRESS_TARGET === 'test' ? 'test' : 'dev';
-  const defaultApiOrigin = e2eTarget === 'test' ? 'http://localhost:8090' : 'http://localhost:9090';
-  const defaultWsOrigin = e2eTarget === 'test' ? 'ws://localhost:8090' : 'ws://localhost:9090';
+  const defaultApiOrigin = e2eTarget === 'test' ? 'http://localhost:8090' : `http://${devBackendHost}:9090`;
+  const defaultWsOrigin = e2eTarget === 'test' ? 'ws://localhost:8090' : `ws://${devBackendHost}:9090`;
   const apiProxyTarget = normalizeApiProxyTarget(
     process.env.CYPRESS_API_BASE_URL?.trim() || process.env.VITE_API_BASE_URL?.trim() || `${defaultApiOrigin}/api/v1`,
   );
@@ -87,7 +108,7 @@ export default defineConfig(() => {
       }),
     ],
     server: {
-      host: true,
+      host: devBind,
       port: 3000,
       strictPort: true,
       ...(process.env.VITE_HTTPS !== 'false' && fs.existsSync(path.resolve(import.meta.dirname, '../certs/dev.crt'))

@@ -38,7 +38,22 @@ scripts/start-mysuricates-dev.sh stop
 # Betriebsart: Host (Default) oder Container — dieselben Kommandos (TODO a1236a64)
 scripts/start-mysuricates-dev.sh start --container
 MYSURICATES_DEV_RUNTIME=container scripts/start-mysuricates-dev.sh   # dauerhaft
+
+# Nach außen öffnen (Standard: nur 127.0.0.1) — Backend und Vite zugleich
+MYSURICATES_DEV_BIND=0.0.0.0 scripts/start-mysuricates-dev.sh restart
 ```
+
+**Nur auf diesem Rechner.** Backend und Vite lauschen standardmäßig nur auf `127.0.0.1`: Der Starter
+gibt dem Backend `--server.address` mit, `vite.config.ts` setzt `host` aus derselben Variable (auch bei
+`npm run dev` von Hand). `MYSURICATES_DEV_BIND` öffnet beide bewusst — `0.0.0.0` fürs lokale Netz
+(Handy, PWA) oder eine einzelne Adresse wie die Tailscale-IP. Erlaubt sind nur IP-Adressen; sonst
+bricht der Start ab, bevor etwas gestoppt oder gebaut wird. Mit einer einzelnen Adresse antwortet das
+Backend nicht mehr auf `localhost`: Die Prüfungen des Starters und der Vite-Proxy folgen ihr, andere
+Werkzeuge auf diesem Rechner (Plugin, `curl localhost:9090`) nicht — dann lieber `0.0.0.0`. Im
+Container-Betrieb gilt für den Backend-Port `MYSURICATES_DEV_CONTAINER_BIND` (siehe unten), der
+Vite-Proxy folgt weiter `MYSURICATES_DEV_BIND` — eine einzelne Adresse also in beiden setzen. Wer die
+Oberfläche von einem anderen Gerät aufruft, trägt dessen Ursprung in `AUTOMATION_CORS_ORIGINS` ein
+([deployment.md → Wo gelauscht wird](deployment.md#wo-gelauscht-wird)).
 
 **Host oder Container?** Der Host-Weg ist der Default und unverändert. `--container` startet das
 Backend stattdessen per `docker compose` aus `ai-automation-backend/docker-compose.dev-container.yml`
@@ -87,7 +102,8 @@ npm install
 npm run dev
 ```
 
-Der Vite-Dev-Server proxied automatisch `/api/*` und `/ws/*` an `localhost:9090`.
+Der Vite-Dev-Server lauscht auf `127.0.0.1` (`MYSURICATES_DEV_BIND` öffnet ihn, siehe oben) und
+proxied automatisch `/api/*` und `/ws/*` an `localhost:9090`.
 `scripts/start-mysuricates-dev.sh` startet ihn schon mit; `npm run dev` von Hand braucht es nur ohne den
 Starter. Öffnen: `http://localhost:3000`
 

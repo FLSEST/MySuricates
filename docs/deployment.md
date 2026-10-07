@@ -426,7 +426,9 @@ Geheimnis im Container, das bei jedem `compose down` wieder weg wäre. Ein früh
    im öffentlichen Default `core` ist es aus; ohne Modul antworten die `/system/remote-access/*`-Endpunkte
    mit 404 `MODULE_DISABLED`
 3. API-Endpunkt aufrufen: `POST /api/v1/system/remote-access/enable` — das Backend startet Tailscale
-   auf dem Host
+   auf dem Host. Erreichbar ist es über die Tailscale-Adresse nur, wenn es nicht bloß auf
+   `127.0.0.1` lauscht: aus dem Quellcode `MYSURICATES_DEV_BIND` (die Tailscale-IP oder `0.0.0.0`),
+   bei `instance.sh` `MYSURICATES_BIND` ([Wo gelauscht wird](#wo-gelauscht-wird))
 4. IP und Hostname kommen in der Response zurück; Status danach über
    `GET /api/v1/system/remote-access/status` → `{ enabled, ip, hostname, inContainer }`. Im Frontend
    unter Settings → Remote Access sichtbar
@@ -611,14 +613,17 @@ Technische Fassung mit Klassennamen und reservierten Kontextschlüsseln:
 
 ### Wo gelauscht wird
 
-Weder Backend noch Frontend binden separat auf Loopback: `server.address` ist nirgends gesetzt, das
-Backend lauscht also auf allen Interfaces; Vite läuft mit `host: true`. Aus dem Quellcode gestartet
-(Dev) ist die Instanz damit im lokalen Netz erreichbar, nicht nur auf dem eigenen Rechner. Jeder
-Docker-Weg veröffentlicht den Port dagegen per Default nur auf `127.0.0.1` — `instance.sh`
+Per Default nur auf `127.0.0.1`, auf jedem Weg. Aus dem Quellcode gestartet (Dev,
+`scripts/start-mysuricates-dev.sh`) bekommt das Backend `--server.address=127.0.0.1` mit, und Vite
+lauscht ebenso nur dort (`vite.config.ts`); `MYSURICATES_DEV_BIND` öffnet beide, etwa mit `0.0.0.0`
+oder der Tailscale-IP ([entwicklung.md → Backend starten](entwicklung.md#backend-starten)). In
+`application.yml` steht `server.address` bewusst nicht: Die Images müssen im Container auf allen
+Interfaces lauschen. Jeder Docker-Weg veröffentlicht den Port per Default nur auf `127.0.0.1` — `instance.sh`
 (`MYSURICATES_BIND`, siehe [Eine Instanz im Container](#eine-instanz-im-container-deploy)), Stable und
 Test (`STABLE_BIND`/`TEST_BIND`), der Dev-Container (`MYSURICATES_DEV_CONTAINER_BIND`) und das
 Tryout-Image ([Tabelle](#ki-anbieter-im-container)) — wer das ändert, umgeht damit auch die üblichen
-Host-Firewall-Regeln (Dockers Portfreigabe).
+Host-Firewall-Regeln (Dockers Portfreigabe). Nach außen geöffnet ist die Instanz im lokalen Netz
+erreichbar, nicht nur auf dem eigenen Rechner.
 
 **CORS** betrifft eine installierte Instanz nicht: Das Backend liefert die Oberfläche selbst aus,
 Seite und API haben denselben Ursprung. Eine Rolle spielt die Liste nur, wo beide verschiedene

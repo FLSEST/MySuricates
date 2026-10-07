@@ -198,7 +198,9 @@ der Oberfläche (`StagingComposeCommand`). Schalter in `~/.config/mysuricates/st
 ohne Anmeldedatei per Variable aus `~/.config/mysuricates/ai.env` — nur die der gewählten Anbieter, vom
 Installer nur mit Zustimmung geschrieben), `AI_PROVIDERS`, `DOCKER_SOCKET` (Standard 0), `BIND` (Standard `127.0.0.1`).
 **Sicher per Standard, überall:** jeder Docker-Weg (deploy/, tryout, Stable, Test, Dev-Container) veröffentlicht den
-Port nur auf `127.0.0.1` und bindet keinen Docker-Socket ein; nach außen (`…BIND=0.0.0.0`) oder mit Socket
+Port nur auf `127.0.0.1` und bindet keinen Docker-Socket ein, und der Dev-Start aus dem Quellcode lauscht ebenso nur
+auf `127.0.0.1` (Backend per `--server.address` aus `start-mysuricates-dev.sh`, Vite per `host`; beide öffnet
+`MYSURICATES_DEV_BIND`); nach außen (`…BIND=0.0.0.0`) oder mit Socket
 (`…DOCKER_SOCKET=1`, nötig für Projekt-Container, Terminal, `container_image`-Blöcke, `docker` in Shell-Blöcken)
 nur per bewusstem Schalter. Nie wieder ganze Provider-Verzeichnisse oder ein Portmapping ohne Adresse fest in eine
 Compose-Datei schreiben (`test-deploy-files.sh` prüft das). Details: [docs/deployment.md](docs/deployment.md) → „KI-Anbieter im Container“.

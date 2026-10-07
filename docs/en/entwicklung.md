@@ -35,7 +35,21 @@ scripts/start-mysuricates-dev.sh stop
 # Runtime: host (default) or container — the same commands (TODO a1236a64)
 scripts/start-mysuricates-dev.sh start --container
 MYSURICATES_DEV_RUNTIME=container scripts/start-mysuricates-dev.sh   # permanently
+
+# Open to the outside (default: 127.0.0.1 only) — backend and Vite at once
+MYSURICATES_DEV_BIND=0.0.0.0 scripts/start-mysuricates-dev.sh restart
 ```
+
+**This machine only.** Backend and Vite listen on `127.0.0.1` only by default: the starter passes
+`--server.address` to the backend, `vite.config.ts` sets `host` from the same variable (also for
+`npm run dev` by hand). `MYSURICATES_DEV_BIND` opens both on purpose — `0.0.0.0` for the local network
+(phone, PWA) or a single address such as the Tailscale IP. Only IP addresses are accepted; anything
+else stops the start before anything is stopped or built. With a single address the backend no longer
+answers on `localhost`: the starter's checks and the Vite proxy follow it, other tools on this machine
+(plugin, `curl localhost:9090`) do not — prefer `0.0.0.0` then. In container mode the backend's port
+follows `MYSURICATES_DEV_CONTAINER_BIND` (see below), the Vite proxy still follows
+`MYSURICATES_DEV_BIND` — so set a single address in both. Whoever opens the UI from another device adds
+its origin to `AUTOMATION_CORS_ORIGINS` ([deployment.md → Where it listens](deployment.md#where-it-listens)).
 
 **Host or container?** The host way is the default and unchanged. `--container` starts the backend
 through `docker compose` from `ai-automation-backend/docker-compose.dev-container.yml` instead (image
@@ -82,7 +96,8 @@ npm install
 npm run dev
 ```
 
-The Vite dev server automatically proxies `/api/*` and `/ws/*` to `localhost:9090`.
+The Vite dev server listens on `127.0.0.1` (`MYSURICATES_DEV_BIND` opens it, see above) and
+automatically proxies `/api/*` and `/ws/*` to `localhost:9090`.
 `scripts/start-mysuricates-dev.sh` already starts it; running `npm run dev` by hand is only needed
 without the starter. Open: `http://localhost:3000`
 

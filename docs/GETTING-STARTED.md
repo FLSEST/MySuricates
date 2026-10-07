@@ -288,7 +288,9 @@ Das ist ein bekannter Entwicklungs-Default für ein selbst-signiertes Zertifikat
 Wer HTTPS auch im Backend nutzt, setzt `AUTOMATION_SSL_ENABLED=true` und vergibt über
 `AUTOMATION_SSL_PASSWORD` einen eigenen Wert; das Skript nimmt ihn aus der Umgebung entgegen. Vite serviert dann automatisch HTTPS; der Browser warnt einmalig
 wegen des selbst-signierten Zertifikats. Ohne dieses Skript bleibt es bei HTTP — völlig ausreichend
-für die lokale Nutzung.
+für die lokale Nutzung. Von einem anderen Gerät aus (Handy, Tailscale) erreichbar wird der Dev-Start
+erst mit `MYSURICATES_DEV_BIND` — standardmäßig lauschen Backend und Vite nur auf `127.0.0.1`
+([entwicklung.md](entwicklung.md#backend-starten)).
 
 `config/SslPasswordGuard` prüft das beim Start des Backends: Ist `AUTOMATION_SSL_ENABLED=true`
 gesetzt und `AUTOMATION_SSL_PASSWORD` noch der Dev-Default `mysuricates`, bricht der Boot mit einer

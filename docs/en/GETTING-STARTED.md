@@ -284,7 +284,9 @@ HTTPS on the backend, set `AUTOMATION_SSL_ENABLED=true` and choose your own valu
 
 Vite then serves HTTPS automatically; the browser warns once
 about the self-signed certificate. Without this script it stays on HTTP — perfectly sufficient for
-local use.
+local use. The dev start becomes reachable from another device (phone, Tailscale) only with
+`MYSURICATES_DEV_BIND` — by default backend and Vite listen on `127.0.0.1` only
+([entwicklung.md](entwicklung.md#starting-the-backend)).
 
 `config/SslPasswordGuard` checks this at backend startup: if `AUTOMATION_SSL_ENABLED=true` is set
 and `AUTOMATION_SSL_PASSWORD` is still the dev default `mysuricates`, boot aborts with an

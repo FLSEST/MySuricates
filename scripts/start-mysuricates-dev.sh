@@ -8,6 +8,10 @@
 #   scripts/start-mysuricates-dev.sh build                               # only build the runtime JAR (setup.sh), starts nothing
 #   scripts/start-mysuricates-dev.sh [start|stop|restart|build] --container  # backend in the Docker container
 #
+# Backend and Vite listen on 127.0.0.1 only; MYSURICATES_DEV_BIND=0.0.0.0 (or one IP address,
+# e.g. a Tailscale IP) opens both — set it deliberately, the instance is then reachable from outside.
+# With --container the backend's port follows MYSURICATES_DEV_CONTAINER_BIND instead.
+#
 # --container: Dockerfile.stable compiles nothing, it copies the JAR from target/. restart therefore
 # always builds it beforehand (mvn clean package), start only with --rebuild or if none exists, build only that.
 #
@@ -30,6 +34,9 @@ REPO_ROOT="$(cd -- "${SCRIPT_DIR}/.." && pwd)"
 # api_key(): env -> key file, never the DB (fff23a6c).
 # shellcheck source=lib/api-key.sh
 . "${SCRIPT_DIR}/lib/api-key.sh"
+# netaddr_local_url(): where this machine reaches a server bound to an address.
+# shellcheck source=lib/netaddr.sh
+. "${SCRIPT_DIR}/lib/netaddr.sh"
 
 COMMAND="start"
 # Operating mode of the backend: host (default, java -jar) or container (docker compose).
@@ -46,7 +53,7 @@ for arg in "$@"; do
     --rebuild) REBUILD=1 ;;     # start: rebuild the JAR even if one already exists
     --container) RUNTIME_MODE=container ;;  # backend in the container instead of as java -jar (TODO a1236a64)
     --host) RUNTIME_MODE=host ;;
-    -h|--help) sed -n '2,18p' "${BASH_SOURCE[0]}"; exit 0 ;;
+    -h|--help) sed -n '2,22p' "${BASH_SOURCE[0]}"; exit 0 ;;
     *) ;; # ignore other arguments
   esac
 done
@@ -89,16 +96,28 @@ CURRENT_JAR="${RUNTIME_DIR}/current.jar"
 BACKEND_PROCESS_PATTERN='(mvn|maven|spring-boot|java)'
 FRONTEND_PROCESS_PATTERN='(npm|node|vite)'
 
+# Address the dev start from source listens on: the backend in host mode (--server.address) and Vite
+# (vite.config.ts reads the same variable). Loopback by default, like every Docker way (cd7c53f9);
+# MYSURICATES_DEV_BIND opens both, e.g. 0.0.0.0 or one Tailscale IP. Not in application.yml: the
+# images must listen on 0.0.0.0 inside their container. Checked by check_dev_bind before any start.
+DEV_BIND="${MYSURICATES_DEV_BIND:-127.0.0.1}"
+
 BACKEND_PORT=9090
 # In the container the backend answers on the port that Compose publishes: already-running check,
 # readiness and run check before restart follow it — a probe next to the host backend (3bfa4e10).
 if [[ "${RUNTIME_MODE}" == "container" ]]; then BACKEND_PORT="${MYSURICATES_DEV_CONTAINER_PORT:-9090}"; fi
-API_BASE="${MYSURICATES_API_BASE:-http://localhost:${BACKEND_PORT}/api/v1}"
+# Bound to a single non-loopback address the backend does not answer on localhost — probe that address.
+if [[ "${RUNTIME_MODE}" == "container" ]]; then
+  BACKEND_LOCAL_URL="http://localhost:${BACKEND_PORT}"
+else
+  BACKEND_LOCAL_URL="$(netaddr_local_url "${DEV_BIND}" "${BACKEND_PORT}")"
+fi
+API_BASE="${MYSURICATES_API_BASE:-${BACKEND_LOCAL_URL}/api/v1}"
 BACKEND_READY_URL="${API_BASE}/system/info"
 # Vite serves HTTPS only when certs/dev.crt exists, otherwise plain HTTP.
 # Probe both schemes so a fresh clone (no certs -> HTTP) is detected correctly.
-FRONTEND_HTTPS_URL="https://localhost:3000"
-FRONTEND_HTTP_URL="http://localhost:3000"
+FRONTEND_HTTP_URL="$(netaddr_local_url "${DEV_BIND}" 3000)"
+FRONTEND_HTTPS_URL="https://${FRONTEND_HTTP_URL#http://}"
 
 # JVM flags as before in the spring-boot-maven-plugin (pom.xml), plus tiered stop for fast start.
 BACKEND_JVM_OPTS=(
@@ -107,6 +126,15 @@ BACKEND_JVM_OPTS=(
   -XX:HeapDumpPath=./data/logs/
   -XX:ErrorFile=./data/logs/hs_err_pid%p.log
 )
+
+# Refuses a MYSURICATES_DEV_BIND that is no IP address (same rule as MYSURICATES_DEV_CONTAINER_BIND):
+# the value ends up in the java and Vite command lines.
+check_dev_bind() {
+  case "${DEV_BIND}" in
+    *[!0-9a-fA-F.:]*) echo "Ungueltiges MYSURICATES_DEV_BIND '${MYSURICATES_DEV_BIND}' (eine IP-Adresse, z. B. 127.0.0.1 oder 0.0.0.0)." >&2
+                      return 2 ;;
+  esac
+}
 
 require_command() {
   local command_name="$1"
@@ -409,6 +437,7 @@ stop_backend_container() {
 }
 
 start_backend() {
+  check_dev_bind || return 2
   discard_stale_pid_file "${BACKEND_PID_FILE}" "${BACKEND_PROCESS_PATTERN}" "Backend"
 
   if pid_belongs_to_service "${BACKEND_PID_FILE}" "${BACKEND_PROCESS_PATTERN}" \
@@ -428,7 +457,7 @@ start_backend() {
   (
     cd "${BACKEND_DIR}"   # cwd stays the backend directory: ./data/automation.db, user.dir users
     nohup java "${BACKEND_JVM_OPTS[@]}" ${MYSURICATES_DEV_JVM_OPTS:-} -jar "${CURRENT_JAR}" \
-      > "${BACKEND_LOG}" 2>&1 &
+      --server.address="${DEV_BIND}" > "${BACKEND_LOG}" 2>&1 &
     echo "$!" > "${BACKEND_PID_FILE}"
   )
 }
@@ -475,6 +504,7 @@ stop_backend() {
 }
 
 start_frontend() {
+  check_dev_bind || return 2
   discard_stale_pid_file "${FRONTEND_PID_FILE}" "${FRONTEND_PROCESS_PATTERN}" "Frontend"
 
   if pid_belongs_to_service "${FRONTEND_PID_FILE}" "${FRONTEND_PROCESS_PATTERN}" \
@@ -492,7 +522,8 @@ start_frontend() {
     # while the backend (Java respects SIG_IGN) kept running (454f8ac5, found by
     # scripts/installer-probe.sh). python3 instead of setsid, because setsid exists only on Linux;
     # execvp keeps the PID, so the PID file still points to npm.
-    nohup python3 -c 'import os, sys; os.setsid(); os.execvp(sys.argv[1], sys.argv[1:])' npm run dev \
+    MYSURICATES_DEV_BIND="${DEV_BIND}" \
+      nohup python3 -c 'import os, sys; os.setsid(); os.execvp(sys.argv[1], sys.argv[1:])' npm run dev \
       > "${FRONTEND_LOG}" 2>&1 &
     echo "$!" > "${FRONTEND_PID_FILE}"
   )
@@ -552,7 +583,7 @@ report_and_exit() {
   echo
   echo "URLs:"
   echo "  Frontend: $(resolved_frontend_url)"
-  echo "  Backend:  http://localhost:${BACKEND_PORT}/api/v1"
+  echo "  Backend:  ${BACKEND_LOCAL_URL}/api/v1"
   if [[ "${backend_ok}" -eq 1 ]]; then
     print_api_key
   fi
@@ -577,6 +608,14 @@ main() {
   echo "Repo: ${REPO_ROOT}"
 
   echo "Betriebsart: ${RUNTIME_MODE}"
+
+  if [[ "${COMMAND}" == "start" || "${COMMAND}" == "restart" ]]; then
+    # Before anything is stopped or built: a bad value must not leave the backend down.
+    check_dev_bind || exit 2
+    if ! netaddr_is_local "${DEV_BIND}"; then
+      echo "Lauscht auf ${DEV_BIND} (MYSURICATES_DEV_BIND) — von außerhalb dieses Rechners erreichbar."
+    fi
+  fi
 
   case "${COMMAND}" in
     build)

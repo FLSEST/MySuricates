@@ -421,7 +421,9 @@ container, gone again on every `compose down`. An earlier attempt at this
    the public default `core`; without it the `/system/remote-access/*` endpoints answer 404
    `MODULE_DISABLED`
 3. Call the API endpoint: `POST /api/v1/system/remote-access/enable` — the backend starts Tailscale
-   on the host
+   on the host. It is reachable through the Tailscale address only if it does not just listen on
+   `127.0.0.1`: from source `MYSURICATES_DEV_BIND` (the Tailscale IP or `0.0.0.0`), with
+   `instance.sh` `MYSURICATES_BIND` ([Where it listens](#where-it-listens))
 4. IP and hostname come back in the response; status afterwards via
    `GET /api/v1/system/remote-access/status` → `{ enabled, ip, hostname, inContainer }`. Visible in
    the frontend under Settings → Remote Access
@@ -603,14 +605,17 @@ Technical version with class names and reserved context keys:
 
 ### Where it listens
 
-Neither backend nor frontend binds to loopback on its own: `server.address` is set nowhere, so the
-backend listens on all interfaces; Vite runs with `host: true`. Started from source (Dev), the
-instance is therefore reachable on the local network, not just on the machine itself. Every Docker
-way instead publishes the port on `127.0.0.1` only by default — `instance.sh` (`MYSURICATES_BIND`, see
-[One instance in a container](#one-instance-in-a-container-deploy)), Stable and Test
+On `127.0.0.1` only by default, on every way. Started from source (Dev,
+`scripts/start-mysuricates-dev.sh`), the backend is passed `--server.address=127.0.0.1`, and Vite
+listens there only as well (`vite.config.ts`); `MYSURICATES_DEV_BIND` opens both, e.g. with `0.0.0.0`
+or the Tailscale IP ([entwicklung.md → Starting the Backend](entwicklung.md#starting-the-backend)).
+`application.yml` deliberately sets no `server.address`: the images must listen on all interfaces
+inside their container. Every Docker way publishes the port on `127.0.0.1` only by default —
+`instance.sh` (`MYSURICATES_BIND`, see [One instance in a container](#one-instance-in-a-container-deploy)), Stable and Test
 (`STABLE_BIND`/`TEST_BIND`), the dev container (`MYSURICATES_DEV_CONTAINER_BIND`) and the tryout image
 ([table](#ai-providers-in-the-container)) — changing that also bypasses the usual host firewall rules
-(Docker's port publishing).
+(Docker's port publishing). Opened to the outside, the instance is reachable on the local network,
+not just on the machine itself.
 
 **CORS** does not affect an installed instance: the backend serves the UI itself, so page and API
 share one origin. The list only matters where the two have different origins — with the Vite dev

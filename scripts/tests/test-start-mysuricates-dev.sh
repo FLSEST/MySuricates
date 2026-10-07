@@ -302,6 +302,58 @@ check "DATA_HOME_KEY_SH reads the same file"             '[ "$(bash -c ". \"\$1\
 rm -rf "$MIG/home/.autotrigger"; echo new-key > "$MIG/home/.mysuricates/api-key"
 check "after the move: ~/.mysuricates"                   '[ "$(dh)" = "$MIG/home/.mysuricates" ] && [ "$(bash -c ". \"\$1\"; sh -c \"\$DATA_HOME_KEY_SH\" sh \"\$2\"" _ "$HERE/../lib/data-home.sh" "$MIG/home")" = new-key ]'
 
+echo "13) the dev start from source listens on 127.0.0.1 unless MYSURICATES_DEV_BIND opens it (cd7c53f9)"
+# The real dev backend and Vite may be running on :9090/:3000 — the readiness probes are stubbed,
+# java and npm are fakes that only write down what they were started with.
+mkdir -p "$TMP/bbin" "$TMP/frontend"
+cat > "$TMP/bbin/java" <<'STUB'
+#!/usr/bin/env bash
+printf '%s\n' "$*" > "$JAVA_ARGS"
+STUB
+cat > "$TMP/bbin/npm" <<'STUB'
+#!/usr/bin/env bash
+printf '%s\n' "${MYSURICATES_DEV_BIND-unset}" > "$NPM_BIND"
+STUB
+cat > "$TMP/bbin/mvnw" <<'STUB'
+#!/usr/bin/env bash
+echo "mvn $*" >> "$BIND_CALLS"
+STUB
+chmod +x "$TMP/bbin/java" "$TMP/bbin/npm" "$TMP/bbin/mvnw"
+BCTX='export PATH="'"$TMP"'/bbin:$PATH" JAVA_ARGS="'"$TMP"'/java.args" NPM_BIND="'"$TMP"'/npm.bind" BIND_CALLS="'"$TMP"'/bind-calls.log"
+  endpoint_is_ready() { return 1; }; frontend_is_ready() { return 1; }
+  BACKEND_DIR="'"$TMP"'/backend"; FRONTEND_DIR="'"$TMP"'/frontend"; MVN_CMD="'"$TMP"'/bbin/mvnw"; RUNTIME_MODE=host
+  mkdir -p "$RUNTIME_DIR"; echo jar > "$RUNTIME_DIR/backend-fake.jar"; ln -sfn "$RUNTIME_DIR/backend-fake.jar" "$CURRENT_JAR"
+  rm -f "$BACKEND_PID_FILE" "$FRONTEND_PID_FILE"'
+# Waits until the background fakes have written their file (they run detached from the subshell)
+await() { for _ in $(seq 1 50); do [ -s "$1" ] && return 0; sleep 0.1; done; return 1; }
+bind_start() {  # starts backend and frontend; prints "<backend rc> <frontend rc>"
+  rm -f "$TMP/java.args" "$TMP/npm.bind"; : > "$TMP/bind-calls.log"
+  run_in_script "$BCTX"'; start_backend >/dev/null 2>&1; b=$?; start_frontend >/dev/null 2>&1; echo "$b $?"'
+}
+RC="$(bind_start)"; await "$TMP/java.args"; await "$TMP/npm.bind"
+check "default: both starts succeed"                       '[ "$RC" = "0 0" ]'
+check "default: java gets --server.address=127.0.0.1"       'grep -F -- "-jar $TMP/state/mysuricates-dev/runtime/current.jar --server.address=127.0.0.1" "$TMP/java.args" >/dev/null'
+check "default: Vite is started with MYSURICATES_DEV_BIND=127.0.0.1" '[ "$(cat "$TMP/npm.bind")" = 127.0.0.1 ]'
+RC="$(MYSURICATES_DEV_BIND=0.0.0.0 bind_start)"; await "$TMP/java.args"; await "$TMP/npm.bind"
+check "switch 0.0.0.0: java gets --server.address=0.0.0.0"  '[ "$RC" = "0 0" ] && grep -F -- "--server.address=0.0.0.0" "$TMP/java.args" >/dev/null'
+check "switch 0.0.0.0: Vite gets the same address"         '[ "$(cat "$TMP/npm.bind")" = 0.0.0.0 ]'
+RC="$(MYSURICATES_DEV_BIND=100.64.1.2 bind_start)"; await "$TMP/java.args"; await "$TMP/npm.bind"
+check "switch to one address (100.64.1.2): java and Vite get it" '[ "$RC" = "0 0" ] && grep -F -- "--server.address=100.64.1.2" "$TMP/java.args" >/dev/null && [ "$(cat "$TMP/npm.bind")" = 100.64.1.2 ]'
+for bad in foo '1.2.3.4; rm' '$(id)'; do
+  RC="$(MYSURICATES_DEV_BIND="$bad" bind_start)"; sleep 0.3
+  check "invalid bind '$bad': backend and frontend refused (rc 2)" '[ "$RC" = "2 2" ] && [ ! -e "$TMP/java.args" ] && [ ! -e "$TMP/npm.bind" ]'
+done
+OUT="$(MYSURICATES_DEV_BIND='1.2.3.4; rm' run_in_script "$BCTX"'; COMMAND=restart; ( main 2>&1 ); echo "rc=$?"')"
+check "invalid bind: restart stops before stop, build and start" 'grep "^rc=2$" <<<"$OUT" >/dev/null && grep "Ungueltiges MYSURICATES_DEV_BIND" <<<"$OUT" >/dev/null && [ ! -s "$TMP/bind-calls.log" ] && [ ! -e "$TMP/java.args" ]'
+URLS() { run_in_script 'echo "$BACKEND_READY_URL $FRONTEND_HTTP_URL $FRONTEND_HTTPS_URL"'; }
+check "default: probes on localhost"                       '[ "$(URLS)" = "http://localhost:9090/api/v1/system/info http://localhost:3000 https://localhost:3000" ]'
+check "0.0.0.0: probes stay on localhost"                  '[ "$(MYSURICATES_DEV_BIND=0.0.0.0 URLS)" = "http://localhost:9090/api/v1/system/info http://localhost:3000 https://localhost:3000" ]'
+check "one address: probes go to that address"            '[ "$(MYSURICATES_DEV_BIND=100.64.1.2 URLS)" = "http://100.64.1.2:9090/api/v1/system/info http://100.64.1.2:3000 https://100.64.1.2:3000" ]'
+check "--container: the backend probe stays on localhost"  '[ "$(MYSURICATES_DEV_RUNTIME=container MYSURICATES_DEV_BIND=100.64.1.2 run_in_script "echo \"\$BACKEND_READY_URL\"")" = "http://localhost:9090/api/v1/system/info" ]'
+VITE="$HERE/../../ai-automation-frontend/vite.config.ts"
+check "vite.config.ts reads MYSURICATES_DEV_BIND, no host: true" 'grep -F "process.env.MYSURICATES_DEV_BIND" "$VITE" >/dev/null && ! grep -E "host: *true" "$VITE" >/dev/null'
+check "--help names MYSURICATES_DEV_BIND"                  '"$SCRIPT" --help | grep "MYSURICATES_DEV_BIND" >/dev/null'
+
 echo
 echo "passed=$PASS failed=$FAIL"
 [ "$FAIL" -eq 0 ]
