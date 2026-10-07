@@ -2,7 +2,6 @@ package com.automation.service.trigger;
 
 import com.automation.config.TodoTriggerConfig;
 import com.automation.dto.request.CreateTodoTriggerRequest;
-import com.automation.entity.RunStatus;
 import com.automation.entity.Todo;
 import com.automation.entity.TodoTrigger;
 import com.automation.entity.Workflow;
@@ -13,6 +12,8 @@ import com.automation.repository.TodoRepository;
 import com.automation.repository.TodoTriggerRepository;
 import com.automation.repository.WorkflowRepository;
 import com.automation.repository.WorkflowRunRepository;
+import com.automation.service.todo.TodoContextVariables;
+import com.automation.service.todo.TodoFixRuns;
 import com.automation.service.workflow.WorkflowExecutor;
 import com.automation.service.workflow.WorkflowService;
 import com.automation.util.EnumParameter;
@@ -249,7 +250,7 @@ public class TodoTriggerService {
                     trigger.getId(), todo.getTitle(), todo.getFixAttempts(), trigger.getMaxAttempts());
             return false;
         }
-        if (isFixRunStillRunning(todo)) {
+        if (TodoFixRuns.isStillRunning(todo, workflowRunRepository)) {
             log.debug("TodoTrigger {}: skipping todo '{}' — fix run still running ({})",
                     trigger.getId(), todo.getTitle(), todo.getLastFixRunId());
             return false;
@@ -289,15 +290,6 @@ public class TodoTriggerService {
         return TodoTriggerMatcher.matches(TodoTriggerMatcher.Criteria.of(trigger), TodoTriggerMatcher.Subject.of(todo));
     }
 
-    private boolean isFixRunStillRunning(Todo todo) {
-        if (todo.getLastFixRunId() == null) {
-            return false;
-        }
-        return workflowRunRepository.findById(todo.getLastFixRunId())
-                .map(run -> run.getStatus() == RunStatus.RUNNING || run.getStatus() == RunStatus.PENDING)
-                .orElse(false);
-    }
-
     private Map<String, Object> buildContext(TodoTrigger trigger, Todo todo) {
         Map<String, Object> context = new HashMap<>();
 
@@ -307,15 +299,7 @@ public class TodoTriggerService {
         }
 
         // Dynamic todo context variables
-        context.put("todo_id", todo.getId());
-        context.put("todo_title", todo.getTitle());
-        context.put("todo_description", todo.getDescription() != null ? todo.getDescription() : "");
-        context.put("todo_tags", todo.getTags() != null ? todo.getTags() : "[]");
-        context.put("todo_priority", todo.getPriority().name());
-        context.put("todo_project_id", todo.getProjectId() != null ? todo.getProjectId() : "");
-        context.put("todo_source", todo.getSource() != null ? todo.getSource().name() : "");
-        context.put("todo_reference_type", todo.getReferenceType() != null ? todo.getReferenceType() : "");
-        context.put("todo_reference_id", todo.getReferenceId() != null ? todo.getReferenceId() : "");
+        context.putAll(TodoContextVariables.of(todo));
         context.put("todo_trigger_id", trigger.getId());
 
         return context;

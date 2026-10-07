@@ -1,6 +1,5 @@
 package com.automation.service.todo;
 
-import com.automation.entity.RunStatus;
 import com.automation.entity.Todo;
 import com.automation.entity.TriggerSource;
 import com.automation.entity.Workflow;
@@ -40,7 +39,7 @@ public class TodoResolutionService {
 
         Workflow workflow = workflowService.findByIdEager(todo.getLinkedWorkflowId());
         WorkflowRun run = workflowExecutorProvider.getObject()
-                .execute(workflow, contextFor(todo), null, runMetadataFor(todo, workflow), TriggerSource.TODO_RESOLUTION);
+                .execute(workflow, TodoContextVariables.of(todo), null, runMetadataFor(todo, workflow), TriggerSource.TODO_RESOLUTION);
 
         todo.setStatus(Todo.Status.IN_PROGRESS);
         todo.setLastFixRunId(run.getId());
@@ -57,18 +56,9 @@ public class TodoResolutionService {
         if (todo.getStatus() == Todo.Status.DONE) {
             throw new IllegalStateException("Done todo does not need resolution");
         }
-        if (isFixRunStillRunning(todo)) {
+        if (TodoFixRuns.isStillRunning(todo, workflowRunRepository)) {
             throw new IllegalStateException("A resolution workflow is already running for this todo");
         }
-    }
-
-    private boolean isFixRunStillRunning(Todo todo) {
-        if (todo.getLastFixRunId() == null || todo.getLastFixRunId().isBlank()) {
-            return false;
-        }
-        return workflowRunRepository.findById(todo.getLastFixRunId())
-                .map(run -> run.getStatus() == RunStatus.RUNNING || run.getStatus() == RunStatus.PENDING)
-                .orElse(false);
     }
 
     private static Map<String, Object> runMetadataFor(Todo todo, Workflow workflow) {
@@ -78,19 +68,5 @@ public class TodoResolutionService {
         metadata.put("linkedTodoPreviousStatus", todo.getStatus().name());
         metadata.put("linkedTodoWorkflowId", workflow.getId());
         return metadata;
-    }
-
-    private static Map<String, Object> contextFor(Todo todo) {
-        Map<String, Object> context = new HashMap<>();
-        context.put("todo_id", todo.getId());
-        context.put("todo_title", todo.getTitle());
-        context.put("todo_description", todo.getDescription() != null ? todo.getDescription() : "");
-        context.put("todo_tags", todo.getTags() != null ? todo.getTags() : "[]");
-        context.put("todo_priority", todo.getPriority().name());
-        context.put("todo_project_id", todo.getProjectId() != null ? todo.getProjectId() : "");
-        context.put("todo_source", todo.getSource() != null ? todo.getSource().name() : "");
-        context.put("todo_reference_type", todo.getReferenceType() != null ? todo.getReferenceType() : "");
-        context.put("todo_reference_id", todo.getReferenceId() != null ? todo.getReferenceId() : "");
-        return context;
     }
 }
