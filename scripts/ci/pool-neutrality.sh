@@ -44,6 +44,12 @@ report() {
   FINDINGS=$((FINDINGS + 1))
 }
 
+# The agent images (ai-automation-backend/docker/Dockerfile.agent-*) run as user "agent" with
+# HOME=/home/agent. A path there - e.g. the container side of a "mounts" entry - is the same on
+# every machine, so PATH-ABS does not count it as a host binding. Only this exact name is exempt;
+# test-public-hygiene.sh pins it against the HOME of every agent image.
+POOL_AGENT_IMAGE_HOME='/home/agent/'
+
 # ---------------------------------------------------------------------------
 # Pattern catalog
 #
@@ -60,7 +66,8 @@ report() {
 scan_file() {
   local f="$1" m
 
-  m=$(grep -noE '(/home/[a-zA-Z_-]+/|/Users/[a-zA-Z_-]+/|/opt/[a-zA-Z]|/var/(log|lib|opt)/)' "$f" | head -1) \
+  m=$(grep -noE '(/home/[a-zA-Z_-]+/|/Users/[a-zA-Z_-]+/|/opt/[a-zA-Z]|/var/(log|lib|opt)/)' "$f" \
+      | grep -vF ":$POOL_AGENT_IMAGE_HOME" | head -1) \
     && [ -n "$m" ] && report "$f" "PATH-ABS" "absoluter Benutzer-/Systempfad: ${m#*:}"
 
   m=$(grep -noE '(^|[^A-Za-z0-9])[A-Z]:\\\\[A-Za-z]' "$f" | head -1) \

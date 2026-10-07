@@ -103,7 +103,7 @@ Blocktypen, Repo-Kennzeichen, Instanz-Schlüssel) stehen in `scripts/lib/hygiene
 | `PROJECT-ID` | kein Schlüssel `projectId`/`project_id` mit konkretem Wert — weder als Feld noch im `defaultContext`, den Metadaten oder einer Block-Config | rekursiver Schlüssel-Lauf; ein Platzhalter (`{{ project_id }}`) oder ein leerer Wert ist erlaubt, das ist die portable Parametrisierung |
 | `INSTANCE-REF` | dasselbe für `workflowId`, `runId`, `scheduleId`, `chainId`, `executionId` (und Snake-Case-Schreibweisen) | wie oben |
 | `UUID` | keine Instanz-UUID irgendwo im Text | Regex `[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}` |
-| `PATH-ABS` | keine absoluten Benutzer-/Systempfade (`/home/…`, `/Users/…`, `/opt/…`, `/var/log|lib|opt/…`) | Regex |
+| `PATH-ABS` | keine absoluten Benutzer-/Systempfade (`/home/…`, `/Users/…`, `/opt/…`, `/var/log|lib|opt/…`); ausgenommen ist nur `/home/agent/`, das HOME der eigenen Agent-Images im Container (etwa als Ziel eines `mounts`-Eintrags) | Regex |
 | `PATH-HOME` | keine Tilde-Pfade (`~/projekt`) | Regex |
 | `PATH-WIN` | kein Windows-Pfad mit Laufwerksbuchstaben | Regex |
 | `BINARY` | kein fest verdrahteter Werkzeugpfad (`/usr/bin/dot`); `#!/usr/bin/env` bleibt erlaubt | Regex |

@@ -34,7 +34,8 @@ class BuiltinTemplateGateTest {
     private static final Pattern OWN_API_HOST = Pattern.compile("(?:localhost|127\\.0\\.0\\.1):9090");
     private static final Pattern CREDENTIAL = Pattern.compile("X-API-Key|app_settings|[/.]api-key\\b");
     private static final Pattern PATH_HOME = Pattern.compile("~/[A-Za-z.]|\\$HOME\\b|\\$\\{HOME}");
-    private static final Pattern PATH_ABS = Pattern.compile("/home/[a-zA-Z_-]+/|/Users/[a-zA-Z_-]+/");
+    /** Like PATH-ABS of the pool gate: /home/agent/ is the HOME of the own agent images, not a host path. */
+    private static final Pattern PATH_ABS = Pattern.compile("/home/(?!agent/)[a-zA-Z_-]+/|/Users/[a-zA-Z_-]+/");
 
     /**
      * No exceptions: the three github-issues templates that broke the rule left the built-ins

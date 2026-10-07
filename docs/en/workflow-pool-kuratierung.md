@@ -102,7 +102,7 @@ block types, repo markers, instance keys) live in `scripts/lib/hygiene-rules.sh`
 | `PROJECT-ID` | no `projectId`/`project_id` key with a concrete value — neither as a field nor in `defaultContext`, metadata or a block config | recursive key walk; a placeholder (`{{ project_id }}`) or an empty value is allowed, that is the portable parameterisation |
 | `INSTANCE-REF` | the same for `workflowId`, `runId`, `scheduleId`, `chainId`, `executionId` (and snake_case spellings) | as above |
 | `UUID` | no instance UUID anywhere in the text | regex `[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}` |
-| `PATH-ABS` | no absolute user/system paths (`/home/…`, `/Users/…`, `/opt/…`, `/var/log|lib|opt/…`) | regex |
+| `PATH-ABS` | no absolute user/system paths (`/home/…`, `/Users/…`, `/opt/…`, `/var/log|lib|opt/…`); only `/home/agent/` is exempt, the HOME of the own agent images inside the container (e.g. as the target of a `mounts` entry) | regex |
 | `PATH-HOME` | no tilde paths (`~/project`) | regex |
 | `PATH-WIN` | no Windows path with a drive letter | regex |
 | `BINARY` | no hard-wired tool path (`/usr/bin/dot`); `#!/usr/bin/env` stays allowed | regex |

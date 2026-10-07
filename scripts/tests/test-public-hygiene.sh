@@ -496,8 +496,34 @@ write_pool api-short-base-probes-ok <<'JSON'
  "blocks": [{"type": "shell", "config": {"command": "HOST=http://localhost:9090; curl -sf \"$HOST/actuator/health\"\nAPI=http://localhost:9090/api\ncurl -s \"$API/v1/system/jvm-memory\"\necho \"$API\""}}]}
 JSON
 
+# --- PATH-ABS: the container HOME of the own agent images is not a host path (76feb278); a real
+# home next to it on the same line, or a name that only starts with "agent", still is. ---
+write_pool agent-home-mount-ok <<'JSON'
+{"name": {"de": "Agent-Home", "en": "Agent home"},
+ "description": {"de": "Text.", "en": "Text."}, "scope": "portable", "tags": ["quality"],
+ "blocks": [{"type": "shell", "config": {"container_image": "automation-agent-devops:latest",
+   "mounts": ["{{ home_dir }}/.m2/repository:/home/agent/.m2/repository:ro"], "command": "true"}}]}
+JSON
+
+write_pool host-home-next-to-agent <<'JSON'
+{"name": {"de": "Host-Home", "en": "Host home"},
+ "description": {"de": "Text.", "en": "Text."}, "scope": "portable", "tags": ["quality"],
+ "blocks": [{"type": "shell", "config": {"command": "cp /home/agent/a /home/somebody/b"}}]}
+JSON
+
+write_pool agent-prefix-home <<'JSON'
+{"name": {"de": "Agent-Praefix", "en": "Agent prefix"},
+ "description": {"de": "Text.", "en": "Text."}, "scope": "portable", "tags": ["quality"],
+ "blocks": [{"type": "shell", "config": {"command": "ls /home/agentur/"}}]}
+JSON
+
 OUT=$(bash "$REPO/scripts/ci/pool-neutrality.sh" --all "$POOL" 2>&1); RC=$?
 check "Befunde gemeldet (exit 1)"              '[ "$RC" -eq 1 ]'
+check "Container-HOME /home/agent/ bleibt erlaubt" '! grep -q "agent-home-mount-ok" <<<"$OUT"'
+check "Host-Home neben /home/agent/ erkannt"   'grep -q "host-home-next-to-agent.*PATH-ABS.*/home/somebody/" <<<"$OUT"'
+check "nur der genaue Name agent ist frei"     'grep -q "agent-prefix-home.*PATH-ABS.*/home/agentur/" <<<"$OUT"'
+check "jedes Agent-Image hat HOME=/home/agent" \
+  'for d in "$REPO"/ai-automation-backend/docker/Dockerfile.agent-*; do grep -q "^ENV HOME=\"/home/agent\"" "$d" || exit 1; done'
 check "ok-portable unbeanstandet"              '! grep -q "ok-portable" <<<"$OUT"'
 check "ok-repo darf scripts/ und mvnw nutzen"  '! grep -q "ok-repo" <<<"$OUT"'
 check "scope external ist erlaubt"             '! grep -q "ok-external" <<<"$OUT"'
