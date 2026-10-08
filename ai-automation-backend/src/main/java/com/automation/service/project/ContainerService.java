@@ -1,6 +1,7 @@
 package com.automation.service.project;
 
 
+import com.automation.concurrency.SingleFlight;
 import com.automation.entity.ActivityLog.LogCategory;
 import com.automation.entity.Container;
 import com.automation.entity.ContainerStatus;
@@ -16,7 +17,6 @@ import org.springframework.transaction.support.TransactionTemplate;
 
 import java.time.Instant;
 import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Lifecycle of project containers (create/reuse, stop) and the containers table.
@@ -38,17 +38,17 @@ public class ContainerService {
     private final TransactionTemplate readOnlyTransactionTemplate;
     private final String hostHome;
 
-    // Per-project lock to serialize concurrent container creation for the same
-    // project. Without this, two parallel workflow runs both pass the
-    // findByProjectId check, both call Docker create, and the second one
-    // clobbers the first container (leaving an orphan Docker container behind).
+    // At most one container start per project at a time. Without it, two parallel
+    // workflow runs both pass the findByProjectId check, both call Docker create,
+    // and the second one clobbers the first container (leaving an orphan Docker
+    // container behind). A run that arrives while a start is going waits for it and
+    // gets the same container (or the same failure).
     //
-    // Entries are never removed: dropping a lock while a thread still holds it
-    // lets the next caller create a *fresh* monitor for the same project and run
-    // in parallel with it — exactly the race this map exists to prevent. The map
-    // holds one entry per project id seen since startup (deleted or archived
-    // projects included), so it is bounded by that count, not by live projects.
-    private final ConcurrentHashMap<String, Object> projectLocks = new ConcurrentHashMap<>();
+    // Not a synchronized block: runs execute on virtual threads, and a monitor held
+    // across the 5-15 s Docker work pins the carrier of the holder and of every
+    // waiting run (TODO 4af75edb). The entry is removed once the start has finished,
+    // so the map only holds projects with a start in progress.
+    private final SingleFlight<String, Container> starts = new SingleFlight<>();
 
     public ContainerService(
             ContainerRepository containerRepository,
@@ -70,21 +70,24 @@ public class ContainerService {
                 ? hostHome : System.getProperty("user.home");
     }
 
+    /** Whether Docker is set up here; without Docker a run does not attempt a project container (a0e85182). */
+    public boolean isDockerConfigured() {
+        return dockerExpectation.isConfigured();
+    }
+
     // NOT @Transactional: Docker create/start can take 5-15s. With pool-size=1
     // (SQLite), an enclosing transaction would hold the single connection for
     // the whole Docker call, blocking every other request and causing the
     // browser-side "Failed to fetch" the user reported. Instead we run the
     // Docker work outside any transaction and use TransactionTemplate for the
     // short DB bursts (find existing row / upsert it).
-    /** Whether Docker is set up here; without Docker a run does not attempt a project container (a0e85182). */
-    public boolean isDockerConfigured() {
-        return dockerExpectation.isConfigured();
+    public Container createAndStartContainer(Project project) {
+        return starts.run(project.getId(), () -> doCreateAndStart(project));
     }
 
-    public Container createAndStartContainer(Project project) {
-        synchronized (projectLocks.computeIfAbsent(project.getId(), k -> new Object())) {
-            return doCreateAndStart(project);
-        }
+    /** Visible for tests: how many projects have a container start in progress. */
+    int startsInFlight() {
+        return starts.inFlight();
     }
 
     private Container doCreateAndStart(Project project) {

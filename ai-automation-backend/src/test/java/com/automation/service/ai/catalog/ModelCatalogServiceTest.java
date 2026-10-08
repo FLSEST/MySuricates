@@ -2,11 +2,15 @@ package com.automation.service.ai.catalog;
 
 import com.automation.config.ModelCatalogConfig;
 import com.automation.exception.ResourceNotFoundException;
+import com.automation.testsupport.ParkedThreads;
 import org.junit.jupiter.api.Test;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -129,6 +133,115 @@ class ModelCatalogServiceTest {
 
         assertThat(catalog.available()).isFalse();
         assertThat(catalog.reason()).contains("kaboom");
+    }
+
+    /** Like {@link CountingSource}, but each probe waits until the test releases it. */
+    private static final class BlockingSource implements ModelCatalogSource {
+        final AtomicInteger calls = new AtomicInteger();
+        final CountDownLatch inside = new CountDownLatch(1);
+        final CountDownLatch release = new CountDownLatch(1);
+        private final ModelCatalog result;
+
+        BlockingSource(ModelCatalog result) {
+            this.result = result;
+        }
+
+        @Override
+        public String providerId() {
+            return result.providerId();
+        }
+
+        @Override
+        public ModelCatalog fetch() {
+            calls.incrementAndGet();
+            inside.countDown();
+            ParkedThreads.await(release);
+            return result;
+        }
+    }
+
+    /**
+     * Starts a request that probes, then a second request for the same provider while the probe
+     * runs; the second must wait parked (not blocked on a monitor: requests run on virtual
+     * threads) and share the probe. Returns both results.
+     */
+    private static ModelCatalog[] twoConcurrentRequests(ModelCatalogService service, BlockingSource src,
+                                                        boolean secondForcesRefresh) throws Exception {
+        AtomicReference<ModelCatalog> first = new AtomicReference<>();
+        AtomicReference<ModelCatalog> second = new AtomicReference<>();
+        Thread t1 = ParkedThreads.start(() -> first.set(service.getCatalog("PI", false)));
+        assertThat(src.inside.await(5, TimeUnit.SECONDS)).as("first request probing").isTrue();
+        Thread t2 = ParkedThreads.start(() -> second.set(service.getCatalog("pi", secondForcesRefresh)));
+        ParkedThreads.awaitParked(t2);
+
+        src.release.countDown();
+        ParkedThreads.join(t1);
+        ParkedThreads.join(t2);
+        return new ModelCatalog[] {first.get(), second.get()};
+    }
+
+    @Test
+    void concurrentRequests_shareOneProbe() throws Exception {
+        BlockingSource src = new BlockingSource(
+                ModelCatalog.available("PI", "test", Instant.now(), List.of(ModelCatalog.ModelOption.of("m1", "M1"))));
+        ModelCatalogService service = service(600, src);
+
+        ModelCatalog[] results = twoConcurrentRequests(service, src, false);
+
+        assertThat(src.calls.get()).as("one pi --list-models for both requests").isEqualTo(1);
+        assertThat(results[1]).isSameAs(results[0]);
+        assertThat(results[0].available()).isTrue();
+        assertThat(service.probesInFlight()).as("no per-provider entry left behind").isZero();
+        assertThat(service.getCatalog("PI", false)).as("the shared probe filled the cache").isSameAs(results[0]);
+        assertThat(src.calls.get()).isEqualTo(1);
+    }
+
+    @Test
+    void concurrentRequests_failedProbe_isSharedToo() throws Exception {
+        BlockingSource src = new BlockingSource(ModelCatalog.unavailable("PI", "test", "pi not installed"));
+        ModelCatalogService service = service(600, src);
+
+        ModelCatalog[] results = twoConcurrentRequests(service, src, false);
+
+        assertThat(src.calls.get()).isEqualTo(1);
+        assertThat(results[0].available()).isFalse();
+        assertThat(results[1]).isSameAs(results[0]);
+        assertThat(service.probesInFlight()).isZero();
+    }
+
+    /** A refresh that arrives while a probe runs takes that probe's result instead of starting a second one. */
+    @Test
+    void forceRefresh_whileAProbeRuns_joinsIt() throws Exception {
+        BlockingSource src = new BlockingSource(
+                ModelCatalog.available("PI", "test", Instant.now(), List.of(ModelCatalog.ModelOption.of("m1", "M1"))));
+        ModelCatalogService service = service(600, src);
+
+        ModelCatalog[] results = twoConcurrentRequests(service, src, true);
+
+        assertThat(src.calls.get()).isEqualTo(1);
+        assertThat(results[1]).isSameAs(results[0]);
+        assertThat(service.probesInFlight()).isZero();
+    }
+
+    @Test
+    void sourceThrowingAnError_reachesTheCaller_andTheNextRequestProbesAgain() {
+        AtomicInteger calls = new AtomicInteger();
+        ModelCatalogSource dying = new ModelCatalogSource() {
+            @Override public String providerId() { return "PI"; }
+            @Override public ModelCatalog fetch() {
+                if (calls.incrementAndGet() == 1) {
+                    throw new LinkageError("broken");
+                }
+                return ModelCatalog.unavailable("PI", "test", "still broken");
+            }
+        };
+        ModelCatalogService service = service(600, dying);
+
+        assertThatThrownBy(() -> service.getCatalog("PI", false)).isInstanceOf(LinkageError.class);
+        assertThat(service.probesInFlight()).isZero();
+
+        assertThat(service.getCatalog("PI", false).reason()).isEqualTo("still broken");
+        assertThat(calls.get()).isEqualTo(2);
     }
 
     @Test
