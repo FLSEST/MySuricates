@@ -526,6 +526,54 @@ class WorkflowRunRepositoryTest {
         assertThat(window.result()).extracting(DashboardRunRow::id).containsSubsequence(odd.getId(), failed.getId());
     }
 
+    /** The run window of the tool-pattern analysis: newest first, capped, since a cutoff (TODO 47c1cbe4). */
+    @Test
+    void should_find_the_newest_run_ids_of_a_workflow_since_a_cutoff() {
+        Instant now = Instant.now();
+        run(workflowA, RunStatus.COMPLETED, now.minus(100, ChronoUnit.DAYS));
+        WorkflowRun first = run(workflowA, RunStatus.COMPLETED, now.minusSeconds(300));
+        WorkflowRun second = run(workflowA, RunStatus.FAILED, now.minusSeconds(200));
+        WorkflowRun third = run(workflowA, RunStatus.COMPLETED, now.minusSeconds(100));
+        run(workflowB, RunStatus.COMPLETED, now);
+        Instant cutoff = now.minus(90, ChronoUnit.DAYS);
+
+        assertThat(runRepository.findRecentRunIds(workflowA.getId(), cutoff, PageRequest.of(0, 2)))
+                .containsExactly(third.getId(), second.getId());
+        assertThat(runRepository.findRecentRunIds(workflowA.getId(), cutoff, PageRequest.of(0, 10)))
+                .containsExactly(third.getId(), second.getId(), first.getId());
+    }
+
+    /** Only [runId, metadata] per step – newest run first, its steps by index (TODO 47c1cbe4). */
+    @Test
+    void should_return_the_step_metadata_of_runs_newest_run_first_steps_in_order() {
+        Instant now = Instant.now();
+        WorkflowRun older = runWithSteps(now.minusSeconds(60), "older");
+        WorkflowRun newer = runWithSteps(now, "newer");
+        WorkflowRun other = runWithSteps(now.minusSeconds(30), "other");
+        entityManager.flush();
+        entityManager.clear();
+
+        List<Object[]> rows = runRepository.findStepMetadataByRunIds(List.of(older.getId(), newer.getId()));
+
+        assertThat(rows).extracting(row -> row[0])
+                .containsExactly(newer.getId(), newer.getId(), older.getId(), older.getId());
+        assertThat(rows).extracting(row -> (Object) ((Map<?, ?>) row[1]).get("step"))
+                .containsExactly("newer-1", "newer-2", "older-1", "older-2");
+        assertThat(rows).noneMatch(row -> row[0].equals(other.getId()));
+    }
+
+    /** A run whose two steps are added in reverse index order, each with an output and a metadata marker. */
+    private WorkflowRun runWithSteps(Instant startedAt, String name) {
+        WorkflowRun r = WorkflowRun.builder().workflow(workflowA).workflowName(workflowA.getName())
+                .status(RunStatus.COMPLETED).startedAt(startedAt).build();
+        for (int index : new int[]{2, 1}) {
+            r.addStep(StepResult.builder().stepIndex(index).status(StepStatus.COMPLETED).startedAt(startedAt)
+                    .output("output of " + name + "-" + index)
+                    .metadata(new java.util.HashMap<>(Map.of("step", name + "-" + index))).build());
+        }
+        return runRepository.save(r);
+    }
+
     /** The dashboard's project filter sits in both queries instead of in Java (TODO 2ccb9e40). */
     @Test
     void should_filter_the_dashboard_window_and_its_steps_by_project_in_the_query() {

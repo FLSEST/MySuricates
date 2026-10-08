@@ -8,13 +8,20 @@ import com.automation.repository.WorkflowRunRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.Pageable;
 
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.*;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -97,7 +104,7 @@ class AgenticLearningServiceTest {
 
     @Test
     void getToolPatterns_noRuns_emptyResult() {
-        when(runRepository.findByWorkflowIdOrderByStartedAtDesc("wf-1")).thenReturn(List.of());
+        when(runRepository.findRecentRunIds(eq("wf-1"), any(Instant.class), any(Pageable.class))).thenReturn(List.of());
 
         Map<String, Object> result = service.getToolPatterns("wf-1");
 
@@ -111,11 +118,10 @@ class AgenticLearningServiceTest {
         meta.put("toolNames", List.of("read", "edit", "read"));
         meta.put("costUsd", 0.1);
 
-        StepResult step = StepResult.builder().stepIndex(0).status(StepStatus.COMPLETED)
-                .metadata(meta).build();
-        WorkflowRun run = WorkflowRun.builder().id("r1").status(RunStatus.COMPLETED)
-                .steps(new ArrayList<>(List.of(step))).build();
-        when(runRepository.findByWorkflowIdOrderByStartedAtDesc("wf-1")).thenReturn(List.of(run));
+        when(runRepository.findRecentRunIds(eq("wf-1"), any(Instant.class), any(Pageable.class)))
+                .thenReturn(List.of("r1"));
+        when(runRepository.findStepMetadataByRunIds(List.of("r1")))
+                .thenReturn(List.<Object[]>of(new Object[]{"r1", meta}));
 
         Map<String, Object> result = service.getToolPatterns("wf-1");
 
@@ -147,5 +153,58 @@ class AgenticLearningServiceTest {
         service.extractToolsFromMeta(iterMap, "actMeta", counts);
 
         assertThat(counts).containsEntry("read", 1).containsEntry("write", 1);
+    }
+
+    // --- Tool patterns read step metadata of a bounded run window (TODO 47c1cbe4) ---
+
+    @Test
+    void getToolPatterns_readsOnlyTheStepMetadataOfTheNewestRunsOfTheWindow() {
+        ArgumentCaptor<Instant> since = ArgumentCaptor.forClass(Instant.class);
+        ArgumentCaptor<Pageable> page = ArgumentCaptor.forClass(Pageable.class);
+        when(runRepository.findRecentRunIds(eq("wf-1"), since.capture(), page.capture())).thenReturn(List.of("r2", "r1"));
+        when(runRepository.findStepMetadataByRunIds(List.of("r2", "r1"))).thenReturn(List.<Object[]>of(
+                new Object[]{"r2", Map.of("toolNames", List.of("Read", "Edit"))},
+                new Object[]{"r2", null},
+                new Object[]{"r1", Map.of("toolNames", List.of("Read", "Edit"), "blockType", "agentic", "costUsd", 0.25)}));
+        Instant before = Instant.now();
+
+        Map<String, Object> result = service.getToolPatterns("wf-1");
+
+        assertThat(since.getValue()).isBetween(
+                before.minus(AgenticLearningService.TOOL_PATTERN_WINDOW_DAYS, ChronoUnit.DAYS).minusSeconds(5),
+                Instant.now().minus(AgenticLearningService.TOOL_PATTERN_WINDOW_DAYS, ChronoUnit.DAYS));
+        assertThat(page.getValue().getPageNumber()).isZero();
+        assertThat(page.getValue().getPageSize()).isEqualTo(AgenticLearningService.TOOL_PATTERN_MAX_RUNS);
+        assertThat(result.get("totalAgenticRuns")).isEqualTo(1);
+        assertThat((double) result.get("totalCostUsd")).isEqualTo(0.25);
+        assertThat(result.get("patterns"))
+                .isEqualTo(List.of(Map.of("pattern", "Read -> Edit", "occurrences", 2)));
+        // No run entity and no step with its output text is loaded.
+        verify(runRepository, never()).findByWorkflowIdOrderByStartedAtDesc(any());
+    }
+
+    @Test
+    void getToolPatterns_noRunInTheWindow_doesNotQuerySteps() {
+        when(runRepository.findRecentRunIds(eq("wf-1"), any(Instant.class), any(Pageable.class))).thenReturn(List.of());
+
+        service.getToolPatterns("wf-1");
+
+        verify(runRepository, never()).findStepMetadataByRunIds(any());
+    }
+
+    @Test
+    void getToolPatterns_countsToolsOfTheAgenticIterations() {
+        Map<String, Object> agentic = Map.of("blockType", "agentic", "iterations", List.of(
+                Map.of("actMeta", Map.of("toolNames", List.of("Bash", "Read"))),
+                Map.of("actMeta", Map.of("toolNames", List.of("Bash"))),
+                Map.of("action", "no tools")));
+        when(runRepository.findRecentRunIds(eq("wf-1"), any(Instant.class), any(Pageable.class))).thenReturn(List.of("r1"));
+        when(runRepository.findStepMetadataByRunIds(List.of("r1"))).thenReturn(List.<Object[]>of(new Object[]{"r1", agentic}));
+
+        Map<String, Object> result = service.getToolPatterns("wf-1");
+
+        assertThat(result.get("topTools")).isEqualTo(List.of(
+                Map.of("name", "Bash", "count", 2), Map.of("name", "Read", "count", 1)));
+        assertThat((List<?>) result.get("patterns")).as("iteration tools form no sequence").isEmpty();
     }
 }

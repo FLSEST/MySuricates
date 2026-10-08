@@ -4,9 +4,12 @@ import com.automation.entity.StepResult;
 import com.automation.entity.WorkflowRun;
 import com.automation.repository.WorkflowRunRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.*;
 
 import static com.automation.service.learning.MetadataExtractor.extractDouble;
@@ -14,6 +17,11 @@ import static com.automation.service.learning.MetadataExtractor.extractDouble;
 @Service
 @RequiredArgsConstructor
 public class AgenticLearningService {
+
+    /** Run window of {@link #getToolPatterns}: runs started within this many days … */
+    static final int TOOL_PATTERN_WINDOW_DAYS = 90;
+    /** … and of those at most this many, newest first. */
+    static final int TOOL_PATTERN_MAX_RUNS = 200;
 
     private final WorkflowRunRepository runRepository;
 
@@ -76,50 +84,50 @@ public class AgenticLearningService {
         return analytics;
     }
 
+    /**
+     * Tool counts and recurring tool sequences of a workflow's steps, plus the number and cost of its
+     * agentic steps.
+     *
+     * <p>Reads only the step metadata of the newest {@value #TOOL_PATTERN_MAX_RUNS} runs of the last
+     * {@value #TOOL_PATTERN_WINDOW_DAYS} days (TODO 47c1cbe4). It runs for every workflow of a project
+     * on each wish decomposition ({@code WorkflowStatsService#getOptimizationSuggestions}); loading
+     * every run with its step entities, output text included, held the single database connection
+     * for as long as the history was big.
+     */
     @Transactional(readOnly = true)
-    @SuppressWarnings("unchecked")
     public Map<String, Object> getToolPatterns(String workflowId) {
-        List<WorkflowRun> runs = runRepository.findByWorkflowIdOrderByStartedAtDesc(workflowId);
+        ToolTally tally = new ToolTally();
+        recentStepMetadata(workflowId).forEach(tally::add);
 
-        Map<String, Integer> toolCounts = new LinkedHashMap<>();
-        List<List<String>> toolSequences = new ArrayList<>();
-        int totalAgenticRuns = 0;
-        double totalCost = 0.0;
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("workflowId", workflowId);
+        result.put("totalAgenticRuns", tally.agenticSteps);
+        result.put("totalCostUsd", tally.totalCost);
+        result.put("patterns", findCommonPatterns(tally.toolSequences));
+        result.put("topTools", topTools(tally.toolCounts));
+        return result;
+    }
 
-        for (WorkflowRun run : runs) {
-            for (StepResult step : run.getSteps()) {
-                if (step.getMetadata() == null) continue;
-
-                Object toolNamesObj = step.getMetadata().get("toolNames");
-                if (toolNamesObj instanceof List<?> toolNames) {
-                    List<String> names = toolNames.stream().map(Object::toString).toList();
-                    for (String name : names) {
-                        toolCounts.merge(name, 1, Integer::sum);
-                    }
-                    if (!names.isEmpty()) {
-                        toolSequences.add(names);
-                    }
-                }
-
-                if ("agentic".equals(step.getMetadata().get("blockType"))) {
-                    totalAgenticRuns++;
-                    totalCost += extractDouble(step.getMetadata(), "costUsd");
-
-                    Object iterations = step.getMetadata().get("iterations");
-                    if (iterations instanceof List<?> iterList) {
-                        for (Object iter : iterList) {
-                            if (iter instanceof Map<?, ?> iterMap) {
-                                extractToolsFromMeta((Map<String, Object>) iterMap, "actMeta", toolCounts);
-                            }
-                        }
-                    }
-                }
+    /** Step metadata of the run window, newest run first, steps in order; steps without metadata are left out. */
+    @SuppressWarnings("unchecked")
+    private List<Map<String, Object>> recentStepMetadata(String workflowId) {
+        Instant since = Instant.now().minus(TOOL_PATTERN_WINDOW_DAYS, ChronoUnit.DAYS);
+        List<String> runIds = runRepository.findRecentRunIds(workflowId, since,
+                PageRequest.of(0, TOOL_PATTERN_MAX_RUNS));
+        if (runIds.isEmpty()) {
+            return List.of();
+        }
+        List<Map<String, Object>> metadata = new ArrayList<>();
+        for (Object[] row : runRepository.findStepMetadataByRunIds(runIds)) {
+            if (row[1] instanceof Map<?, ?> stepMeta) {
+                metadata.add((Map<String, Object>) stepMeta);
             }
         }
+        return metadata;
+    }
 
-        List<Map<String, Object>> patterns = findCommonPatterns(toolSequences);
-
-        List<Map<String, Object>> topTools = toolCounts.entrySet().stream()
+    private static List<Map<String, Object>> topTools(Map<String, Integer> toolCounts) {
+        return toolCounts.entrySet().stream()
                 .sorted(Map.Entry.<String, Integer>comparingByValue().reversed())
                 .limit(10)
                 .map(e -> {
@@ -129,15 +137,46 @@ public class AgenticLearningService {
                     return m;
                 })
                 .toList();
+    }
 
-        Map<String, Object> result = new LinkedHashMap<>();
-        result.put("workflowId", workflowId);
-        result.put("totalAgenticRuns", totalAgenticRuns);
-        result.put("totalCostUsd", totalCost);
-        result.put("patterns", patterns);
-        result.put("topTools", topTools);
+    /** What {@link #getToolPatterns} counts, one step's metadata at a time. */
+    private final class ToolTally {
+        private final Map<String, Integer> toolCounts = new LinkedHashMap<>();
+        private final List<List<String>> toolSequences = new ArrayList<>();
+        private int agenticSteps;
+        private double totalCost;
 
-        return result;
+        void add(Map<String, Object> stepMeta) {
+            addToolSequence(stepMeta.get("toolNames"));
+            if ("agentic".equals(stepMeta.get("blockType"))) {
+                addAgenticStep(stepMeta);
+            }
+        }
+
+        private void addToolSequence(Object toolNames) {
+            if (!(toolNames instanceof List<?> list)) {
+                return;
+            }
+            List<String> names = list.stream().map(Object::toString).toList();
+            names.forEach(name -> toolCounts.merge(name, 1, Integer::sum));
+            if (!names.isEmpty()) {
+                toolSequences.add(names);
+            }
+        }
+
+        @SuppressWarnings("unchecked")
+        private void addAgenticStep(Map<String, Object> stepMeta) {
+            agenticSteps++;
+            totalCost += extractDouble(stepMeta, "costUsd");
+            if (!(stepMeta.get("iterations") instanceof List<?> iterations)) {
+                return;
+            }
+            for (Object iteration : iterations) {
+                if (iteration instanceof Map<?, ?> iterMap) {
+                    extractToolsFromMeta((Map<String, Object>) iterMap, "actMeta", toolCounts);
+                }
+            }
+        }
     }
 
     @SuppressWarnings("unchecked")

@@ -92,6 +92,24 @@ public interface WorkflowRunRepository extends JpaRepository<WorkflowRun, String
          + "ORDER BY wr.id, sr.stepIndex")
     List<Object[]> findStepMetadataForDashboard(@Param("since") Instant since, @Param("projectId") String projectId);
 
+    /**
+     * Ids of a workflow's runs started at or after {@code since}, newest first, capped via
+     * {@code pageable} – the run window of the tool-pattern analysis (TODO 47c1cbe4).
+     */
+    @Query("SELECT wr.id FROM WorkflowRun wr WHERE wr.workflow.id = :workflowId AND wr.startedAt >= :since "
+         + "ORDER BY wr.startedAt DESC")
+    List<String> findRecentRunIds(@Param("workflowId") String workflowId, @Param("since") Instant since,
+                                  Pageable pageable);
+
+    /**
+     * Rows {@code [runId, metadata]} with the step metadata of the given runs – NOT the large
+     * input/output/context_delta TEXT columns. Newest run first, its steps in order, as
+     * {@code WorkflowRun#getSteps} lists them.
+     */
+    @Query("SELECT wr.id, sr.metadata FROM StepResult sr JOIN sr.workflowRun wr WHERE wr.id IN :runIds "
+         + "ORDER BY wr.startedAt DESC, wr.id, sr.stepIndex")
+    List<Object[]> findStepMetadataByRunIds(@Param("runIds") Collection<String> runIds);
+
     @Query("SELECT wr.workflow.id, wr.workflow.name, COUNT(wr) " +
            "FROM WorkflowRun wr " +
            "WHERE wr.workflow IS NOT NULL " +

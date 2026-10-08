@@ -23,6 +23,7 @@ import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -677,7 +678,7 @@ class LearningServiceTest {
             WorkflowRun run = createRunWithSteps(List.of(
                     createStep(0, "npm test", StepStatus.COMPLETED, 1000L)
             ));
-            when(runRepository.findByWorkflowIdOrderByStartedAtDesc("wf-1")).thenReturn(List.of(run));
+            stubToolPatternSteps(List.of(run));
 
             Map<String, Object> patterns = agenticService.getToolPatterns("wf-1");
 
@@ -696,7 +697,7 @@ class LearningServiceTest {
                     .build();
 
             WorkflowRun run = createRunWithSteps(List.of(step));
-            when(runRepository.findByWorkflowIdOrderByStartedAtDesc("wf-1")).thenReturn(List.of(run));
+            stubToolPatternSteps(List.of(run));
 
             Map<String, Object> result = agenticService.getToolPatterns("wf-1");
 
@@ -721,7 +722,7 @@ class LearningServiceTest {
                     .build();
 
             WorkflowRun run = createRunWithSteps(List.of(step1, step2));
-            when(runRepository.findByWorkflowIdOrderByStartedAtDesc("wf-1")).thenReturn(List.of(run));
+            stubToolPatternSteps(List.of(run));
 
             Map<String, Object> result = agenticService.getToolPatterns("wf-1");
 
@@ -741,7 +742,7 @@ class LearningServiceTest {
                     .build();
 
             WorkflowRun run = createRunWithSteps(List.of(step));
-            when(runRepository.findByWorkflowIdOrderByStartedAtDesc("wf-1")).thenReturn(List.of(run));
+            stubToolPatternSteps(List.of(run));
 
             Map<String, Object> result = agenticService.getToolPatterns("wf-1");
 
@@ -762,7 +763,7 @@ class LearningServiceTest {
                     .build();
 
             WorkflowRun run = createRunWithSteps(List.of(step1, step2));
-            when(runRepository.findByWorkflowIdOrderByStartedAtDesc("wf-1")).thenReturn(List.of(run));
+            stubToolPatternSteps(List.of(run));
 
             Map<String, Object> result = agenticService.getToolPatterns("wf-1");
 
@@ -819,6 +820,27 @@ class LearningServiceTest {
                 .userRating(rating)
                 .steps(new ArrayList<>())
                 .build();
+    }
+
+    /**
+     * Stubs the lean queries of {@code getToolPatterns} (run ids of the window, then step metadata)
+     * with the steps of {@code runs}, newest run first.
+     */
+    private void stubToolPatternSteps(List<WorkflowRun> runs) {
+        List<String> runIds = new ArrayList<>();
+        List<Object[]> rows = new ArrayList<>();
+        for (int i = 0; i < runs.size(); i++) {
+            String runId = "run-" + i;
+            runIds.add(runId);
+            for (StepResult step : runs.get(i).getSteps()) {
+                rows.add(new Object[]{runId, step.getMetadata()});
+            }
+        }
+        when(runRepository.findRecentRunIds(eq("wf-1"), any(Instant.class), any(org.springframework.data.domain.Pageable.class)))
+                .thenReturn(runIds);
+        if (!runIds.isEmpty()) {
+            when(runRepository.findStepMetadataByRunIds(runIds)).thenReturn(rows);
+        }
     }
 
     private WorkflowRun createRunWithSteps(List<StepResult> steps) {
