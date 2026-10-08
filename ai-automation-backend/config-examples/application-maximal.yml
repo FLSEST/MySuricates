@@ -33,6 +33,9 @@ automation:
     # AI CLIs and shell blocks outside runs a person started cannot read, change or replace the key files
     # or the database (Linux Landlock); without Landlock they do not start at all.
     unattended-sandbox: true
+    # The same processes run in a fresh container of automation-agent-workflow instead (Docker; build the image
+    # with scripts/build-agent-images.sh agent-workflow): working directory, CLI program and login only.
+    unattended-in-container: true
     # HMAC-SHA256 signing secret per webhook (header X-Signature). Requires the webhooks module.
     webhook-signatures: true
     # iCal/RSS feeds only fetch public addresses (resolved IPs, every redirect hop).

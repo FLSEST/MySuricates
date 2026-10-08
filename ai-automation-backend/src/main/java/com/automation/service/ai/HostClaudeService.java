@@ -149,7 +149,7 @@ public class HostClaudeService {
             pb.environment().remove("CLAUDECODE");
 
             log.debug("{} (prompt length: {} chars, workDir: {})", label, prompt.length(), workingDirectory);
-            Process proc = pb.start();
+            Process proc = ChildProcessEnv.start(pb);
             writePromptToStdin(proc, prompt);
 
             int effectiveTimeout = timeoutSeconds != null ? timeoutSeconds : config.getTimeoutSeconds();

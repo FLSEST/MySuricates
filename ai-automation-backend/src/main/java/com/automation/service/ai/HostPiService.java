@@ -209,7 +209,7 @@ public class HostPiService {
             ProcessBuilder pb = ChildProcessEnv.forAgent(cmd, workingDirectory);
 
             log.debug("{} (prompt length: {} chars, workDir: {})", label, prompt.length(), workingDirectory);
-            Process proc = pb.start();
+            Process proc = ChildProcessEnv.start(pb);
             writePromptToStdin(proc, prompt);
 
             int effectiveTimeout = timeoutSeconds != null ? timeoutSeconds : config.getTimeoutSeconds();

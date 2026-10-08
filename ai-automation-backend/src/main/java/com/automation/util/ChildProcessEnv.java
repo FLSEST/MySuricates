@@ -1,6 +1,8 @@
 package com.automation.util;
 
 import java.io.File;
+import java.io.IOException;
+import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -25,7 +27,10 @@ import java.util.Set;
  * <p>The environment is only one path. The key files and the database in the user's home stay readable
  * for every process of the same user; outside attended runs {@link ProcessSandbox} hides them when
  * {@code automation.hardening.unattended-sandbox} is on (TODO 9525820a). Both go through
- * {@link #scrub(ProcessBuilder)}, so every spawn site that scrubs is sandboxed as well.
+ * {@link #scrub(ProcessBuilder)}, so every spawn site that scrubs is sandboxed as well. AI CLIs and shell
+ * blocks go through {@link #isolate} instead: with {@code automation.hardening.unattended-in-container}
+ * they run in a container outside attended runs ({@link UnattendedContainer}, TODO 6ee57b87) and start
+ * through {@link #start(ProcessBuilder)}, which removes that container again.
  */
 public final class ChildProcessEnv {
 
@@ -39,15 +44,33 @@ public final class ChildProcessEnv {
 
     /**
      * A process builder for an AI CLI: stderr merged into stdout, working directory set when
-     * given, backend secrets {@linkplain #scrub(ProcessBuilder) stripped}.
+     * given, {@linkplain #isolate isolated}. Start it with {@link #start(ProcessBuilder)}.
      */
     public static ProcessBuilder forAgent(List<String> command, String workingDirectory) {
         ProcessBuilder pb = new ProcessBuilder(command).redirectErrorStream(true);
         if (workingDirectory != null && !workingDirectory.isBlank()) {
             pb.directory(new File(workingDirectory));
         }
-        scrub(pb);
+        isolate(pb);
         return pb;
+    }
+
+    /**
+     * For AI CLIs and shell blocks, after the working directory is set: strips the backend's secrets, then
+     * turns the command into a container start when {@linkplain UnattendedContainer#active() that mode
+     * applies} — the working directory and {@code writable} mounted under their own paths — or else puts the
+     * {@linkplain ProcessSandbox process sandbox} in front of it when that is active.
+     */
+    public static void isolate(ProcessBuilder pb, Path... writable) {
+        scrub(pb.environment());
+        if (!UnattendedContainer.apply(pb, List.of(writable))) {
+            ProcessSandbox.apply(pb);
+        }
+    }
+
+    /** Starts a builder from {@link #isolate}; a container it starts is removed once the process has ended. */
+    public static Process start(ProcessBuilder pb) throws IOException {
+        return UnattendedContainer.start(pb);
     }
 
     /**

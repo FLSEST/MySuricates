@@ -92,6 +92,14 @@ public final class ProcessSandbox {
         };
     }
 
+    /**
+     * Whether this thread works for anything but an attended run — unmarked threads included. The container
+     * mode ({@link UnattendedContainer}) decides with exactly this marker.
+     */
+    public static boolean unattendedHere() {
+        return !Boolean.TRUE.equals(ATTENDED.get());
+    }
+
     /** Whether a process started from this thread now runs behind the sandbox. */
     public static boolean active() {
         return active(policy);

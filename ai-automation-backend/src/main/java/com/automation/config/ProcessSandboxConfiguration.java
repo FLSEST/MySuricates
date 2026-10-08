@@ -91,7 +91,7 @@ public class ProcessSandboxConfiguration {
         }
     }
 
-    List<Path> hiddenPaths() {
+    public List<Path> hiddenPaths() {
         return hiddenPaths(Path.of(System.getProperty("user.home")), DataHome.dir(),
                 System.getProperty("java.class.path", ""));
     }

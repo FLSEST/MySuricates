@@ -34,6 +34,13 @@ class ChildProcessEnvGateTest {
             "com/automation/service/cli/ShellCommandService.java",
             "com/automation/service/cli/TaskCommandService.java");
 
+    /** AI CLIs and shell blocks: outside attended runs they may run in a container (TODO 6ee57b87). */
+    private static final Set<String> MUST_ISOLATE = Set.of(
+            "com/automation/service/ai/HostClaudeService.java",
+            "com/automation/service/ai/HostCodexService.java",
+            "com/automation/service/ai/HostPiService.java",
+            "com/automation/service/cli/ShellCommandService.java");
+
     /** file → why it may start processes with the inherited environment. */
     private static final Map<String, String> EXEMPT = Map.ofEntries(
             // fixed probe commands (--list-models, version), no prompt and no workflow content
@@ -56,6 +63,7 @@ class ChildProcessEnvGateTest {
     void everyProcessSpawnSiteScrubsOrIsPinned() throws IOException {
         Set<String> spawning = new TreeSet<>();
         Set<String> scrubbing = new TreeSet<>();
+        Set<String> isolating = new TreeSet<>();
         try (Stream<Path> files = Files.walk(MAIN)) {
             for (Path file : files.filter(f -> f.toString().endsWith(".java")).toList()) {
                 String source = Files.readString(file);
@@ -63,8 +71,13 @@ class ChildProcessEnvGateTest {
                 if (source.contains("new ProcessBuilder(") || source.contains("Runtime.getRuntime().exec(")) {
                     spawning.add(name);
                 }
-                if (source.contains("ChildProcessEnv.scrub(") || source.contains("ChildProcessEnv.forAgent(")) {
+                if (source.contains("ChildProcessEnv.scrub(") || source.contains("ChildProcessEnv.forAgent(")
+                        || source.contains("ChildProcessEnv.isolate(")) {
                     scrubbing.add(name);
+                }
+                if ((source.contains("ChildProcessEnv.forAgent(") || source.contains("ChildProcessEnv.isolate("))
+                        && source.contains("ChildProcessEnv.start(")) {
+                    isolating.add(name);
                 }
             }
         }
@@ -72,6 +85,10 @@ class ChildProcessEnvGateTest {
         assertThat(scrubbing)
                 .as("these spawn sites run workflow content and must strip the backend secrets")
                 .containsAll(MUST_SCRUB);
+        assertThat(isolating)
+                .as("AI CLIs and shell blocks go through ChildProcessEnv.isolate/forAgent and ChildProcessEnv.start, "
+                        + "so they run in a container outside attended runs and the container is removed again")
+                .containsAll(MUST_ISOLATE);
         Set<String> undecided = new TreeSet<>(spawning);
         undecided.removeAll(scrubbing);
         undecided.removeAll(EXEMPT.keySet());

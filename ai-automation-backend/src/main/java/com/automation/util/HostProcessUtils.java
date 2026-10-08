@@ -10,6 +10,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -95,11 +96,20 @@ public class HostProcessUtils {
      *                       (every other platform) simply means "the name as it is"
      */
     static boolean resolvesOnPath(String command, String pathVariable, String pathExtensions) {
+        return findOnPath(command, pathVariable, pathExtensions).isPresent();
+    }
+
+    /** The executable {@link #isOnPath(String)} finds, as it lies on this JVM's {@code PATH}; empty when none. */
+    public Optional<Path> findOnPath(String command) {
+        return findOnPath(command, System.getenv("PATH"), System.getenv("PATHEXT"));
+    }
+
+    static Optional<Path> findOnPath(String command, String pathVariable, String pathExtensions) {
         if (command == null || command.isBlank()) {
-            return false;
+            return Optional.empty();
         }
         if (command.indexOf('/') >= 0 || command.indexOf(File.separatorChar) >= 0) {
-            return isExecutableFile(null, command); // a name with a separator is a path, as in execvp
+            return executableFile(null, command); // a name with a separator is a path, as in execvp
         }
         List<String> names = new ArrayList<>();
         names.add(command);
@@ -113,21 +123,22 @@ public class HostProcessUtils {
         for (String entry : (pathVariable == null ? "" : pathVariable).split(File.pathSeparator, -1)) {
             for (String name : names) {
                 // An empty PATH entry means the working directory — again as in execvp.
-                if (isExecutableFile(entry.isEmpty() ? "." : entry, name)) {
-                    return true;
+                Optional<Path> hit = executableFile(entry.isEmpty() ? "." : entry, name);
+                if (hit.isPresent()) {
+                    return hit;
                 }
             }
         }
-        return false;
+        return Optional.empty();
     }
 
     /** A broken PATH entry (unmappable characters, a NUL byte) is simply not a hit, never a crash. */
-    private static boolean isExecutableFile(String directory, String name) {
+    private static Optional<Path> executableFile(String directory, String name) {
         try {
             Path candidate = directory == null ? Path.of(name) : Path.of(directory, name);
-            return Files.isRegularFile(candidate) && Files.isExecutable(candidate);
+            return Files.isRegularFile(candidate) && Files.isExecutable(candidate) ? Optional.of(candidate) : Optional.empty();
         } catch (RuntimeException notAUsablePath) {
-            return false;
+            return Optional.empty();
         }
     }
 }

@@ -57,6 +57,10 @@ RUN echo "APT_REFRESH=${APT_REFRESH:-unset}" && \
 
 RUN mkdir -p /home/agent/.cache /home/agent/.config && chown -R agent:agent /home/agent
 
+# Mount point of the download cache the backend shares between unattended runs (named volume): a new volume
+# takes over this directory's mode, so whatever uid the container runs with can write to it.
+RUN mkdir -m 1777 /cache
+
 ENV HOME="/home/agent"
 USER agent
 WORKDIR /home/agent

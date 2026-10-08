@@ -94,23 +94,25 @@ public class HostCodexService {
     }
 
     private String run(String prompt, Path workingDirectory, int timeoutSeconds, boolean readOnly, String model) throws IOException {
-        Path outputFile = Files.createTempFile("codex-result-", ".txt");
+        // A directory of its own: in a container (TODO 6ee57b87) Codex can only write the answer into a mount
+        Path outputDir = Files.createTempDirectory("codex-result-");
+        Path outputFile = outputDir.resolve("answer.txt");
 
         try {
             List<String> cmd = buildCommand(workingDirectory, outputFile, readOnly, model);
 
             ProcessBuilder pb = new ProcessBuilder(cmd);
             pb.redirectErrorStream(true);
-            // The agent may run prompts with foreign content unattended — it gets no
-            // instance API key (TODO 62037bf2).
-            ChildProcessEnv.scrub(pb);
             if (workingDirectory != null) {
                 pb.directory(workingDirectory.toFile());
             }
+            // The agent may run prompts with foreign content unattended — it gets no
+            // instance API key (TODO 62037bf2).
+            ChildProcessEnv.isolate(pb, outputDir);
 
             log.debug("Host Codex exec (prompt length: {} chars, workDir: {}, timeout: {}s)",
                     prompt.length(), workingDirectory, timeoutSeconds);
-            Process proc = pb.start();
+            Process proc = ChildProcessEnv.start(pb);
             // Registered with the running step (if any), so cancelling the run kills codex
             ProcessTracking.Tracker tracker = ProcessTracking.current();
             tracker.started(proc);
@@ -176,6 +178,11 @@ public class HostCodexService {
             }
         } finally {
             Files.deleteIfExists(outputFile);
+            try {
+                Files.deleteIfExists(outputDir);
+            } catch (IOException leftover) { // anything else Codex wrote there stays in the temp directory
+                log.debug("Could not remove {}: {}", outputDir, leftover.getMessage());
+            }
         }
     }
 

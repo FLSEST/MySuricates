@@ -128,6 +128,23 @@ is built for local operation by a trusted person — for remote access, put a VP
 not an open port. Full details:
 [Trust model and network exposure](docs/en/deployment.md#trust-model-and-network-exposure).
 
+For runs nobody watches (schedules, webhooks, triggers) there are two startup switches, both off by
+default. They keep AI CLIs and shell blocks outside runs started by a person away from the instance's
+keys and database: `unattended-sandbox` with Linux Landlock (governs file access only, a partial
+protection) and `unattended-in-container` with a fresh container per process (only the working
+directory, the CLI program and its login). What applies in which setup:
+
+| Setup | Landlock (`unattended-sandbox`) | Container (`unattended-in-container`) |
+|---|---|---|
+| Directly on the machine, Linux with Docker | yes | yes |
+| Directly on the machine, Linux without Docker | yes | no |
+| Instance in a container, no Docker socket (default) | yes | no |
+| Instance in a container with the Docker socket | yes | not yet |
+| macOS directly | no (no Landlock) | untested; not Claude and Codex (Mac programs do not run in a Linux container) |
+| Windows with WSL2 | untested | untested |
+
+Details: [Workflow hardening](docs/en/architektur.md#workflow-hardening-optional).
+
 Not everything is enabled after installation. Peripheral functions are modules that are fixed at
 startup. The `core` preset (default) contains the core — workflows, blocks, schedules, TODOs.
 `research` adds: chains (several workflows as

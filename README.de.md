@@ -130,6 +130,23 @@ ist fuer den lokalen Betrieb durch eine vertrauenswuerdige Person gebaut — fue
 ein VPN davor, kein offener Port. Vollstaendig:
 [Vertrauensmodell und Netzwerk-Exposition](docs/deployment.md#vertrauensmodell-und-netzwerk-exposition).
 
+Fuer Laeufe, die niemand beobachtet (Zeitplaene, Webhooks, Trigger), gibt es zwei Startschalter, beide
+standardmaessig aus. Sie halten KI-CLIs und Shell-Bloecke ausserhalb von Hand gestarteter Laeufe von den
+Schluesseln und der Datenbank der Instanz fern: `unattended-sandbox` per Linux Landlock (regelt nur
+Dateizugriffe, ein Teilschutz) und `unattended-in-container` mit einem frischen Container je Prozess
+(nur Arbeitsverzeichnis, CLI-Programm und dessen Anmeldung). Was in welcher Aufstellung greift:
+
+| Aufstellung | Landlock (`unattended-sandbox`) | Container (`unattended-in-container`) |
+|---|---|---|
+| Direkt auf dem Rechner, Linux mit Docker | ja | ja |
+| Direkt auf dem Rechner, Linux ohne Docker | ja | nein |
+| Instanz im Container, ohne Docker-Socket (Standard) | ja | nein |
+| Instanz im Container mit Docker-Socket | ja | noch nicht |
+| macOS direkt | nein (kein Landlock) | ungeprueft; Claude und Codex nicht (Mac-Programme laufen im Linux-Container nicht) |
+| Windows mit WSL2 | ungeprueft | ungeprueft |
+
+Details: [Workflow-Haertung](docs/architektur.md#workflow-härtung-optional).
+
 Nicht alles ist nach der Installation eingeschaltet. Randfunktionen sind Module, die beim
 Start festgelegt werden. Das Preset `core` (Standard) enthaelt den Kern — Workflows, Bloecke,
 Zeitplaene, TODOs. `research` ergaenzt:

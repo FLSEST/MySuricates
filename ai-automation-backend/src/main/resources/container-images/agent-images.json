@@ -202,7 +202,7 @@
       "image": "automation-agent-workflow:latest",
       "service": "agent-workflow",
       "dockerfile": "docker/Dockerfile.agent-workflow",
-      "dockerfileSha256": "e8c4414d845037736008f7ca4ee6985ab2d2bf20c0839e34eed6f731ce5d3f76",
+      "dockerfileSha256": "af591a1b106a33e599234c2e036e77fc08eae5f156b0b9c31a74e83d807daf89",
       "base": "eclipse-temurin:21-jdk-noble",
       "purpose": {
         "de": "Laufzeit für KI-CLIs und Shell-Blöcke unbeaufsichtigter Läufe, wenn der Schalter unattended-in-container an ist: python3, Node, JDK, Maven, git und gh nebeneinander. Claude, Codex und Pi bindet das Backend vom Rechner ein.",

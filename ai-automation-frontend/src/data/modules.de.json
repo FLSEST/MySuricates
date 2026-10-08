@@ -107,6 +107,10 @@
     "name": "Schutz unbeaufsichtigter Prozesse",
     "description": "KI-CLIs und Shell-Blöcke außerhalb von Hand gestarteter Läufe können API-Schlüsseldatei, Siegel- und Integrationsschlüssel und die Datenbank weder lesen noch ändern oder ersetzen (Linux Landlock). Ohne Landlock starten solche Prozesse gar nicht."
   },
+  "unattended-in-container": {
+    "name": "Unbeaufsichtigte Prozesse im Container",
+    "description": "KI-CLIs und Shell-Blöcke außerhalb von Hand gestarteter Läufe laufen in einem frischen Container des Images automation-agent-workflow: Nur das Arbeitsverzeichnis, das CLI-Programm und seine Anmeldung kommen hinein, nie Schlüsseldateien, Datenbank oder andere Dienste des Host-Benutzers. Ohne Docker oder Image starten solche Prozesse gar nicht."
+  },
   "webhook-signatures": {
     "name": "Webhook-Signaturen (HMAC)",
     "description": "Signatur-Secret je Webhook (HMAC-SHA256 im Header X-Signature); ein gespeichertes Secret gilt immer, der Schalter regelt nur Setzen und Entfernen."

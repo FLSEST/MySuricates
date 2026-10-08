@@ -107,6 +107,10 @@
     "name": "Unattended process sandbox",
     "description": "AI CLIs and shell blocks outside runs started by a person can neither read nor change or replace the API key file, the seal and integration keys or the database (Linux Landlock). Without Landlock such processes do not start at all."
   },
+  "unattended-in-container": {
+    "name": "Unattended processes in a container",
+    "description": "AI CLIs and shell blocks outside runs started by a person run in a fresh container of the image automation-agent-workflow: only the working directory, the CLI program and its login go in, never the key files, the database or other services of the host user. Without Docker or the image such processes do not start at all."
+  },
   "webhook-signatures": {
     "name": "Webhook signatures (HMAC)",
     "description": "Per-webhook signing secret (HMAC-SHA256 in the X-Signature header); a stored secret is always enforced, the switch only gates setting and removing it."

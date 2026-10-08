@@ -112,8 +112,11 @@ public class ProjectContainerClaudeAccess {
                 : Files.exists(Path.of(program));
     }
 
-    /** The instance's own token (container, login mode) first, else the file the generator reads. */
-    private Optional<String> token() {
+    /**
+     * The instance's own token (container, login mode) first, else the file the generator reads — also the
+     * login of Claude in the containers of unattended runs (TODO 6ee57b87).
+     */
+    public Optional<String> token() {
         String own = env.apply(ClaudeOAuthToken.VARIABLE);
         if (ClaudeOAuthToken.isPlausible(own)) {
             return Optional.of(own);

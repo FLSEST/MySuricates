@@ -102,6 +102,11 @@ public enum ModuleCatalog {
             "AI CLIs and shell blocks outside runs started by a person cannot read, change or replace the "
                     + "API key file, the seal and integration keys or the database (Linux Landlock). Without "
                     + "Landlock such processes do not start at all."),
+    UNATTENDED_IN_CONTAINER("unattended-in-container", HARDENING, EXPERIMENTAL, false, Set.of(), List.of(),
+            "AI CLIs and shell blocks outside runs started by a person run in a fresh container of the image "
+                    + "automation-agent-workflow: only the working directory, the CLI program and its login go in, "
+                    + "never the key files, the database or other services of the host user. Without Docker or the "
+                    + "image such processes do not start at all."),
     WEBHOOK_SIGNATURES("webhook-signatures", HARDENING, EXPERIMENTAL, false, Set.of(), List.of("webhooks"),
             "Per-webhook HMAC-SHA256 signing secret (X-Signature). A stored secret is always enforced; "
                     + "the switch gates setting and removing it."),

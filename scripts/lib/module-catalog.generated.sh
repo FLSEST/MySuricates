@@ -42,6 +42,7 @@ MODULE_CATALOG_KEYS=(
   require-signed-seal
   seal-immutable
   unattended-sandbox
+  unattended-in-container
   webhook-signatures
   private-network-guard
   private-network-guard-http-api
@@ -79,6 +80,7 @@ MODULE_CATALOG_HARDENING_KEYS=(
   require-signed-seal
   seal-immutable
   unattended-sandbox
+  unattended-in-container
   webhook-signatures
   private-network-guard
   private-network-guard-http-api
@@ -113,6 +115,7 @@ MODULE_CATALOG_TIER__require_sealed_for_unattended="hardening"
 MODULE_CATALOG_TIER__require_signed_seal="hardening"
 MODULE_CATALOG_TIER__seal_immutable="hardening"
 MODULE_CATALOG_TIER__unattended_sandbox="hardening"
+MODULE_CATALOG_TIER__unattended_in_container="hardening"
 MODULE_CATALOG_TIER__webhook_signatures="hardening"
 MODULE_CATALOG_TIER__private_network_guard="hardening"
 MODULE_CATALOG_TIER__private_network_guard_http_api="hardening"
@@ -146,6 +149,7 @@ MODULE_CATALOG_MATURITY__require_sealed_for_unattended="experimental"
 MODULE_CATALOG_MATURITY__require_signed_seal="experimental"
 MODULE_CATALOG_MATURITY__seal_immutable="experimental"
 MODULE_CATALOG_MATURITY__unattended_sandbox="experimental"
+MODULE_CATALOG_MATURITY__unattended_in_container="experimental"
 MODULE_CATALOG_MATURITY__webhook_signatures="experimental"
 MODULE_CATALOG_MATURITY__private_network_guard="experimental"
 MODULE_CATALOG_MATURITY__private_network_guard_http_api="experimental"
@@ -179,6 +183,7 @@ MODULE_CATALOG_DEFAULT__require_sealed_for_unattended="false"
 MODULE_CATALOG_DEFAULT__require_signed_seal="false"
 MODULE_CATALOG_DEFAULT__seal_immutable="false"
 MODULE_CATALOG_DEFAULT__unattended_sandbox="false"
+MODULE_CATALOG_DEFAULT__unattended_in_container="false"
 MODULE_CATALOG_DEFAULT__webhook_signatures="false"
 MODULE_CATALOG_DEFAULT__private_network_guard="true"
 MODULE_CATALOG_DEFAULT__private_network_guard_http_api="false"
@@ -212,6 +217,7 @@ MODULE_CATALOG_PROPERTY__require_sealed_for_unattended="automation.hardening.req
 MODULE_CATALOG_PROPERTY__require_signed_seal="automation.hardening.require-signed-seal"
 MODULE_CATALOG_PROPERTY__seal_immutable="automation.hardening.seal-immutable"
 MODULE_CATALOG_PROPERTY__unattended_sandbox="automation.hardening.unattended-sandbox"
+MODULE_CATALOG_PROPERTY__unattended_in_container="automation.hardening.unattended-in-container"
 MODULE_CATALOG_PROPERTY__webhook_signatures="automation.hardening.webhook-signatures"
 MODULE_CATALOG_PROPERTY__private_network_guard="automation.hardening.private-network-guard"
 MODULE_CATALOG_PROPERTY__private_network_guard_http_api="automation.hardening.private-network-guard-http-api"
@@ -245,6 +251,7 @@ MODULE_CATALOG_RISKS__require_sealed_for_unattended=""
 MODULE_CATALOG_RISKS__require_signed_seal=""
 MODULE_CATALOG_RISKS__seal_immutable=""
 MODULE_CATALOG_RISKS__unattended_sandbox=""
+MODULE_CATALOG_RISKS__unattended_in_container=""
 MODULE_CATALOG_RISKS__webhook_signatures=""
 MODULE_CATALOG_RISKS__private_network_guard=""
 MODULE_CATALOG_RISKS__private_network_guard_http_api=""
@@ -278,6 +285,7 @@ MODULE_CATALOG_REQUIRES__require_sealed_for_unattended="sealing"
 MODULE_CATALOG_REQUIRES__require_signed_seal="sealing"
 MODULE_CATALOG_REQUIRES__seal_immutable="sealing"
 MODULE_CATALOG_REQUIRES__unattended_sandbox=""
+MODULE_CATALOG_REQUIRES__unattended_in_container=""
 MODULE_CATALOG_REQUIRES__webhook_signatures="webhooks"
 MODULE_CATALOG_REQUIRES__private_network_guard=""
 MODULE_CATALOG_REQUIRES__private_network_guard_http_api=""
@@ -311,6 +319,7 @@ MODULE_TEXT_NAME__de__require_sealed_for_unattended="Unbeaufsichtigt nur versieg
 MODULE_TEXT_NAME__de__require_signed_seal="Siegel müssen signiert sein"
 MODULE_TEXT_NAME__de__seal_immutable="Entsiegeln gesperrt"
 MODULE_TEXT_NAME__de__unattended_sandbox="Schutz unbeaufsichtigter Prozesse"
+MODULE_TEXT_NAME__de__unattended_in_container="Unbeaufsichtigte Prozesse im Container"
 MODULE_TEXT_NAME__de__webhook_signatures="Webhook-Signaturen (HMAC)"
 MODULE_TEXT_NAME__de__private_network_guard="Feeds: keine Abrufe ins lokale Netz"
 MODULE_TEXT_NAME__de__private_network_guard_http_api="HTTP-API: keine Abrufe ins lokale Netz"
@@ -342,6 +351,7 @@ MODULE_TEXT_NAME__en__require_sealed_for_unattended="Unattended runs only when s
 MODULE_TEXT_NAME__en__require_signed_seal="Seals must be signed"
 MODULE_TEXT_NAME__en__seal_immutable="Unsealing locked"
 MODULE_TEXT_NAME__en__unattended_sandbox="Unattended process sandbox"
+MODULE_TEXT_NAME__en__unattended_in_container="Unattended processes in a container"
 MODULE_TEXT_NAME__en__webhook_signatures="Webhook signatures (HMAC)"
 MODULE_TEXT_NAME__en__private_network_guard="Feeds: no fetches into the local network"
 MODULE_TEXT_NAME__en__private_network_guard_http_api="HTTP API: no fetches into the local network"
@@ -375,6 +385,7 @@ MODULE_TEXT_DESC__de__require_sealed_for_unattended="Unbeaufsichtigte Runs (Sche
 MODULE_TEXT_DESC__de__require_signed_seal="Versiegelte Workflows brauchen eine gültige Signatur (Schlüssel außerhalb der Datenbank). Ein Siegel ohne oder mit falscher Signatur lehnt seine Runs ab."
 MODULE_TEXT_DESC__de__seal_immutable="Entsiegeln ist über die Oberfläche und die API nicht mehr möglich; ein Siegel löst nur, wer die Startkonfiguration ändern kann."
 MODULE_TEXT_DESC__de__unattended_sandbox="KI-CLIs und Shell-Blöcke außerhalb von Hand gestarteter Läufe können API-Schlüsseldatei, Siegel- und Integrationsschlüssel und die Datenbank weder lesen noch ändern oder ersetzen (Linux Landlock). Ohne Landlock starten solche Prozesse gar nicht."
+MODULE_TEXT_DESC__de__unattended_in_container="KI-CLIs und Shell-Blöcke außerhalb von Hand gestarteter Läufe laufen in einem frischen Container des Images automation-agent-workflow: Nur das Arbeitsverzeichnis, das CLI-Programm und seine Anmeldung kommen hinein, nie Schlüsseldateien, Datenbank oder andere Dienste des Host-Benutzers. Ohne Docker oder Image starten solche Prozesse gar nicht."
 MODULE_TEXT_DESC__de__webhook_signatures="Signatur-Secret je Webhook (HMAC-SHA256 im Header X-Signature); ein gespeichertes Secret gilt immer, der Schalter regelt nur Setzen und Entfernen."
 MODULE_TEXT_DESC__de__private_network_guard="iCal-Feed und RSS/Atom-Feed rufen nur öffentliche Adressen ab: Ziele auf localhost, in privaten Netzen, Link-Local (samt Cloud-Metadaten 169.254.169.254), 0.0.0.0/:: oder Multicast werden abgelehnt – geprüft werden die aufgelösten IP-Adressen, auch bei jeder Weiterleitung. Ausschalten gibt lokale Feeds bewusst frei."
 MODULE_TEXT_DESC__de__private_network_guard_http_api="Dieselbe Adressprüfung für die HTTP-API-Verbindung. Standardmäßig aus, weil Dienste im eigenen Netz ein häufiges Ziel der HTTP-API sind; eingeschaltet lehnt sie auch diese ab."
@@ -406,6 +417,7 @@ MODULE_TEXT_DESC__en__require_sealed_for_unattended="Unattended runs (schedules,
 MODULE_TEXT_DESC__en__require_signed_seal="Sealed workflows need a valid signature (key outside the database). A seal without one, or with a wrong one, refuses its runs."
 MODULE_TEXT_DESC__en__seal_immutable="Unsealing is no longer possible through the UI or the API; a seal is released only by someone who can change the startup configuration."
 MODULE_TEXT_DESC__en__unattended_sandbox="AI CLIs and shell blocks outside runs started by a person can neither read nor change or replace the API key file, the seal and integration keys or the database (Linux Landlock). Without Landlock such processes do not start at all."
+MODULE_TEXT_DESC__en__unattended_in_container="AI CLIs and shell blocks outside runs started by a person run in a fresh container of the image automation-agent-workflow: only the working directory, the CLI program and its login go in, never the key files, the database or other services of the host user. Without Docker or the image such processes do not start at all."
 MODULE_TEXT_DESC__en__webhook_signatures="Per-webhook signing secret (HMAC-SHA256 in the X-Signature header); a stored secret is always enforced, the switch only gates setting and removing it."
 MODULE_TEXT_DESC__en__private_network_guard="iCal feed and RSS/Atom feed fetch public addresses only: targets on localhost, in private networks, link-local (including cloud metadata 169.254.169.254), 0.0.0.0/:: or multicast are refused — the resolved IP addresses are checked, on every redirect too. Turning it off allows local feeds on purpose."
 MODULE_TEXT_DESC__en__private_network_guard_http_api="The same address check for the HTTP API connection. Off by default, because services in your own network are a common HTTP API target; turned on, it refuses them as well."

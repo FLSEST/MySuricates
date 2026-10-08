@@ -38,18 +38,19 @@ public class ShellCommandService {
 
         ProcessBuilder pb = new ProcessBuilder("/bin/bash", "-c", command);
         pb.redirectErrorStream(true);
-        // Shell blocks get no instance API key, not even one the backend was started with (TODO 62037bf2).
-        ChildProcessEnv.scrub(pb);
         if (workingDirectory != null && !workingDirectory.isBlank()) {
             pb.directory(new File(workingDirectory));
         }
+        // Shell blocks get no instance API key, not even one the backend was started with (TODO 62037bf2);
+        // outside attended runs they may run in a container (TODO 6ee57b87), so the directory comes first.
+        ChildProcessEnv.isolate(pb);
 
         log.debug("Shell execute (workDir: {}, timeout: {}s): {}", workingDirectory, timeoutSeconds,
                 command.length() > 200 ? command.substring(0, 200) + "..." : command);
 
         Process proc = null;
         try {
-            proc = pb.start();
+            proc = ChildProcessEnv.start(pb);
 
             if (processCallback != null) {
                 processCallback.accept(proc);
