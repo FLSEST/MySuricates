@@ -13,11 +13,17 @@ price is that no new file can be created directly in such a directory (e.g. the 
 its existing entries and every subdirectory off the way stay fully usable. A file that appears there
 later is not readable either, which keeps a new key file or database journal hidden as well.
 
+A hidden directory hides everything below it; a hidden path below another one is dropped, since as a way
+directory the outer one would be opened up again. A symbolic link off the way gets no rule: opening it
+would grant its target, and a link to a hidden path or a way directory would undo the hiding. Landlock
+checks an access through a link where the link points to, so the link itself needs none (TODO 75890a40).
+
 Exit code 126 and a line starting with "landlock_exec:" when the sandbox cannot be set up; the command
 does not run then.
 """
 import ctypes
 import os
+import stat
 import sys
 
 SYS_CREATE_RULESET, SYS_ADD_RULE, SYS_RESTRICT_SELF = 444, 445, 446
@@ -58,7 +64,16 @@ def parse(argv):
     command = argv[i + 1:]
     if not hidden or not command:
         fail("usage: --hide PATH [--hide PATH ...] -- COMMAND [ARGS...]")
-    return hidden, command
+    return outermost(hidden), command
+
+
+def outermost(paths):
+    """The hidden paths without those below another hidden one (sorted: a parent comes before its children)."""
+    kept = []
+    for path in sorted(set(paths)):
+        if not any(path == k or path.startswith(k.rstrip("/") + "/") for k in kept):
+            kept.append(path)
+    return kept
 
 
 def handled_rights(abi):
@@ -87,11 +102,11 @@ def main(argv):
 
     def grant(path, allowed):
         try:
-            fd = os.open(path, os.O_PATH | os.O_CLOEXEC)
+            fd = os.open(path, os.O_PATH | os.O_NOFOLLOW | os.O_CLOEXEC)
         except OSError:
             return  # vanished or unreadable entry: nothing to grant
         try:
-            if not os.path.isdir(path):
+            if not stat.S_ISDIR(os.fstat(fd).st_mode):
                 allowed &= FILE_RIGHTS
             rule = PathBeneathAttr(allowed & rights, fd)
             if libc.syscall(SYS_ADD_RULE, ruleset, RULE_PATH_BENEATH, ctypes.byref(rule), ctypes.c_uint32(0)) != 0:
@@ -115,7 +130,7 @@ def main(argv):
             continue
         for entry in entries:
             path = os.path.join(directory, entry)
-            if path not in hidden and path not in way:
+            if path not in hidden and path not in way and not os.path.islink(path):
                 grant(path, rights)
 
     if libc.prctl(PR_SET_NO_NEW_PRIVS, 1, 0, 0, 0) != 0:

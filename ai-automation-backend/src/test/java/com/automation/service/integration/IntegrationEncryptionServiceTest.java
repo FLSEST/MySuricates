@@ -123,6 +123,18 @@ class IntegrationEncryptionServiceTest {
         assertThat(second.decrypt(encrypted)).isEqualTo("test");
     }
 
+    /** TODO 94316c37: loading an existing key leaves the file as it is. */
+    @Test
+    void loadingAnExistingKeyDoesNotRewriteTheFile() throws Exception {
+        String content = Files.readString(keyFile);
+        java.nio.file.attribute.FileTime modified = Files.getLastModifiedTime(keyFile);
+
+        newService(Map.of()).init();
+
+        assertThat(Files.readString(keyFile)).isEqualTo(content);
+        assertThat(Files.getLastModifiedTime(keyFile)).isEqualTo(modified);
+    }
+
     @Test
     void envKeyTakesPrecedenceOverFile() {
         String envKey = Base64.getEncoder().encodeToString(new byte[32]);

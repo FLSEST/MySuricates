@@ -771,6 +771,57 @@ class WorkflowExecutorTest {
         assertThat(event.getStatus()).isEqualTo(RunStatus.COMPLETED);
     }
 
+    // --- process sandbox: attended runs start their processes unchanged (finding f0d92638) -------
+
+    /** Whether a process started by the block would run behind the sandbox, recorded per block call. */
+    private List<Boolean> recordSandboxedProcessStarts() {
+        List<Boolean> sandboxed = new ArrayList<>();
+        when(simpleBlockExecutor.execute(any(BlockDefinition.class), any(ExecutionContext.class))).thenAnswer(inv -> {
+            ProcessBuilder pb = new ProcessBuilder("true");
+            com.automation.util.ChildProcessEnv.scrub(pb);
+            sandboxed.add(!pb.command().equals(List.of("true")));
+            return StepResult.builder().stepIndex(0).status(StepStatus.COMPLETED).output("ok").build();
+        });
+        com.automation.util.ProcessSandbox.configure(new com.automation.util.ProcessSandbox.Policy(true,
+                () -> List.of(java.nio.file.Path.of("/home/u/.mysuricates/api-key")), java.nio.file.Path.of("/usr/bin/python3")));
+        return sandboxed;
+    }
+
+    @org.junit.jupiter.api.AfterEach
+    void switchProcessSandboxOff() {
+        com.automation.util.ProcessSandbox.reset();
+    }
+
+    @Test
+    void processSandbox_aManualRunStartsUnwrapped_scheduledAndChainedFromASchedulerOnesBehindIt() {
+        testWorkflow.setBlocks(new ArrayList<>(List.of(testWorkflow.getBlocks().getFirst())));
+        List<Boolean> sandboxed = recordSandboxedProcessStarts();
+
+        workflowExecutor.execute(testWorkflow, null, TriggerSource.MANUAL);
+        workflowExecutor.execute(testWorkflow, null, TriggerSource.SCHEDULE);
+        workflowExecutor.execute(testWorkflow, Map.of(TriggerSource.PARENT_CONTEXT_KEY, "SCHEDULE"), TriggerSource.CHAIN);
+        workflowExecutor.execute(testWorkflow, Map.of(TriggerSource.PARENT_CONTEXT_KEY, "MANUAL"), TriggerSource.CHAIN);
+
+        assertThat(sandboxed).containsExactly(false, true, true, false);
+        assertThat(com.automation.util.ProcessSandbox.active()).as("the mark ends with the run").isTrue();
+    }
+
+    @Test
+    void processSandbox_aResumeByAPersonStartsUnwrapped_anAutomaticOneBehindIt() {
+        StepResult done = StepResult.builder().stepIndex(0).status(StepStatus.COMPLETED).output("first-output").build();
+        when(stepResultRepository.findByWorkflowRunIdOrderByStepIndexAsc("run-1")).thenReturn(List.of(done));
+        List<Boolean> sandboxed = recordSandboxedProcessStarts();
+
+        for (TriggerSource source : List.of(TriggerSource.RESUME, TriggerSource.AUTO_RESUME)) {
+            WorkflowRun interrupted = WorkflowRun.builder().id("run-1").workflow(testWorkflow).workflowName("Test Workflow")
+                    .status(RunStatus.INTERRUPTED).triggerSource(TriggerSource.SCHEDULE).startedAt(Instant.now()).build();
+            when(runRepository.findById("run-1")).thenReturn(Optional.of(interrupted));
+            workflowExecutor.resumeFromStep("run-1", source);
+        }
+
+        assertThat(sandboxed).containsExactly(false, true);
+    }
+
     // --- resumeFromStep (previously untested; safety net for the WorkflowSnapshot refactoring) ----
 
     @Test

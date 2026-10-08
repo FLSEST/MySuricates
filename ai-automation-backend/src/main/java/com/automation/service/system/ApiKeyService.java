@@ -2,6 +2,7 @@ package com.automation.service.system;
 
 import com.automation.config.InstanceAddress;
 import com.automation.repository.AppSettingsRepository;
+import com.automation.util.SecretFiles;
 import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -12,7 +13,6 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.attribute.PosixFilePermissions;
 import java.security.MessageDigest;
 import java.util.UUID;
 
@@ -73,11 +73,7 @@ public class ApiKeyService {
                 Files.deleteIfExists(apiKeyFile);
                 return;
             }
-            Files.createDirectories(apiKeyFile.getParent());
-            Files.writeString(apiKeyFile, key);
-            try {
-                Files.setPosixFilePermissions(apiKeyFile, PosixFilePermissions.fromString("rw-------"));
-            } catch (UnsupportedOperationException ignored) { }
+            SecretFiles.writeOwnerOnly(apiKeyFile, key); // 0600 from the start, never the umask default
             log.info("Wrote API key to {}", apiKeyFile);
         } catch (IOException e) {
             log.warn("Failed to write API key file: {}", e.getMessage());

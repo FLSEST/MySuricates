@@ -1,5 +1,6 @@
 package com.automation.service.workflow;
 
+import com.automation.util.SecretFiles;
 import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -11,7 +12,6 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.attribute.PosixFilePermissions;
 import java.security.MessageDigest;
 import java.security.SecureRandom;
 import java.util.Base64;
@@ -120,13 +120,7 @@ public class WorkflowSealSigner {
         byte[] raw = new byte[32];
         new SecureRandom().nextBytes(raw);
         String encoded = Base64.getEncoder().encodeToString(raw);
-        Files.createDirectories(keyFile.getParent());
-        Files.writeString(keyFile, encoded);
-        try {
-            Files.setPosixFilePermissions(keyFile, PosixFilePermissions.fromString("rw-------"));
-        } catch (UnsupportedOperationException e) {
-            log.debug("Filesystem without POSIX permissions — seal key file left at default permissions");
-        }
+        SecretFiles.writeOwnerOnly(keyFile, encoded);
         return encoded;
     }
 

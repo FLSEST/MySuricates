@@ -17,6 +17,7 @@ import org.springframework.test.util.ReflectionTestUtils;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.attribute.PosixFilePermissions;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -106,6 +107,24 @@ class ApiKeyServiceTest {
             logger.detachAppender(appender);
             logger.setLevel(previousLevel);
             appender.stop();
+        }
+    }
+
+    /** TODO 94316c37: the key file never exists with the umask's permissions, not even briefly. */
+    @Test
+    void init_writesTheKeyFileOwnerOnly_andTightensAnOlderFileOthersCouldRead() throws Exception {
+        Path keyFile = tempHome.resolve("data/api-key");
+        Files.createDirectories(keyFile.getParent());
+        Files.writeString(keyFile, "stale-key");
+        Files.setPosixFilePermissions(keyFile, PosixFilePermissions.fromString("rw-r--r--"));
+        when(settingsRepo.get("api-key")).thenReturn(Optional.of("db-key"));
+
+        service.init();
+
+        assertThat(Files.readString(keyFile)).isEqualTo("db-key");
+        assertThat(PosixFilePermissions.toString(Files.getPosixFilePermissions(keyFile))).isEqualTo("rw-------");
+        try (var siblings = Files.list(keyFile.getParent())) {
+            assertThat(siblings).containsExactly(keyFile); // no temp file left behind
         }
     }
 

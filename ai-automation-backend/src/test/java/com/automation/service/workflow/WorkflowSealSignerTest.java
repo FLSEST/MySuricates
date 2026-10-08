@@ -28,6 +28,22 @@ class WorkflowSealSignerTest {
         assertThat(PosixFilePermissions.toString(Files.getPosixFilePermissions(key))).isEqualTo("rw-------");
     }
 
+    /** TODO 94316c37: reading an existing key leaves the file as it is — content, time and permissions. */
+    @Test
+    void anExistingKeyFileIsReadButNotRewritten(@TempDir Path dir) throws Exception {
+        Path key = dir.resolve("seal.key");
+        withKeyFile(key);
+        Files.setPosixFilePermissions(key, PosixFilePermissions.fromString("rw-r-----"));
+        String content = Files.readString(key);
+        java.nio.file.attribute.FileTime modified = Files.getLastModifiedTime(key);
+
+        assertThat(withKeyFile(key).available()).isTrue();
+
+        assertThat(Files.readString(key)).isEqualTo(content);
+        assertThat(Files.getLastModifiedTime(key)).isEqualTo(modified);
+        assertThat(PosixFilePermissions.toString(Files.getPosixFilePermissions(key))).isEqualTo("rw-r-----");
+    }
+
     @Test
     void signatureSurvivesARestartWithTheSameKeyFile(@TempDir Path dir) {
         Path key = dir.resolve("seal.key");
