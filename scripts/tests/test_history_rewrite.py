@@ -62,6 +62,19 @@ class MoveTodoBracket(unittest.TestCase):
         self.assertTrue(out.endswith(f"Claude-Session: https://example.invalid/s\nTodo: {UUID_A} (Projekt umbenennen)\n{CO}\n"))
 
 
+class PrivateTrailers(unittest.TestCase):
+    def test_claude_session_trailer_is_dropped_other_trailers_stay(self):
+        msg = f"fix: x\n\nBody.\n\nClaude-Session: https://example.invalid/s\nTodo: deadbee1 (T)\n{CO}\n"
+        self.assertEqual(hm.drop_private_trailers(msg), f"fix: x\n\nBody.\n\nTodo: deadbee1 (T)\n{CO}\n")
+
+    def test_message_with_only_a_session_trailer_loses_the_trailer_block(self):
+        self.assertEqual(hm.drop_private_trailers("docs: y\n\nClaude-Session: https://example.invalid/s\n"), "docs: y\n")
+
+    def test_message_without_it_is_unchanged(self):
+        msg = f"fix: x\n\n{CO}\n"
+        self.assertIs(hm.drop_private_trailers(msg), msg)
+
+
 class Checks(unittest.TestCase):
     SRC = ("fix(staging): Hinweis für `foreach` in SealedSyncScope.java\n\n"
            "Die Frage beantwortet jetzt WorkflowStarters über workflow_id (V85, 3 Stellen, a0e85182).\n\n"

@@ -104,6 +104,16 @@ def parse_refs(inner):
     return refs
 
 
+DROPPED_TRAILERS = ('Claude-Session:',)
+
+
+def drop_private_trailers(msg):
+    """Trailers that link to the author's private sessions do not go public (Flo, 2026-10-08)."""
+    subject, body, trailers = split_message(msg)
+    kept = [t for t in trailers if not t.startswith(DROPPED_TRAILERS)]
+    return msg if kept == trailers else join_message(subject, body, kept)
+
+
 def move_todo_bracket(msg, index):
     """Step b: the TODO bracket at the end of the subject becomes `Todo:` trailer lines.
 
@@ -329,7 +339,7 @@ def cmd_extract(args):
     for sha, msg in git_messages(args.repo, args.rev):
         if sha in done:
             continue
-        moved = move_todo_bracket(msg, index)
+        moved = drop_private_trailers(move_todo_bracket(msg, index))
         if needs_translation(moved):
             pending.append({'hash': sha, 'source': msg, 'message': moved})
         else:
