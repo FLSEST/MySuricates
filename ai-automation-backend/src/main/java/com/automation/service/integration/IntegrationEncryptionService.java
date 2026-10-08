@@ -1,6 +1,7 @@
 package com.automation.service.integration;
 
 import com.automation.repository.AppSettingsRepository;
+import com.automation.util.SecretFiles;
 import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -15,8 +16,6 @@ import javax.crypto.spec.SecretKeySpec;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.StandardCopyOption;
-import java.nio.file.attribute.PosixFilePermissions;
 import java.security.SecureRandom;
 import java.util.Base64;
 import java.util.function.UnaryOperator;
@@ -158,24 +157,7 @@ public class IntegrationEncryptionService {
     }
 
     private void writeKeyFile(String base64Key) throws IOException {
-        Path dir = keyFile.toAbsolutePath().getParent();
-        Files.createDirectories(dir);
-        Path tmp = Files.createTempFile(dir, keyFile.getFileName().toString(), ".tmp");
-        try {
-            restrictToOwner(tmp);
-            Files.writeString(tmp, base64Key);
-            Files.move(tmp, keyFile, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
-        } finally {
-            Files.deleteIfExists(tmp);
-        }
-    }
-
-    private static void restrictToOwner(Path path) {
-        try {
-            Files.setPosixFilePermissions(path, PosixFilePermissions.fromString("rw-------"));
-        } catch (UnsupportedOperationException | IOException e) {
-            log.warn("Could not restrict permissions on {}", path);
-        }
+        SecretFiles.writeOwnerOnly(keyFile, base64Key);
     }
 
     private static SecretKeySpec toKey(String base64) {
