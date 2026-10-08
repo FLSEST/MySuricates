@@ -89,10 +89,13 @@ public class AgenticLearningService {
      * agentic steps.
      *
      * <p>Reads only the step metadata of the newest {@value #TOOL_PATTERN_MAX_RUNS} runs of the last
-     * {@value #TOOL_PATTERN_WINDOW_DAYS} days (TODO 47c1cbe4). It runs for every workflow of a project
-     * on each wish decomposition ({@code WorkflowStatsService#getOptimizationSuggestions}); loading
-     * every run with its step entities, output text included, held the single database connection
-     * for as long as the history was big.
+     * {@value #TOOL_PATTERN_WINDOW_DAYS} days (TODO 47c1cbe4); runs without a start time
+     * ({@code startedAt}) do not count. The result names that window ({@code windowDays},
+     * {@code maxRuns}), so no reader takes the counts for the whole history. It runs for every
+     * workflow of a project on each wish decomposition
+     * ({@code WorkflowStatsService#getOptimizationSuggestions}); loading every run with its step
+     * entities, output text included, held the single database connection for as long as the
+     * history was big.
      */
     @Transactional(readOnly = true)
     public Map<String, Object> getToolPatterns(String workflowId) {
@@ -101,6 +104,8 @@ public class AgenticLearningService {
 
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("workflowId", workflowId);
+        result.put("windowDays", TOOL_PATTERN_WINDOW_DAYS);
+        result.put("maxRuns", TOOL_PATTERN_MAX_RUNS);
         result.put("totalAgenticRuns", tally.agenticSteps);
         result.put("totalCostUsd", tally.totalCost);
         result.put("patterns", findCommonPatterns(tally.toolSequences));

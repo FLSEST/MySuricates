@@ -16,7 +16,6 @@ import java.util.List;
  * capped in the query, never the description blob (pool=1). Queries only – writing goes through
  * {@link TodoRepository}, which stands at the 300-line limit of {@code SourceSizeRatchetTest}.
  */
-@org.springframework.stereotype.Repository
 public interface TodoSummaryRepository extends Repository<Todo, String> {
 
     /** TODOs per priority among {@code statuses}; priorities without a TODO have no row. */

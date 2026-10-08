@@ -93,11 +93,12 @@ public interface WorkflowRunRepository extends JpaRepository<WorkflowRun, String
     List<Object[]> findStepMetadataForDashboard(@Param("since") Instant since, @Param("projectId") String projectId);
 
     /**
-     * Ids of a workflow's runs started at or after {@code since}, newest first, capped via
-     * {@code pageable} – the run window of the tool-pattern analysis (TODO 47c1cbe4).
+     * Ids of a workflow's runs started at or after {@code since}, newest first (the id breaks ties, so
+     * the cap cuts the same runs every time), capped via {@code pageable} – the run window of the
+     * tool-pattern analysis (TODO 47c1cbe4). Runs without {@code startedAt} are not in it.
      */
     @Query("SELECT wr.id FROM WorkflowRun wr WHERE wr.workflow.id = :workflowId AND wr.startedAt >= :since "
-         + "ORDER BY wr.startedAt DESC")
+         + "ORDER BY wr.startedAt DESC, wr.id")
     List<String> findRecentRunIds(@Param("workflowId") String workflowId, @Param("since") Instant since,
                                   Pageable pageable);
 

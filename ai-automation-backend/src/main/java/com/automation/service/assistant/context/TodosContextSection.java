@@ -4,6 +4,7 @@ import com.automation.dto.projection.PriorityCount;
 import com.automation.dto.projection.TodoHeadline;
 import com.automation.entity.Todo;
 import com.automation.repository.TodoSummaryRepository;
+import com.automation.util.UntrustedText;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.PageRequest;
@@ -21,6 +22,10 @@ import java.util.Map;
  * counts per priority, or the most urgent titles – instead of loading every TODO with its
  * description and filtering in memory (TODO f1074d2e): with pool-size 1 that held the only
  * connection, and it grew with every finished TODO.
+ *
+ * <p>Titles can come from imports, webhooks or AI output; like in {@code open_todos} each one is
+ * flattened to a bounded line with platform markers and block boundaries defused
+ * ({@link UntrustedText#inline}), so a title cannot pose as a prompt instruction.
  */
 @Component
 @RequiredArgsConstructor
@@ -79,7 +84,7 @@ public class TodosContextSection implements AssistantContextSection {
         }
         sb.append("**Open Todos (").append(top.size()).append("):**\n");
         top.forEach(t -> sb.append("  - [").append(t.priority()).append("] ")
-                .append(t.title()).append("\n"));
+                .append(UntrustedText.inline(t.title(), UntrustedText.MAX_TITLE_CHARS)).append("\n"));
         sb.append("\n");
     }
 }

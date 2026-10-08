@@ -175,6 +175,8 @@ class AgenticLearningServiceTest {
                 Instant.now().minus(AgenticLearningService.TOOL_PATTERN_WINDOW_DAYS, ChronoUnit.DAYS));
         assertThat(page.getValue().getPageNumber()).isZero();
         assertThat(page.getValue().getPageSize()).isEqualTo(AgenticLearningService.TOOL_PATTERN_MAX_RUNS);
+        // The answer names its window, so the counts are not read as the whole history.
+        assertThat(result).containsEntry("windowDays", 90).containsEntry("maxRuns", 200);
         assertThat(result.get("totalAgenticRuns")).isEqualTo(1);
         assertThat((double) result.get("totalCostUsd")).isEqualTo(0.25);
         assertThat(result.get("patterns"))

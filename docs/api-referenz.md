@@ -501,6 +501,7 @@ Quelle: `LearningController` – Run statistics: dashboard figures, platform cou
 Hinweise:
 
 - `GET /api/v1/learning/dashboard` — `projectId` restricts every value, the overall counts included, to that project's workflows and runs. `recentRuns` holds at most the ten newest runs of the window, without steps.
+- `GET /api/v1/learning/workflows/{workflowId}/tool-patterns` — Counts only the newest 200 runs of the last 90 days – `windowDays` and `maxRuns` in the answer name that window –, and runs without a start time not at all.
 
 ## /api/v1/notifications
 

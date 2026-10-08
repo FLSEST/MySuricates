@@ -543,6 +543,22 @@ class WorkflowRunRepositoryTest {
                 .containsExactly(third.getId(), second.getId(), first.getId());
     }
 
+    /** Runs started in the same instant: the id decides, so the cap always cuts the same runs. */
+    @Test
+    void should_break_ties_of_the_run_window_by_id() {
+        Instant sameStart = Instant.now().minusSeconds(60);
+        List<String> ids = new ArrayList<>();
+        for (int i = 0; i < 3; i++) {
+            ids.add(run(workflowA, RunStatus.COMPLETED, sameStart).getId());
+        }
+        run(workflowA, RunStatus.RUNNING, null);
+        ids.sort(null);
+
+        assertThat(runRepository.findRecentRunIds(workflowA.getId(), sameStart.minusSeconds(1), PageRequest.of(0, 10)))
+                .as("ordered by id within the same start, without the run that never started")
+                .containsExactlyElementsOf(ids);
+    }
+
     /** Only [runId, metadata] per step – newest run first, its steps by index (TODO 47c1cbe4). */
     @Test
     void should_return_the_step_metadata_of_runs_newest_run_first_steps_in_order() {
