@@ -6,6 +6,8 @@ import com.automation.dto.request.UpdateTodoStatusRequest;
 import com.automation.dto.response.TodoCountResponse;
 import com.automation.entity.Project;
 import com.automation.entity.Todo;
+import com.automation.exception.ErrorMessage;
+import com.automation.exception.LocalizedArgumentException;
 import com.automation.exception.ResourceNotFoundException;
 import com.automation.repository.ProjectRepository;
 import com.automation.repository.TodoRepository;
@@ -22,7 +24,9 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
 
+import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.*;
@@ -327,6 +331,90 @@ class TodoServiceTest {
         todoService.update("t-1", new UpdateTodoRequest(null, null, null, null, null, "proj-2", null, null, null, null));
         verify(goalConsistency).afterProjectChange(existing);
         assertThat(existing.getProjectId()).isEqualTo("proj-2");
+    }
+
+    // --- dueDate (TODO 6968dc90): ISO timestamp or plain date, anything else is a 400 ---
+
+    @Test
+    void create_plainDueDate_meansTheEndOfThatDayInUtc_likeAMilestone() {
+        when(todoRepository.save(any(Todo.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        Todo result = todoService.create(createRequestWithDueDate("2026-10-15"));
+
+        assertThat(result.getDueDate()).isEqualTo(Instant.parse("2026-10-15T23:59:59Z"));
+    }
+
+    @Test
+    void create_isoTimestampDueDate_asTheUiSendsIt_isTakenAsSent() {
+        when(todoRepository.save(any(Todo.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        Todo result = todoService.create(createRequestWithDueDate("2026-10-15T21:59:59.000Z"));
+
+        assertThat(result.getDueDate()).isEqualTo(Instant.parse("2026-10-15T21:59:59Z"));
+    }
+
+    @Test
+    void create_blankDueDate_meansNoDueDate() {
+        when(todoRepository.save(any(Todo.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        assertThat(todoService.create(createRequestWithDueDate("  ")).getDueDate()).isNull();
+        assertThat(todoService.create(createRequestWithDueDate(null)).getDueDate()).isNull();
+    }
+
+    @Test
+    void create_invalidDueDate_isALocalizedInvalidDate_andSavesNothing() {
+        assertThatThrownBy(() -> todoService.create(createRequestWithDueDate("15.10.2026")))
+                .isInstanceOfSatisfying(LocalizedArgumentException.class, e -> {
+                    assertThat(e.errorMessage()).isEqualTo(ErrorMessage.INVALID_DATE);
+                    assertThat(e.params()).isEqualTo(Map.of("value", "15.10.2026"));
+                });
+        verify(todoRepository, never()).save(any());
+    }
+
+    @Test
+    void update_plainDueDate_meansTheEndOfThatDayInUtc() {
+        Todo existing = Todo.builder().id("t-1").title("Test").build();
+        when(todoRepository.findById("t-1")).thenReturn(Optional.of(existing));
+        when(todoRepository.save(any(Todo.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        Todo result = todoService.update("t-1", updateRequestWithDueDate("2026-10-15"));
+
+        assertThat(result.getDueDate()).isEqualTo(Instant.parse("2026-10-15T23:59:59Z"));
+    }
+
+    @Test
+    void update_isoTimestampDueDate_isTakenAsSent_andBlankClearsIt() {
+        Todo existing = Todo.builder().id("t-1").title("Test").build();
+        when(todoRepository.findById("t-1")).thenReturn(Optional.of(existing));
+        when(todoRepository.save(any(Todo.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        todoService.update("t-1", updateRequestWithDueDate("2026-10-15T08:30:00Z"));
+        assertThat(existing.getDueDate()).isEqualTo(Instant.parse("2026-10-15T08:30:00Z"));
+
+        todoService.update("t-1", updateRequestWithDueDate(""));
+        assertThat(existing.getDueDate()).isNull();
+    }
+
+    @Test
+    void update_invalidDueDate_isALocalizedInvalidDate_andKeepsTheOldDate() {
+        Instant before = Instant.parse("2026-10-01T23:59:59Z");
+        Todo existing = Todo.builder().id("t-1").title("Test").dueDate(before).build();
+        when(todoRepository.findById("t-1")).thenReturn(Optional.of(existing));
+
+        assertThatThrownBy(() -> todoService.update("t-1", updateRequestWithDueDate("2026-10-15 08:30")))
+                .isInstanceOfSatisfying(LocalizedArgumentException.class,
+                        e -> assertThat(e.errorMessage()).isEqualTo(ErrorMessage.INVALID_DATE));
+        assertThat(existing.getDueDate()).isEqualTo(before);
+        verify(todoRepository, never()).save(any());
+    }
+
+    private static CreateTodoRequest createRequestWithDueDate(String dueDate) {
+        return new CreateTodoRequest(
+                "Todo", null, null, null, null, null, null, null, null, null, null, null, null, dueDate);
+    }
+
+    private static UpdateTodoRequest updateRequestWithDueDate(String dueDate) {
+        return new UpdateTodoRequest(null, null, null, null, null, null, null, null, null, dueDate);
     }
 
     // --- updateStatus ---

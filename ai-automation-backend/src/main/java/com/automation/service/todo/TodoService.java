@@ -15,6 +15,7 @@ import com.automation.modules.ModuleRegistry;
 import com.automation.repository.ProjectRepository;
 import com.automation.repository.TodoRepository;
 import com.automation.repository.WorkflowRepository;
+import com.automation.util.IsoDates;
 import com.automation.event.TodoCreatedEvent;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -102,7 +103,8 @@ public class TodoService {
                 .referenceId(request.referenceId())
                 .resolutionState(request.linkedWorkflowId() != null && !request.linkedWorkflowId().isBlank()
                         ? Todo.ResolutionState.IDLE : null)
-                .dueDate(request.dueDate() != null && !request.dueDate().isBlank() ? Instant.parse(request.dueDate()) : null)
+                // ISO timestamp or plain date (end of that day, as for milestones); anything else is a 400 (TODO 6968dc90)
+                .dueDate(IsoDates.endOfDay(request.dueDate()))
                 .build();
 
         Todo saved = todoRepository.save(todo);
@@ -137,7 +139,7 @@ public class TodoService {
             todo.setAgentSessionRef(normalizeSessionRef(request.agentSessionRef()));
         }
         if (request.dueDate() != null) {
-            todo.setDueDate(request.dueDate().isBlank() ? null : Instant.parse(request.dueDate()));
+            todo.setDueDate(IsoDates.endOfDay(request.dueDate()));
         }
 
         // A change to DONE reports the TODO itself on save (Todo.Completed) - the audit finding follows there.

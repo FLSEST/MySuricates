@@ -174,11 +174,14 @@ public class ExecutionController {
         return ResponseEntity.ok(response);
     }
 
-    /** Creates ({@code approved: true}) or discards the TODOs a run proposed for approval. */
+    /**
+     * Creates ({@code approved: true}) or discards the TODOs a run proposed for approval.
+     * {@code approved} is required: a body without it returns 400 and discards nothing.
+     */
     @PostMapping("/{id}/todos/approve")
     public ResponseEntity<Void> approveTodos(
             @PathVariable String id,
-            @RequestBody ApproveTodosRequest request) {
+            @Valid @RequestBody ApproveTodosRequest request) {
         pendingTodoApprovalService.approvePendingTodos(id, request.approved());
         return ResponseEntity.ok().build();
     }

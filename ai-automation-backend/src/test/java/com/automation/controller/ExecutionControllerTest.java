@@ -36,6 +36,7 @@ import java.util.List;
 import java.util.Map;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.isNull;
@@ -593,6 +594,24 @@ class ExecutionControllerTest {
                 .andExpect(status().isOk());
 
         verify(pendingTodoApprovalService).approvePendingTodos("run-1", false);
+    }
+
+    /**
+     * TODO 8697722b: a body without {@code approved} used to bind as {@code false} and discarded every
+     * proposed TODO for good. A missing or null decision is a 400 now and touches nothing.
+     */
+    @Test
+    void approveTodos_withoutADecision_returns400AndDiscardsNothing() throws Exception {
+        for (String body : List.of("{}", "{\"answer\": \"Yes\"}", "{\"approved\": null}")) {
+            mockMvc.perform(post("/api/v1/executions/run-1/todos/approve")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(body))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.code").value(ErrorCode.VALIDATION_FAILED.name()))
+                    .andExpect(jsonPath("$.fieldErrors.approved").exists());
+        }
+
+        verify(pendingTodoApprovalService, never()).approvePendingTodos(anyString(), anyBoolean());
     }
 
     @Test

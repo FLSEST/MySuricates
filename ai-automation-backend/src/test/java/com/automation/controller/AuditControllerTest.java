@@ -31,8 +31,10 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 import static org.hamcrest.Matchers.nullValue;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -243,6 +245,23 @@ class AuditControllerTest {
                         .content("{\"todoId\":\"t-foreign\"}"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("INVALID_ARGUMENT"));
+    }
+
+    /**
+     * TODO 8697722b (finding 0060732c): a body without {@code todoId} reached {@code findById(null)}
+     * and the API answered 500. A missing or blank id is a 400 now, before the service is called.
+     */
+    @Test
+    void linkTodo_withoutATodoId_returns400NotInternalError() throws Exception {
+        for (String body : List.of("{}", "{\"todoId\":\"  \"}")) {
+            mockMvc.perform(post("/api/v1/audit-findings/f1/todo-links").contentType(MediaType.APPLICATION_JSON)
+                            .content(body))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"))
+                    .andExpect(jsonPath("$.fieldErrors.todoId").exists());
+        }
+
+        verify(auditCenterService, never()).linkTodo(anyString(), any());
     }
 
     @Test

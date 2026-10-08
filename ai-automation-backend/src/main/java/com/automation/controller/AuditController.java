@@ -8,6 +8,8 @@ import com.automation.modules.ModuleCatalog;
 import com.automation.modules.RequiresModule;
 import com.automation.service.audit.AuditCenterService;
 import com.automation.service.audit.AuditCenterService.*;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotBlank;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -98,7 +100,7 @@ public class AuditController {
 
     /** Links an existing TODO ({@code todoId}) to the finding. */
     @PostMapping("/audit-findings/{id}/todo-links")
-    public AuditFindingResponse linkTodo(@PathVariable String id, @RequestBody LinkTodoRequest request) {
+    public AuditFindingResponse linkTodo(@PathVariable String id, @Valid @RequestBody LinkTodoRequest request) {
         return auditCenterService.linkTodo(id, request.todoId());
     }
 
@@ -110,5 +112,6 @@ public class AuditController {
     }
 
     public record UpdateFindingRequest(AuditFindingStatus status, String dispositionNote) {}
-    public record LinkTodoRequest(String todoId) {}
+    /** {@code todoId} is required: without it the lookup ran into {@code findById(null)} and answered 500 (TODO 8697722b). */
+    public record LinkTodoRequest(@NotBlank String todoId) {}
 }

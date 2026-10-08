@@ -380,6 +380,7 @@ Notes:
 - `POST /api/v1/executions/{id}/cancel` — A run still marked `RUNNING` without an active execution is set to `CANCELLED` directly.
 - `GET /api/v1/executions/{id}/live-log` — `available=false` instead of 404 when there is none.
 - `POST /api/v1/executions/{id}/resume-from-step` — Other statuses are refused.
+- `POST /api/v1/executions/{id}/todos/approve` — `approved` is required: a body without it returns 400 and discards nothing.
 
 ## /api/v1/factory
 
@@ -845,11 +846,11 @@ Source: `TodoController` – TODOs: list, create, edit and close them, start the
 Notes:
 
 - `GET /api/v1/todos` — ARCHIVED TODOs only appear when `status` names them; status, priority and source ignore case, an unknown value returns 400, and `goalId=none` selects TODOs without a goal.
-- `POST /api/v1/todos` — Defaults are OPEN, MEDIUM and source USER; an unknown `projectId` or `linkedWorkflowId` returns 404, and a new OPEN TODO can start matching TODO triggers. `agentSessionRef` keeps only the conversation UUID found in the value (a whole `claude --resume` command is accepted); a value without a UUID is dropped.
+- `POST /api/v1/todos` — Defaults are OPEN, MEDIUM and source USER; an unknown `projectId` or `linkedWorkflowId` returns 404, and a new OPEN TODO can start matching TODO triggers. `agentSessionRef` keeps only the conversation UUID found in the value (a whole `claude --resume` command is accepted); a value without a UUID is dropped. `dueDate` is an ISO timestamp or a plain date (`2026-10-15`, meaning the end of that day in UTC); anything else returns 400.
 - `POST /api/v1/todos/archive-stale` — Optional `projectId` scopes it to one project; omit to archive across all. Returns `{"archived": n}`.
 - `POST /api/v1/todos/bulk-status` — Returns `{"updated": n}`.
 - `GET /api/v1/todos/similar` — `projectId` and `title` are required. Frontend calls this to offer merge/link options to the user.
-- `PUT /api/v1/todos/{id}` — An empty `dueDate` or `linkedWorkflowId` clears it; an unknown project or workflow id returns 404.
+- `PUT /api/v1/todos/{id}` — An empty `dueDate` or `linkedWorkflowId` clears it; an unknown project or workflow id returns 404. `dueDate` takes the same forms as on create, anything else returns 400.
 - `POST /api/v1/todos/{id}/export` — Provider and target come from the body or the project's `taskExport` setting.
 - `PATCH /api/v1/todos/{id}/planning` — A `goalId` in the same request is applied first; an unknown goal or work package is 404. `goalRank` of 0 or less removes the rank, a rank without a goal is 400. Sending `complexity`, `suggestedEffort` or `ratingNote` stamps `ratedAt`, with `ratedBy` defaulting to `USER`; other values than S/M/L/XL or low/medium/high/xhigh are 400.
 - `POST /api/v1/todos/{id}/resolve` — Returns 400 without a linked workflow and 409 when the TODO is DONE or its last fix run is still running.
