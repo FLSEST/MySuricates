@@ -1,5 +1,6 @@
 package com.automation.service.ai.catalog;
 
+import com.automation.concurrency.SingleFlight;
 import com.automation.config.ModelCatalogConfig;
 import com.automation.exception.ResourceNotFoundException;
 import lombok.extern.slf4j.Slf4j;
@@ -30,7 +31,13 @@ public class ModelCatalogService {
 
     private final Map<String, ModelCatalogSource> sources;
     private final Map<String, CachedCatalog> cache = new ConcurrentHashMap<>();
-    private final Map<String, Object> locks = new ConcurrentHashMap<>();
+    /**
+     * At most one probe per provider at a time; concurrent requests share it. Not a
+     * {@code synchronized} block: requests run on virtual threads and the pi probe is a process
+     * of up to {@code probeTimeoutSeconds}, during which a monitor would pin the carrier of the
+     * prober and of every waiting request (TODO a7294cf2).
+     */
+    private final SingleFlight<String, ModelCatalog> probes = new SingleFlight<>();
     private volatile long ttlMs;
 
     private record CachedCatalog(ModelCatalog catalog, long timestamp) {
@@ -59,7 +66,8 @@ public class ModelCatalogService {
 
     /**
      * @param providerId   registry id, case-insensitive
-     * @param forceRefresh bypass the cache and probe the host now
+     * @param forceRefresh bypass the cache and probe the host now; a probe for the provider that
+     *                     is already running counts as "now", its result is shared
      * @throws ResourceNotFoundException when no source exists for the provider (→ HTTP 404)
      */
     public ModelCatalog getCatalog(String providerId, boolean forceRefresh) {
@@ -72,15 +80,21 @@ public class ModelCatalogService {
         if (!forceRefresh && cached != null && !cached.isExpired(ttlMs)) {
             return cached.catalog();
         }
-        synchronized (locks.computeIfAbsent(id, k -> new Object())) {
-            cached = cache.get(id);
-            if (!forceRefresh && cached != null && !cached.isExpired(ttlMs)) {
-                return cached.catalog();
+        return probes.run(id, () -> {
+            // A probe that finished between the check above and here has just filled the cache.
+            CachedCatalog current = cache.get(id);
+            if (!forceRefresh && current != null && !current.isExpired(ttlMs)) {
+                return current.catalog();
             }
             ModelCatalog fresh = probe(source);
             cache.put(id, new CachedCatalog(fresh, System.currentTimeMillis()));
             return fresh;
-        }
+        });
+    }
+
+    /** Visible for tests: how many providers are being probed right now. */
+    int probesInFlight() {
+        return probes.inFlight();
     }
 
     private ModelCatalog probe(ModelCatalogSource source) {

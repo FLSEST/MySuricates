@@ -148,7 +148,7 @@ public class ProjectService {
      * Archives the project and stops its container afterwards. Deliberately not
      * {@code @Transactional}: {@link ContainerService#stopContainer} does a multi-second Docker
      * stop+remove, so an enclosing transaction would pin the single pooled connection for that
-     * whole time — the same lock-order inversion between per-project monitor and connection that
+     * whole time — the same lock-order inversion between per-project start and connection that
      * {@link #startContainer} avoids (TODO b3c88eeb / 0db2b2c9).
      *
      * <p>The order is a deliberate trade-off: the archive burst commits <em>first</em>, the Docker
@@ -206,12 +206,13 @@ public class ProjectService {
 
     /**
      * Deliberately not {@code @Transactional}: {@link ContainerService#createAndStartContainer}
-     * takes the per-project monitor and runs a 5–15 s Docker create inside it. With HikariCP
-     * pool-size 1 an enclosing transaction would pin the single connection for that whole time,
-     * so a workflow run that already holds the monitor blocks on the pool until
-     * connection-timeout (120 s) — a lock-order inversion between monitor and connection
-     * (TODO b3c88eeb). Same shape as ContainerService: short write burst (STARTING) → Docker
-     * outside any transaction → short write burst (RUNNING/ERROR).
+     * runs a 5–15 s Docker create as the single start in flight for the project (or waits for the
+     * one already running). With HikariCP pool-size 1 an enclosing transaction would pin the single
+     * connection for that whole time, so a workflow run that is already starting the container
+     * blocks on the pool until connection-timeout (120 s) — a lock-order inversion between the
+     * per-project start and the connection (TODO b3c88eeb). Same shape as ContainerService:
+     * short write burst (STARTING) → Docker outside any transaction → short write burst
+     * (RUNNING/ERROR).
      */
     public Project startContainer(String id) {
         Project project = transactionTemplate.execute(status -> {

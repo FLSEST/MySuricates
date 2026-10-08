@@ -8,6 +8,7 @@ import com.automation.entity.ProjectType;
 import com.automation.exception.ContainerException;
 import com.automation.repository.ContainerRepository;
 import com.automation.service.activitylog.ActivityLogService;
+import com.automation.testsupport.ParkedThreads;
 import com.automation.util.HostProcessUtils;
 import com.github.dockerjava.api.DockerClient;
 import com.github.dockerjava.api.command.*;
@@ -25,9 +26,11 @@ import java.util.Optional;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.catchThrowable;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -223,100 +226,143 @@ class ContainerServiceTest {
     }
 
     /**
-     * The per-project lock must never be dropped from the map while a thread still holds it:
-     * the next caller would then create a fresh lock object and run createAndStart concurrently
-     * for the same project — exactly the UNIQUE(project_id) race the lock exists to prevent.
-     *
-     * <p>Interleaving forced here: T1 is inside, T2 blocks on the monitor, T1 completes (and with
-     * the old code removes the map entry while T2 is inside), then T3 arrives.
+     * Runs that find the container stopped (e.g. by the idle reaper) all try to start it at once.
+     * Only one Docker create may happen per project; the others wait - parked, not blocked on a
+     * monitor, because runs execute on virtual threads and a monitor would pin the carrier - and
+     * get the same container. A run that arrives while the start is still going joins it as well,
+     * so no second start can ever overlap with the first (the UNIQUE(project_id) race).
      */
     @Test
-    void createAndStart_lockIsNotDroppedWhileContended() throws Exception {
-        AtomicInteger concurrent = new AtomicInteger();
-        AtomicInteger maxConcurrent = new AtomicInteger();
+    void createAndStart_concurrentCallsForSameProject_shareOneDockerStart() throws Exception {
+        AtomicInteger creates = new AtomicInteger();
         CountDownLatch firstInside = new CountDownLatch(1);
         CountDownLatch releaseFirst = new CountDownLatch(1);
-        CountDownLatch secondInside = new CountDownLatch(1);
-        CountDownLatch releaseRest = new CountDownLatch(1);
-
         when(containerRepository.findByProjectId("project-1")).thenReturn(Optional.empty());
         when(containerRepository.save(any(Container.class))).thenAnswer(inv -> inv.getArgument(0));
         stubDockerRemoveCommands();
-        stubDockerCreateAndStartBlocking("docker-parallel", () -> {
-            maxConcurrent.accumulateAndGet(concurrent.incrementAndGet(), Math::max);
-            try {
-                if (firstInside.getCount() > 0) {
-                    firstInside.countDown();
-                    awaitLatch(releaseFirst);
-                } else {
-                    secondInside.countDown();
-                    awaitLatch(releaseRest);
-                }
-            } finally {
-                concurrent.decrementAndGet();
+        stubDockerCreateAndStartBlocking("docker-shared", () -> {
+            creates.incrementAndGet();
+            firstInside.countDown();
+            ParkedThreads.await(releaseFirst);
+        });
+
+        AtomicReference<Container> first = new AtomicReference<>();
+        AtomicReference<Container> second = new AtomicReference<>();
+        AtomicReference<Container> third = new AtomicReference<>();
+        Thread t1 = ParkedThreads.start(() -> first.set(service.createAndStartContainer(testProject)));
+        assertThat(firstInside.await(5, TimeUnit.SECONDS)).as("T1 inside Docker create").isTrue();
+        // Each run loads its own Project entity; the start is shared by project id.
+        Thread t2 = ParkedThreads.start(() -> second.set(service.createAndStartContainer(sameProjectAgain())));
+        Thread t3 = ParkedThreads.start(() -> third.set(service.createAndStartContainer(sameProjectAgain())));
+        ParkedThreads.awaitParked(t2);
+        ParkedThreads.awaitParked(t3);
+
+        releaseFirst.countDown();
+        ParkedThreads.join(t1);
+        ParkedThreads.join(t2);
+        ParkedThreads.join(t3);
+
+        assertThat(creates.get()).as("one Docker create for the project").isEqualTo(1);
+        assertThat(first.get().getDockerContainerId()).isEqualTo("docker-shared");
+        assertThat(second.get()).as("waiters get the started container").isSameAs(first.get());
+        assertThat(third.get()).isSameAs(first.get());
+        verify(containerRepository, times(1)).save(any(Container.class));
+        assertThat(service.startsInFlight()).as("no per-project entry left behind").isZero();
+    }
+
+    @Test
+    void createAndStart_failedStart_reachesEveryWaiter_andNextCallStartsAgain() throws Exception {
+        AtomicInteger creates = new AtomicInteger();
+        CountDownLatch firstInside = new CountDownLatch(1);
+        CountDownLatch releaseFirst = new CountDownLatch(1);
+        when(containerRepository.findByProjectId("project-1")).thenReturn(Optional.empty());
+        when(containerRepository.save(any(Container.class))).thenAnswer(inv -> inv.getArgument(0));
+        stubDockerRemoveCommands();
+        stubDockerCreateAndStartBlocking("docker-retry", () -> {
+            if (creates.incrementAndGet() == 1) {
+                firstInside.countDown();
+                ParkedThreads.await(releaseFirst);
+                throw new RuntimeException("Docker error");
             }
         });
 
-        Thread t1 = startCreateAndStart();
-        assertThat(firstInside.await(5, TimeUnit.SECONDS)).as("T1 inside").isTrue();
-
-        Thread t2 = startCreateAndStart();
-        awaitBlockedOnMonitor(t2, true);
+        AtomicReference<Throwable> firstFailure = new AtomicReference<>();
+        AtomicReference<Throwable> secondFailure = new AtomicReference<>();
+        Thread t1 = ParkedThreads.start(() -> firstFailure.set(catchThrowable(
+                () -> service.createAndStartContainer(testProject))));
+        assertThat(firstInside.await(5, TimeUnit.SECONDS)).as("T1 inside Docker create").isTrue();
+        Thread t2 = ParkedThreads.start(() -> secondFailure.set(catchThrowable(
+                () -> service.createAndStartContainer(sameProjectAgain()))));
+        ParkedThreads.awaitParked(t2);
 
         releaseFirst.countDown();
-        t1.join(5_000);
-        assertThat(secondInside.await(5, TimeUnit.SECONDS)).as("T2 inside").isTrue();
+        ParkedThreads.join(t1);
+        ParkedThreads.join(t2);
 
-        // T3 arrives after T1 finished — the old code had dropped the lock in the meantime.
-        Thread t3 = startCreateAndStart();
-        boolean thirdWaitedForTheLock = awaitBlockedOnMonitor(t3, false);
+        assertThat(firstFailure.get())
+                .isInstanceOf(ContainerException.class)
+                .hasMessageContaining("Failed to create container");
+        assertThat(secondFailure.get()).as("the waiter gets the same failure").isSameAs(firstFailure.get());
+        verify(activityLogService, times(1)).error(any(), anyString(), anyString(), anyString());
+        assertThat(service.startsInFlight()).as("failed start leaves no entry behind").isZero();
 
-        releaseRest.countDown();
-        t2.join(5_000);
-        t3.join(5_000);
+        Container retried = service.createAndStartContainer(testProject);
 
-        assertThat(maxConcurrent.get())
-                .as("createAndStart must never run twice in parallel for the same project")
-                .isEqualTo(1);
-        assertThat(thirdWaitedForTheLock)
-                .as("T3 must queue on the existing project lock, not create a fresh one")
-                .isTrue();
-    }
-
-    private Thread startCreateAndStart() {
-        Thread thread = new Thread(() -> service.createAndStartContainer(testProject));
-        thread.setDaemon(true);
-        thread.start();
-        return thread;
+        assertThat(retried.getDockerContainerId()).isEqualTo("docker-retry");
+        assertThat(creates.get()).as("a later call starts afresh").isEqualTo(2);
     }
 
     /**
-     * Polls (no Awaitility dependency) until the thread parks on a monitor. {@code required}
-     * distinguishes the test setup (T2 must queue for the interleaving to happen) from the
-     * behaviour under test (T3 should queue — reported, not thrown, so the concurrency
-     * assertion gets to speak first).
+     * A cancelled run interrupts its thread while it starts the container. The run waiting for
+     * that start must not inherit the failure and silently fall back to the host: it starts the
+     * container itself, as it did when it queued on a monitor.
      */
-    private static boolean awaitBlockedOnMonitor(Thread thread, boolean required) {
-        long deadline = System.nanoTime() + java.time.Duration.ofSeconds(2).toNanos();
-        while (System.nanoTime() < deadline) {
-            if (thread.getState() == Thread.State.BLOCKED) return true;
-            Thread.onSpinWait();
-        }
-        if (required) {
-            throw new AssertionError("thread never blocked on the project lock; state=" + thread.getState());
-        }
-        return false;
+    @Test
+    void createAndStart_cancelledStart_letsTheWaitingRunStartTheContainerItself() throws Exception {
+        AtomicInteger creates = new AtomicInteger();
+        CountDownLatch firstInside = new CountDownLatch(1);
+        CountDownLatch never = new CountDownLatch(1);
+        when(containerRepository.findByProjectId("project-1")).thenReturn(Optional.empty());
+        when(containerRepository.save(any(Container.class))).thenAnswer(inv -> inv.getArgument(0));
+        stubDockerRemoveCommands();
+        stubDockerCreateAndStartBlocking("docker-second", () -> {
+            if (creates.incrementAndGet() == 1) {
+                firstInside.countDown();
+                try {
+                    never.await();
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    throw new RuntimeException("docker call interrupted", e);
+                }
+            }
+        });
+
+        AtomicReference<Throwable> cancelledRun = new AtomicReference<>();
+        AtomicReference<Container> waitingRun = new AtomicReference<>();
+        Thread t1 = ParkedThreads.start(() -> cancelledRun.set(catchThrowable(
+                () -> service.createAndStartContainer(testProject))));
+        assertThat(firstInside.await(5, TimeUnit.SECONDS)).as("T1 inside Docker create").isTrue();
+        Thread t2 = ParkedThreads.start(() -> waitingRun.set(service.createAndStartContainer(sameProjectAgain())));
+        ParkedThreads.awaitParked(t2);
+
+        t1.interrupt();
+        ParkedThreads.join(t1);
+        ParkedThreads.join(t2);
+
+        assertThat(cancelledRun.get()).isInstanceOf(ContainerException.class);
+        assertThat(waitingRun.get()).as("the waiting run starts the container itself").isNotNull();
+        assertThat(waitingRun.get().getDockerContainerId()).isEqualTo("docker-second");
+        assertThat(creates.get()).isEqualTo(2);
+        assertThat(service.startsInFlight()).isZero();
     }
 
-    private static void awaitLatch(CountDownLatch latch) {
-        try {
-            if (!latch.await(5, TimeUnit.SECONDS)) {
-                throw new AssertionError("latch was not released within 5s");
-            }
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            throw new AssertionError("interrupted while waiting for a latch", e);
-        }
+    private Project sameProjectAgain() {
+        return Project.builder()
+                .id(testProject.getId())
+                .name(testProject.getName())
+                .path(testProject.getPath())
+                .type(testProject.getType())
+                .build();
     }
 
     @SuppressWarnings("unchecked")

@@ -31,11 +31,11 @@ import static org.mockito.Mockito.when;
 
 /**
  * Container start/stop from the UI must not hold a transaction around the Docker call
- * (TODO b3c88eeb). {@code ContainerService} takes the per-project monitor and runs a 5-15 s
- * Docker create inside it; with HikariCP pool-size 1 an enclosing transaction pins the single
- * connection for that whole time, so a workflow run that already holds the monitor blocks on
- * the pool until connection-timeout (120 s) — a lock-order inversion between monitor and
- * connection. Runs against the real transaction manager and asserts, from inside the mocked
+ * (TODO b3c88eeb). {@code ContainerService} runs a 5-15 s Docker create as the only start in
+ * flight for the project; with HikariCP pool-size 1 an enclosing transaction pins the single
+ * connection for that whole time, so a workflow run that is already starting the container
+ * blocks on the pool until connection-timeout (120 s) — a lock-order inversion between the
+ * per-project start and the connection. Runs against the real transaction manager and asserts, from inside the mocked
  * container call, that no transaction is active — and that the status is still persisted.
  */
 @SpringBootTest
