@@ -1,0 +1,21 @@
+# gitleaks configuration: default rules plus an allowlist for invented test literals.
+#
+# .gitleaksignore pins false positives by fingerprint (commit:file:rule:line), so every entry dies
+# with a history rewrite - the first public repository (TODO 0bf5eed4) gets new commit hashes, and
+# CI scans its whole history on the first push. This allowlist does not depend on hashes: it frees
+# exactly the known invented values, and only inside test directories. A real secret is never
+# allowed here - remove it and rotate it instead.
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "Invented test tokens and API keys in tests (no real credentials)"
+condition = "AND"
+paths = ['''^ai-automation-backend/src/test/''', '''^scripts/tests/''']
+regexTarget = "secret"
+regexes = [
+  '''^test-api-key-12345$''',
+  '''^xoxb-1111-2222-abcdefSECRET$''',
+  '''^0123456789abcdef0123456789abcdef01234567$''',
+  '''^sk-test-anthropic-4711$''',
+]
