@@ -20,7 +20,7 @@ Just trying it out — all you need is Docker:
 
 ```bash
 git clone https://github.com/FLSEST/MySuricates.git && cd MySuricates
-scripts/tryout.sh build          # builds the image from the latest release; takes a few minutes the first time
+scripts/tryout.sh build          # builds the image from the latest release; the first build takes longer, depending on the machine
 scripts/tryout.sh start          # http://localhost:9095 — the output shows the API key for login
 scripts/tryout.sh login claude   # optional, for AI blocks; likewise codex or pi
 ```
@@ -121,9 +121,9 @@ Known hard limits:
 
 Shell blocks and AI calls run **with your privileges** — directly on the machine or, for the
 instance in a container, with your mounted folders and logins — not in a sandbox per block; the AI
-CLIs by default do not ask before using tools. When started from source, backend and frontend listen
-on all network interfaces (the instance set up by the installer binds only to `127.0.0.1` by
-default), and some endpoints do not need an API key. MySuricates
+CLIs by default do not ask before using tools. On every way — installer, container, dev start from
+source — backend and frontend listen only on `127.0.0.1` by default (`MYSURICATES_DEV_BIND` or
+`…BIND=0.0.0.0` open that deliberately), and some endpoints do not need an API key. MySuricates
 is built for local operation by a trusted person — for remote access, put a VPN in front of it,
 not an open port. Full details:
 [Trust model and network exposure](docs/en/deployment.md#trust-model-and-network-exposure).
@@ -133,7 +133,7 @@ startup. The `core` preset (default) contains the core — workflows, blocks, sc
 `research` adds: chains (several workflows as
 one chain), the chat assistant, learning (analyses of completed runs — metrics and recommendations),
 workflow memory (knowledge from runs that is injected into later runs), the Audit Center (the page
-where the findings from audit workflows are tracked over time), and BPMN export. `full` enables
+where the findings from audit workflows are tracked over time), and BPMN export/import. `full` enables
 everything — including integrations, webhooks, and remote access. The installer asks for this; the
 complete list with all modules is in [Architecture](docs/en/architektur.md#module-system-startup-configuration).
 
@@ -144,14 +144,14 @@ complete list with all modules is in [Architecture](docs/en/architektur.md#modul
 | Backend | Spring Boot 3.5, Java 21 |
 | Frontend | React 19, TypeScript 6, Vite 8 |
 | Database | SQLite (WAL mode) + Flyway |
-| Container | Docker (Java Docker Client 3.7.1) — optional, only for shell blocks with `container_image` |
+| Container | Docker (Java Docker Client 3.7.1) — optional; for shell blocks with `container_image`, project containers and the terminal |
 | Styling | Tailwind CSS 4, CSS variables |
 | State | Zustand 5 + TanStack Query 5 |
 | WebSocket | STOMP over SockJS |
 | Security | API key auth, rate limiting, admission check before every run; optional HMAC-signed workflow seals |
 | i18n | German / English |
 | PWA | Vite PWA Plugin |
-| Integrations | Google Calendar, Gmail, Jira, Confluence, Trello, GitHub, Gitea/Forgejo, GitLab, Taskwarrior — module, in the `full` preset |
+| Integrations | Plugin system for external services, e.g. Google Calendar, Gmail, Jira, Confluence, Trello, GitHub, Gitea/Forgejo, GitLab, Taskwarrior; a new provider is a single class — module, in the `full` preset |
 
 Execution happens where the instance runs — in the container (recommended) or directly on the
 machine: shell blocks through the user's shell, AI blocks through the installed CLI (mounted into
@@ -198,6 +198,6 @@ Please do **not** report security vulnerabilities as public issues; use the repo
 
 ---
 
-> 🌍 **README.de.md is the source, `README.md` the translation.** Content changes belong in the German file. The author generates the English version from it in their MySuricates instance using the "README DE↔EN Sync" workflow; the repository holds only the result, not the workflow. So if you contribute from outside, change the German source and adjust `README.md` by hand in the same commit — or change only the German one and note in the pull request that the translation still needs to follow.
+> 🌍 **README.de.md is the source, `README.md` the translation.** Content changes belong in the German file. The author generates the English version from it in their MySuricates instance using the "README DE↔EN Sync" workflow; the repository holds the result and the deterministic part of the sync (`scripts/readme-sync/readme_sync.py`), not the workflow definition itself. So if you contribute from outside, change the German source and adjust `README.md` by hand in the same commit — or change only the German one and note in the pull request that the translation still needs to follow.
 
-<!-- synced-from: 71109653546e sha256:7996860cfa88f357bc4b5484afaf68e08fdc14c1498e564c63e29d3a04f19244 -->
+<!-- synced-from: af2d49f13e31 sha256:38dfb68f905b785bb0e0a1ca08e21f8da5c41f2aa6f1298bc78e47175488dadb -->
