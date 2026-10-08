@@ -20,14 +20,10 @@ import com.automation.service.scheduler.ScheduleConflictCheck.SkipReason;
 import com.automation.service.workflow.WorkflowExecutor;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.scheduling.support.CronExpression;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Clock;
 import java.time.Instant;
-import java.time.LocalDateTime;
-import java.time.ZoneId;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
@@ -47,6 +43,7 @@ public class ScheduledWorkflowExecutor {
     private final ModuleRegistry modules;
     private final ScheduleConflictCheck conflictCheck;
     private final ScheduleSkipPolicy skipPolicy;
+    private final ScheduleAdvancer advancer;
 
     /**
      * Execute a scheduled workflow/chain.
@@ -56,8 +53,8 @@ public class ScheduledWorkflowExecutor {
      * workflow duration (potentially 30+ minutes), blocking all other DB operations including
      * read-only Executions API calls.
      * <p>
-     * Schedule metadata reads/writes use their own short-lived repository transactions, and
-     * workflow execution manages its own transaction scope internally.
+     * Schedule metadata reads/writes use their own short-lived transactions
+     * ({@link ScheduleAdvancer}), and workflow execution manages its own transaction scope internally.
      */
     public Optional<ScheduledRunRef> executeSingleSchedule(String scheduleId) {
         // Use JOIN FETCH query to eagerly load workflow.activatedSkills within the repository's
@@ -84,6 +81,10 @@ public class ScheduledWorkflowExecutor {
             endAtEndDate(scheduled);
             return Optional.empty();
         }
+
+        // The occurrence this call moves past; a stored next run that differs from it afterwards was
+        // set by an update while the run was starting (TODO 0d2704db).
+        Instant dueAt = scheduled.getNextRunAt();
 
         // Conflict behaviour SKIP (default; OVERLAP allows parallel runs): while the target still has
         // a run in progress, this occurrence is dropped and the schedule moves on to its next one.
@@ -133,8 +134,7 @@ public class ScheduledWorkflowExecutor {
             }
         } finally {
             // Short write transaction for schedule metadata update
-            updateScheduleAfterRun(scheduleId, scheduled.getScheduleType(),
-                    scheduled.getCronExpression());
+            updateScheduleAfterRun(scheduleId, dueAt);
         }
     }
 
@@ -161,8 +161,7 @@ public class ScheduledWorkflowExecutor {
      */
     private void skipOccurrence(ScheduledWorkflow scheduled, SkipReason reason) {
         Instant skippedAt = scheduled.getNextRunAt();
-        ScheduledWorkflow advanced = advance(scheduled.getId(), scheduled.getScheduleType(),
-                scheduled.getCronExpression(), false);
+        ScheduledWorkflow advanced = advancer.advance(scheduled.getId(), skippedAt, false);
         Instant nextRunAt = advanced != null ? advanced.getNextRunAt() : null;
         log.warn("Schedule {} skipped — {} '{}': {}; next run at {}",
                 scheduled.getId(), scheduled.getTargetType(), scheduled.getTargetName(), reason.text, nextRunAt);
@@ -186,7 +185,7 @@ public class ScheduledWorkflowExecutor {
      */
     private void endAtEndDate(ScheduledWorkflow scheduled) {
         Instant occurrence = scheduled.getNextRunAt();
-        advance(scheduled.getId(), scheduled.getScheduleType(), scheduled.getCronExpression(), false);
+        advancer.advance(scheduled.getId(), occurrence, false);
         log.info("Schedule {} ended — its occurrence at {} is not before its end date {}",
                 scheduled.getId(), occurrence, scheduled.getEndDate());
 
@@ -199,76 +198,8 @@ public class ScheduledWorkflowExecutor {
                 "ScheduledWorkflowExecutor", scheduled.getId(), metadata);
     }
 
-    @Transactional
-    public void updateScheduleAfterRun(String scheduleId, ScheduleType scheduleType,
-                                        String cronExpression) {
-        advance(scheduleId, scheduleType, cronExpression, true);
-    }
-
-    /**
-     * Moves a schedule past its due occurrence: ONCE/DELAYED are done and disabled, CRON goes to its
-     * next occurrence unless an end condition is met. Only when {@code ran} (a start was attempted,
-     * successful or not) are {@code lastRunAt} and {@code runCount} updated.
-     *
-     * @return the updated schedule, or {@code null} when it no longer exists
-     */
-    private ScheduledWorkflow advance(String scheduleId, ScheduleType scheduleType, String cronExpression,
-                                      boolean ran) {
-        ScheduledWorkflow scheduled = scheduledRepository.findById(scheduleId).orElse(null);
-        if (scheduled == null) return null;
-
-        if (ran) {
-            scheduled.setLastRunAt(Instant.now(clock));
-        }
-
-        if (scheduleType == ScheduleType.ONCE || scheduleType == ScheduleType.DELAYED) {
-            scheduled.setNextRunAt(null);
-            scheduled.setEnabled(false);
-            log.info("{} schedule {} {} and disabled", scheduleType, scheduleId, ran ? "executed" : "skipped");
-        } else {
-            // Count the run and check the end conditions of a CRON schedule
-            if (ran) {
-                scheduled.setRunCount(scheduled.getRunCount() + 1);
-            }
-
-            Instant now = Instant.now(clock);
-            boolean maxRunsReached = ScheduleEndConditions.maxRunsReached(scheduled);
-            // The end date bounds the next run, not only this moment: a next run at or after it is no
-            // longer part of the schedule. Setting it anyway started it once after the end date
-            // (TODO 9a3e6c91). Without a next run to check (none left, or not computed), now counts.
-            Instant next = maxRunsReached || ScheduleEndConditions.reachesEndDate(scheduled, now)
-                    ? null : calculateNextRun(cronExpression);
-            boolean endDateReached = ScheduleEndConditions.reachesEndDate(scheduled, next != null ? next : now);
-
-            if (maxRunsReached || endDateReached) {
-                scheduled.setNextRunAt(null);
-                scheduled.setEnabled(false);
-                log.info("Schedule {} disabled — end condition met (maxRuns={}, runCount={}, endDate={})",
-                        scheduleId, scheduled.getMaxRuns(), scheduled.getRunCount(), scheduled.getEndDate());
-            } else if (next == null) {
-                // A valid expression without a future occurrence (30 February): ended like at the end
-                // date and reported once, instead of enabled with no next run (TODO 1e801952).
-                scheduled.setEnabled(false);
-                scheduled.setNextRunAt(null);
-                log.info("Schedule {} disabled — cron expression '{}' has no further occurrence", scheduleId, cronExpression);
-                activityLogService.log(LogLevel.INFO, LogCategory.SCHEDULE,
-                        "Schedule ended (no further occurrence): " + scheduled.getTargetName(),
-                        "ScheduledWorkflowExecutor", scheduleId, Map.of("reason", "no-next-run"));
-            } else {
-                scheduled.setNextRunAt(next);
-                log.info("Schedule {} {}, next run at: {}",
-                        scheduleId, ran ? "executed" : "skipped", scheduled.getNextRunAt());
-            }
-        }
-
-        scheduledRepository.save(scheduled);
-        return scheduled;
-    }
-
-    private Instant calculateNextRun(String cronExpression) {
-        CronExpression cron = CronExpression.parse(cronExpression);
-        LocalDateTime next = cron.next(LocalDateTime.now(clock));
-        if (next == null) return null;
-        return next.atZone(ZoneId.systemDefault()).toInstant();
+    /** Moves the schedule past the occurrence due at {@code dueAt} after a start was attempted. */
+    void updateScheduleAfterRun(String scheduleId, Instant dueAt) {
+        advancer.advance(scheduleId, dueAt, true);
     }
 }
