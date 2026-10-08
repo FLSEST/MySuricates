@@ -15,7 +15,11 @@ translation itself happens here, so it is testable and costs no tokens:
                                              into rejects.jsonl with the reason. The raw answer is
                                              kept, so --stored re-checks it after a rule change
   report      --state S --run ID             summary plus a side-by-side review page (review.html)
-  callback    --map FILE                     body for `git filter-repo --commit-callback`
+  callback    --map FILE [--replacements F]  body for `git filter-repo --commit-callback`: message from the
+                                             map, then the replacements (filter-repo expression syntax)
+  map-missing --repo R --map FILE            number of commits without a map entry
+  german-left --repo R                       number of messages that still read German
+  patterns-left --repo R --replacements F    number of replacement rules that still match a message
 
 State lives outside the repository (`--state`, e.g. ~/.mysuricates/history-rewrite): `map.jsonl`
 (archive hash -> final message) is the cache, so the final run translates only what is new.
@@ -108,7 +112,7 @@ DROPPED_TRAILERS = ('Claude-Session:',)
 
 
 def drop_private_trailers(msg):
-    """Trailers that link to the author's private sessions do not go public (Flo, 2026-10-08)."""
+    """Trailers that link to the author's private sessions do not go public (decided 2026-10-08)."""
     subject, body, trailers = split_message(msg)
     kept = [t for t in trailers if not t.startswith(DROPPED_TRAILERS)]
     return msg if kept == trailers else join_message(subject, body, kept)
@@ -522,23 +526,74 @@ pre{{white-space:pre-wrap;margin:0;font-size:12px}}tr.rejected td:first-child{{c
     return 0
 
 
-CALLBACK = '''import json
-_map = globals().setdefault('_rewrite_map', {{}})
-if not _map:
+CALLBACK = '''import json, re
+_state = globals().setdefault('_rewrite_state', {{}})
+if not _state:
+    _state['map'] = {{}}
     with open({path!r}, encoding='utf-8') as fh:
         for line in fh:
             if line.strip():
                 entry = json.loads(line)
-                _map[entry['hash'].encode()] = entry['message'].encode('utf-8')
-new = _map.get(commit.original_id)
-if new is not None:
-    commit.message = new
+                _state['map'][entry['hash'].encode()] = entry['message'].encode('utf-8')
+    _state['rules'] = []
+    for raw in {rules!r}:
+        pattern, _, repl = raw.partition('==>')
+        repl = (repl if _ else '***REMOVED***').encode('utf-8')
+        if pattern.startswith('regex:'):
+            _state['rules'].append((re.compile(pattern[6:].encode('utf-8')), repl))
+        else:
+            _state['rules'].append((re.compile(re.escape(pattern.encode('utf-8'))), repl))
+message = _state['map'].get(commit.original_id, commit.message)
+# Private session links go regardless of the map (also for messages that were never translated).
+message = re.sub(rb'(?m)^Claude-Session: [^\\n]*\\n?', b'', message).rstrip(b'\\n') + b'\\n'
+for rx, repl in _state['rules']:
+    message = rx.sub(lambda m: repl, message)
+commit.message = message
 '''
 
 
+def replacement_rules(path):
+    """Lines of a filter-repo style expressions file (literal==>new, regex:pattern==>new)."""
+    if not path or not Path(path).exists():
+        return []
+    return [line for line in Path(path).read_text(encoding='utf-8').splitlines()
+            if line.strip() and not line.lstrip().startswith('#')]
+
+
 def cmd_callback(args):
-    print(CALLBACK.format(path=str(Path(args.map).resolve())))
+    print(CALLBACK.format(path=str(Path(args.map).resolve()), rules=replacement_rules(args.replacements)))
     return 0
+
+
+def cmd_map_missing(args):
+    done = load_map_file(args.map)
+    print(sum(1 for sha, _ in git_messages(args.repo, '--all') if sha not in done))
+    return 0
+
+
+def cmd_german_left(args):
+    print(sum(1 for _, msg in git_messages(args.repo, '--all') if needs_translation(msg)))
+    return 0
+
+
+def compile_rules(path):
+    out = []
+    for raw in replacement_rules(path):
+        pattern = raw.partition('==>')[0]
+        out.append(re.compile(pattern[6:]) if pattern.startswith('regex:') else re.compile(re.escape(pattern)))
+    return out
+
+
+def cmd_patterns_left(args):
+    """Number of replacement rules that still match some message (Python regex, like the callback)."""
+    rules = compile_rules(args.replacements)
+    texts = [msg for _, msg in git_messages(args.repo, '--all')]
+    print(sum(1 for rx in rules if any(rx.search(t) for t in texts)))
+    return 0
+
+
+def load_map_file(path):
+    return {e['hash'] for e in read_jsonl(path)}
 
 
 def main(argv=None):
@@ -565,9 +620,19 @@ def main(argv=None):
     p.add_argument('--run', required=True)
     p = sub.add_parser('callback')
     p.add_argument('--map', required=True)
+    p.add_argument('--replacements', help='message replacements, filter-repo expression syntax')
+    p = sub.add_parser('map-missing')
+    p.add_argument('--repo', required=True)
+    p.add_argument('--map', required=True)
+    p = sub.add_parser('patterns-left')
+    p.add_argument('--repo', required=True)
+    p.add_argument('--replacements', required=True)
+    p = sub.add_parser('german-left')
+    p.add_argument('--repo', required=True)
     args = ap.parse_args(argv)
     return {'todo-index': cmd_todo_index, 'extract': cmd_extract, 'check': cmd_check,
-            'report': cmd_report, 'callback': cmd_callback}[args.cmd](args)
+            'report': cmd_report, 'callback': cmd_callback, 'map-missing': cmd_map_missing,
+            'german-left': cmd_german_left, 'patterns-left': cmd_patterns_left}[args.cmd](args)
 
 
 if __name__ == '__main__':

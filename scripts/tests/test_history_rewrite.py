@@ -75,6 +75,31 @@ class PrivateTrailers(unittest.TestCase):
         self.assertIs(hm.drop_private_trailers(msg), msg)
 
 
+class Callback(unittest.TestCase):
+    def run_callback(self, map_lines, replacements, original_id, message):
+        with tempfile.TemporaryDirectory() as tmp:
+            mp, rp = Path(tmp) / "map.jsonl", Path(tmp) / "repl.txt"
+            mp.write_text("".join(json.dumps(m) + "\n" for m in map_lines))
+            rp.write_text(replacements)
+            code = subprocess.run([sys.executable, str(SCRIPT), "callback", "--map", str(mp), "--replacements", str(rp)],
+                                  capture_output=True, text=True, check=True).stdout
+
+            class Commit:
+                pass
+            Commit.original_id, Commit.message = original_id, message
+            exec(code, {"commit": Commit})  # noqa: S102 - as git filter-repo runs it
+            return Commit.message.decode()
+
+    def test_session_trailer_goes_even_without_a_map_entry(self):
+        out = self.run_callback([], "", b"abc", b"fix: x\n\nClaude-Session: https://example.invalid/s\nCo-Authored-By: Bot <b@example.invalid>\n")
+        self.assertEqual(out, "fix: x\n\nCo-Authored-By: Bot <b@example.invalid>\n")
+
+    def test_replacements_apply_after_the_map_literal_and_regex(self):
+        out = self.run_callback([{"hash": "abc", "message": "fix: path /home/dev/x and Secret\n"}],
+                                "/home/dev==>~\nregex:(?i)secret==>[redacted]\n# comment\nbare\n", b"abc", b"old")
+        self.assertEqual(out, "fix: path ~/x and [redacted]\n")
+
+
 class Checks(unittest.TestCase):
     SRC = ("fix(staging): Hinweis für `foreach` in SealedSyncScope.java\n\n"
            "Die Frage beantwortet jetzt WorkflowStarters über workflow_id (V85, 3 Stellen, a0e85182).\n\n"
