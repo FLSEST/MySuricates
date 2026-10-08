@@ -23,6 +23,7 @@ import org.springframework.stereotype.Service;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ExecutorService;
 
 @Service
 @Slf4j
@@ -43,6 +44,7 @@ public class AutoRepairService {
     private final AppSettingsRepository appSettingsRepository;
     private final WorkflowRunRepository workflowRunRepository;
     private final WorkflowExecutor workflowExecutor;
+    private final ExecutorService virtualThreadExecutor;
 
     public AutoRepairService(FactoryVerificationService factoryVerificationService,
                              WorkflowService workflowService,
@@ -50,7 +52,7 @@ public class AutoRepairService {
                              ActivityLogService activityLogService,
                              AppSettingsRepository appSettingsRepository,
                              WorkflowRunRepository workflowRunRepository,
-                             @Lazy WorkflowExecutor workflowExecutor) {
+                             @Lazy WorkflowExecutor workflowExecutor, ExecutorService virtualThreadExecutor) {
         this.factoryVerificationService = factoryVerificationService;
         this.workflowService = workflowService;
         this.testingService = testingService;
@@ -58,6 +60,7 @@ public class AutoRepairService {
         this.appSettingsRepository = appSettingsRepository;
         this.workflowRunRepository = workflowRunRepository;
         this.workflowExecutor = workflowExecutor;
+        this.virtualThreadExecutor = virtualThreadExecutor;
     }
 
     @Async
@@ -114,11 +117,15 @@ public class AutoRepairService {
     }
 
     /**
-     * Retroactively repair a single workflow by ID.
-     * Uses resolved repair mode (test/local/auto).
+     * Retroactively repair a single workflow by ID in the background, with the resolved repair mode
+     * (test/local/auto). Handed to the executor explicitly rather than via {@code @Async}: the batch
+     * below calls it from inside this class, where the proxy would be bypassed (TODO d04398a3).
      */
-    @Async
     public void repairWorkflow(String workflowId) {
+        virtualThreadExecutor.execute(() -> runRepair(workflowId));
+    }
+
+    private void runRepair(String workflowId) {
         Workflow workflow = workflowService.findById(workflowId);
         String mode = resolveRepairMode(workflow);
         int maxRetries = resolveMaxRetries(workflow);
@@ -320,20 +327,13 @@ public class AutoRepairService {
         return switch (mode) {
             case "test" -> true;
             case "local" -> false;
-            case "auto" -> testingService.isHealthy();
-            default -> testingService.isHealthy();
+            default -> testingService.isHealthy(); // "auto"
         };
     }
 
     private String extractErrorMessage(Map<String, Object> error) {
-        if (error == null || error.isEmpty()) {
-            return "Unknown error";
-        }
-        Object message = error.get("message");
-        if (message instanceof String s) {
-            return s;
-        }
-        return error.toString();
+        if (error == null || error.isEmpty()) return "Unknown error";
+        return error.get("message") instanceof String s ? s : error.toString();
     }
 
     private String extractLastFailedRunError(String workflowId) {
