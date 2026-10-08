@@ -21,11 +21,16 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
+import java.time.Duration;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
-import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Future;
+import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
 
 /**
@@ -59,6 +64,10 @@ public class AssistantService {
     private final AssistantActionSuggestionService actionSuggestionService;
     private final AssistantErrorClassifier errorClassifier;
     private final AssistantResponseParser responseParser;
+    private final ExecutorService virtualThreadExecutor;
+
+    /** How long the chat waits for its action suggestions before it answers without them. */
+    private Duration suggestionTimeout = Duration.ofSeconds(35);
 
     // ── Chat ─────────────────────────────────────────────────────────────────
 
@@ -176,22 +185,40 @@ public class AssistantService {
      * Runs the action-suggestion CLI call with a short timeout; failure or timeout returns an
      * empty result so the chat still delivers its text response. Skipped entirely when
      * suggestions are disabled in settings — saves a CLI slot per chat turn.
+     *
+     * <p>The call runs on the virtual-thread executor, not the common pool, and is interrupted on
+     * timeout: a wait for a CLI throttle slot gives its permits back, a running CLI process is
+     * destroyed and its slot freed — nobody would collect its result (TODO c7dd61df).
      */
     private AssistantActionSuggestionService.SuggestionResult fetchSuggestedActions(
             AssistantChatRequest req, String pageContext, String answer) {
         if (actionSuggestionService == null || !actionSuggestionService.isEnabled()) {
             return AssistantActionSuggestionService.SuggestionResult.empty();
         }
+        Future<AssistantActionSuggestionService.SuggestionResult> call;
         try {
-            return CompletableFuture
-                    .supplyAsync(() -> actionSuggestionService.suggest(req, answer, pageContext))
-                    .completeOnTimeout(AssistantActionSuggestionService.SuggestionResult.empty(),
-                            35, TimeUnit.SECONDS)
-                    .join();
-        } catch (Exception e) {
-            log.debug("Action-suggestion call failed; returning empty actions", e);
+            call = virtualThreadExecutor.submit(() -> actionSuggestionService.suggest(req, answer, pageContext));
+        } catch (RejectedExecutionException e) {
+            log.debug("Action-suggestion call not started; returning empty actions", e);
             return AssistantActionSuggestionService.SuggestionResult.empty();
         }
+        try {
+            return call.get(suggestionTimeout.toMillis(), TimeUnit.MILLISECONDS);
+        } catch (TimeoutException e) {
+            call.cancel(true);
+            log.debug("Action-suggestion call timed out after {}; returning empty actions", suggestionTimeout);
+        } catch (InterruptedException e) {
+            call.cancel(true);
+            Thread.currentThread().interrupt();
+        } catch (ExecutionException e) {
+            log.debug("Action-suggestion call failed; returning empty actions", e.getCause());
+        }
+        return AssistantActionSuggestionService.SuggestionResult.empty();
+    }
+
+    /** Test hook: a short wait instead of the chat's 35 seconds. */
+    void setSuggestionTimeout(Duration suggestionTimeout) {
+        this.suggestionTimeout = suggestionTimeout;
     }
 
 }

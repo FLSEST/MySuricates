@@ -20,6 +20,7 @@ import com.automation.service.cli.CliSession;
 import com.automation.service.cli.CommandExecutorService;
 import com.automation.service.cli.HostExecutionRequest;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -28,8 +29,14 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.io.IOException;
 import java.sql.SQLTransientConnectionException;
+import java.time.Duration;
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Predicate;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -66,15 +73,21 @@ class AssistantServiceTest {
 
     private HostClaudeConfig hostClaudeConfig;
 
+    /** Threads of the injected executor carry this name, so a test can tell them from the common pool. */
+    private static final String EXECUTOR_THREAD_PREFIX = "assistant-test-";
+    private ExecutorService suggestionExecutor;
+
     @BeforeEach
     void setUp() {
+        suggestionExecutor = Executors.newThreadPerTaskExecutor(Thread.ofVirtual().name(EXECUTOR_THREAD_PREFIX, 0).factory());
         hostClaudeConfig = new HostClaudeConfig();
         hostClaudeConfig.setAssistantChatTimeoutSeconds(240);
         chatCaller = new AssistantChatCaller(commandExecutorService, hostClaudeConfig, appSettingsRepository);
         service = new AssistantService(
                 aiProviderRegistry, contextBuilder, fetchService, toolExecutor,
                 broadcaster, chatCaller, actionSuggestionService,
-                new AssistantErrorClassifier(hostClaudeConfig), new AssistantResponseParser(new ObjectMapper())
+                new AssistantErrorClassifier(hostClaudeConfig), new AssistantResponseParser(new ObjectMapper()),
+                suggestionExecutor
         );
         // Action-suggestion service defaults — disabled unless explicitly stubbed per test
         lenient().when(actionSuggestionService.isEnabled()).thenReturn(false);
@@ -603,7 +616,38 @@ class AssistantServiceTest {
         assertThat(result.actions().getFirst().type()).isEqualTo("run_workflow");
     }
 
+    @AfterEach
+    void tearDown() {
+        suggestionExecutor.shutdownNow();
+    }
+
     // ── Action suggestions (suggestions-model decoupling) ───────────────────
+
+    @Test
+    void chat_suggestionTimeout_interruptsTheCallOnTheInjectedExecutorAndStillAnswers() throws Exception {
+        stubClaude("Antwort ohne Vorschläge.");
+        when(fetchService.stripFetchTags("Antwort ohne Vorschläge.")).thenReturn("Antwort ohne Vorschläge.");
+        service.setSuggestionTimeout(Duration.ofMillis(200));
+        AtomicReference<Thread> suggestionThread = new AtomicReference<>();
+        CountDownLatch interrupted = new CountDownLatch(1);
+        when(actionSuggestionService.isEnabled()).thenReturn(true);
+        when(actionSuggestionService.suggest(any(), any(), any())).thenAnswer(inv -> {
+            suggestionThread.set(Thread.currentThread());
+            try {
+                new CountDownLatch(1).await(); // hangs like a call waiting for a CLI throttle slot
+            } catch (InterruptedException e) {
+                interrupted.countDown();
+            }
+            return AssistantActionSuggestionService.SuggestionResult.empty();
+        });
+
+        var result = chat("Frage");
+
+        assertThat(result.message()).isEqualTo("Antwort ohne Vorschläge.");
+        assertThat(result.actions()).isEmpty();
+        assertThat(interrupted.await(10, TimeUnit.SECONDS)).as("suggestion call interrupted on timeout").isTrue();
+        assertThat(suggestionThread.get().getName()).startsWith(EXECUTOR_THREAD_PREFIX);
+    }
 
     @Test
     void chat_mergesSuggestedActionsIntoResponse() {

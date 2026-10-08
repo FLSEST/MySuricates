@@ -5,6 +5,7 @@ import com.automation.dto.response.StagingStatusResponse;
 import com.automation.dto.response.SyncResult;
 import com.automation.entity.*;
 import com.automation.service.system.ApiKeyService;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -13,12 +14,18 @@ import java.nio.file.Path;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
 
 import static org.assertj.core.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
 class StagingServiceTest {
+
+    /** Threads of the injected executor carry this name, so a test can tell them from the common pool. */
+    private static final String EXECUTOR_THREAD_PREFIX = "staging-test-";
 
     private StagingConfig config;
     private InstanceSyncHelper syncHelper;
@@ -26,6 +33,7 @@ class StagingServiceTest {
     private DockerContainerManager dockerManager;
     private StagingComposeCommand compose;
     private StagingService service;
+    private ExecutorService executor;
 
     @TempDir
     Path tempDir;
@@ -41,7 +49,18 @@ class StagingServiceTest {
         apiKeyService = mock(ApiKeyService.class);
         dockerManager = mock(DockerContainerManager.class);
         compose = mock(StagingComposeCommand.class);
-        service = new StagingService(config, syncHelper, mock(InstanceHttpClient.class), mock(SyncPreviewService.class), apiKeyService, dockerManager, compose);
+        executor = Executors.newThreadPerTaskExecutor(Thread.ofVirtual().name(EXECUTOR_THREAD_PREFIX, 0).factory());
+        service = newService(executor);
+    }
+
+    @AfterEach
+    void tearDown() {
+        executor.shutdownNow();
+    }
+
+    private StagingService newService(ExecutorService executorService) {
+        return new StagingService(config, syncHelper, mock(InstanceHttpClient.class), mock(SyncPreviewService.class),
+                apiKeyService, dockerManager, compose, executorService);
     }
 
     @Test
@@ -204,6 +223,32 @@ class StagingServiceTest {
         }
         // Released, the first promote runs on and fails in the missing backend dir
         assertThat(awaitPromoteSettled().promotePhase()).isEqualTo("ERROR");
+    }
+
+    @Test
+    void promote_runsThePipelineOnTheInjectedExecutor_notTheCommonPool() throws InterruptedException {
+        pointAtMissingProjectDirs();
+        AtomicReference<Thread> pipelineThread = new AtomicReference<>();
+        when(compose.command(any(), any(), eq("stable"), eq("down"))).thenAnswer(inv -> {
+            pipelineThread.set(Thread.currentThread());
+            return null;
+        });
+
+        service.promote();
+
+        assertThat(awaitPromoteSettled().promotePhase()).isEqualTo("ERROR");
+        assertThat(pipelineThread.get()).isNotNull();
+        assertThat(pipelineThread.get().getName()).startsWith(EXECUTOR_THREAD_PREFIX);
+    }
+
+    @Test
+    void autoStartStable_runsOnTheInjectedExecutor() {
+        ExecutorService recording = mock(ExecutorService.class);
+        config.setAutoStart(true);
+
+        newService(recording).autoStartStable();
+
+        verify(recording).execute(any(Runnable.class));
     }
 
     /** Missing (not just unlikely) dirs: the pipeline fails at step 2 instead of building anything. */
