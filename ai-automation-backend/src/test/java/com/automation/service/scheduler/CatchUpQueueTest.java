@@ -226,6 +226,48 @@ class CatchUpQueueTest {
     }
 
     @Test
+    void failingStartLogKeepsTheStartedRunActive_andReleasesTheDrain() {
+        queue.enqueue(schedule("a", "A"), NOW.minusSeconds(7200), "cold-start");
+        queue.enqueue(schedule("b", "B"), NOW.minusSeconds(3600), "cold-start");
+        ScheduledRunRef runA = new ScheduledRunRef("run-a", TargetType.WORKFLOW);
+        when(executor.executeSingleSchedule("a")).thenReturn(Optional.of(runA));
+        when(activityLogService.info(eq(LogCategory.SCHEDULE), contains("Catch-up started"), eq("SchedulerService"), any()))
+                .thenThrow(new IllegalStateException("activity log unavailable"))
+                .thenReturn(null);
+
+        assertThatThrownBy(() -> queue.drain(executor, NOW)).isInstanceOf(IllegalStateException.class);
+
+        // The run did start: it stays active, so it is neither lost nor started a second time.
+        assertThat(queue.snapshot().active().runId()).isEqualTo("run-a");
+        assertThat(queue.contains("a")).isTrue();
+        when(executor.isFinished(runA)).thenReturn(false);
+        assertThat(queue.drain(executor, NOW.plusSeconds(60))).isNull();
+        verify(executor, times(1)).executeSingleSchedule("a");
+
+        // The drain flag was released: once the run finished, the next tick starts b.
+        when(executor.isFinished(runA)).thenReturn(true);
+        when(executor.executeSingleSchedule("b")).thenReturn(Optional.of(new ScheduledRunRef("run-b", TargetType.WORKFLOW)));
+        assertThat(queue.drain(executor, NOW.plusSeconds(120)).scheduleId()).isEqualTo("b");
+    }
+
+    @Test
+    void failingRunCheckReleasesTheDrain_andKeepsTheActiveRun() {
+        queue.enqueue(schedule("a", "A"), NOW.minusSeconds(7200), "cold-start");
+        queue.enqueue(schedule("b", "B"), NOW.minusSeconds(3600), "cold-start");
+        ScheduledRunRef runA = new ScheduledRunRef("run-a", TargetType.WORKFLOW);
+        when(executor.executeSingleSchedule("a")).thenReturn(Optional.of(runA));
+        queue.drain(executor, NOW);
+        when(executor.isFinished(runA)).thenThrow(new IllegalStateException("database unavailable")).thenReturn(true);
+
+        assertThatThrownBy(() -> queue.drain(executor, NOW.plusSeconds(60))).isInstanceOf(IllegalStateException.class);
+
+        assertThat(queue.snapshot().active().runId()).isEqualTo("run-a");
+        assertThat(queue.snapshot().pending()).extracting(CatchUpQueue.Pending::scheduleId).containsExactly("b");
+        when(executor.executeSingleSchedule("b")).thenReturn(Optional.of(new ScheduledRunRef("run-b", TargetType.WORKFLOW)));
+        assertThat(queue.drain(executor, NOW.plusSeconds(120)).scheduleId()).isEqualTo("b");
+    }
+
+    @Test
     void failingActivityLogDuringAStartLeavesNoEntryBehind() {
         queue.enqueue(schedule("boom", "Boom"), NOW.minusSeconds(7200), "cold-start");
         when(executor.executeSingleSchedule("boom")).thenThrow(new RuntimeException("fail"));

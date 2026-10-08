@@ -29,6 +29,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.RejectedExecutionException;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
@@ -150,6 +151,20 @@ class AutoRepairServiceTest {
         doThrow(new RejectedExecutionException("shut down")).when(virtualThreadExecutor).execute(any());
 
         assertThat(service.repairAllFailed(true)).isZero();
+    }
+
+    @Test
+    void repairWorkflow_workflowDeletedMeanwhile_failureIsLoggedNotLost() {
+        when(workflowService.findById("wf-gone")).thenThrow(new IllegalStateException("Workflow not found: wf-gone"));
+        ArgumentCaptor<Runnable> repair = ArgumentCaptor.forClass(Runnable.class);
+        service.repairWorkflow("wf-gone");
+        verify(virtualThreadExecutor).execute(repair.capture());
+
+        assertThatCode(() -> repair.getValue().run()).doesNotThrowAnyException();
+
+        verify(activityLogService).error(eq(LogCategory.EXECUTION),
+                contains("Retroactive repair error for workflow: wf-gone"), eq("AutoRepairService"), isNull(), eq("wf-gone"));
+        verifyNoInteractions(factoryVerificationService, workflowExecutor);
     }
 
     @Test

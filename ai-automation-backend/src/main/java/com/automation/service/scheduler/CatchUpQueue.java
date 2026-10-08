@@ -59,9 +59,11 @@ public class CatchUpQueue {
     public void enqueue(ScheduledWorkflow scheduled, Instant missedAt, String reason) {
         Integer position = withLock(() -> {
             if (containsLocked(scheduled.getId())) return null;
-            pending.add(new Pending(scheduled.getId(), scheduled.getTargetName(), missedAt));
+            Pending entry = new Pending(scheduled.getId(), scheduled.getTargetName(), missedAt);
+            pending.add(entry);
             pending.sort(Comparator.comparing(Pending::missedAt, Comparator.nullsLast(Comparator.naturalOrder())));
-            return pending.size();
+            // 1-based place in the waiting list as snapshot() shows it: the entry being started comes first.
+            return pending.indexOf(entry) + 1 + (starting == null ? 0 : 1);
         });
         if (position == null) return;
         log.info("Schedule {} queued for catch-up ({}), position {}", scheduled.getId(), reason, position);
