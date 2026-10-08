@@ -85,6 +85,34 @@ class EvidenceMetricsTest {
     }
 
     @Test
+    void readsCveAndGhsaIdentifiersInOrderOfFirstAppearance() {
+        assertThat(EvidenceMetrics.advisoryIds(
+                "TREFFER trivy_jar: CRITICAL spring-webmvc-6.2.11.jar CVE-2026-47890 – SSE; "
+                        + "TREFFER trivy: HIGH pom.xml GHSA-j9f9-w8pj-32f8, CVE-2026-47884 (XsltView), CVE-2026-47890"))
+                .containsExactly("CVE-2026-47890", "GHSA-j9f9-w8pj-32f8", "CVE-2026-47884");
+    }
+
+    @Test
+    void identifiersAreCanonicalisedSoCaseDoesNotCount() {
+        assertThat(EvidenceMetrics.advisoryIds("cve-2026-47890, https://osv.dev/vulnerability/ghsa-J9F9-W8PJ-32F8"))
+                .containsExactly("CVE-2026-47890", "GHSA-j9f9-w8pj-32f8");
+        assertThat(EvidenceMetrics.advisoryIds("CVE-2026-47890 and Cve-2026-47890")).containsExactly("CVE-2026-47890");
+    }
+
+    @Test
+    void ignoresTokensThatAreNoAdvisoryIdentifier() {
+        assertThat(EvidenceMetrics.advisoryIds("CVE-26-47890, CVE-2026-123, XCVE-2026-47890, CVE-2026-47890x, "
+                + "GHSA-j9f9-w8pj, GHSA_j9f9-w8pj-32f8, CWE-79, FAKT trivy_high: 2")).isEmpty();
+        assertThat(EvidenceMetrics.advisoryIds(null)).isEmpty();
+        assertThat(EvidenceMetrics.advisoryIds("  ")).isEmpty();
+    }
+
+    @Test
+    void identifiersAreNoMeasurableValues() {
+        assertThat(EvidenceMetrics.parse("TREFFER trivy: CVE-2026-47884, CVE-2026-47890, GHSA-j9f9-w8pj-32f8")).isEmpty();
+    }
+
+    @Test
     void formatsIntegralValuesWithoutDecimals() {
         assertThat(EvidenceMetrics.format(320.0, "LOC")).isEqualTo("320 LOC");
         assertThat(EvidenceMetrics.format(3.5, "MB")).isEqualTo("3.5 MB");

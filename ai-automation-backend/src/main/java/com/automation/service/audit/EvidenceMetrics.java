@@ -1,8 +1,10 @@
 package com.automation.service.audit;
 
+import java.util.LinkedHashSet;
 import java.util.Locale;
 import java.util.Map;
 import java.util.OptionalInt;
+import java.util.Set;
 import java.util.TreeMap;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -15,6 +17,8 @@ import java.util.regex.Pattern;
   *       is the name). NCLOC is a unit of its own, never LOC. Per key the largest value counts.</li>
   *   <li>{@link #churn} / {@link #hotspotThreshold}: rate of change ("6 Aenderungen in 90 Tagen (Hotspot ab 5)",
   *       "Backend churn: 30") separate from it because it fluctuates and is not compared by percentage.</li>
+  *   <li>{@link #advisoryIds}: vulnerability identifiers ("CVE-2026-47890", "GHSA-j9f9-w8pj-32f8") — no value
+  *       but a set, compared for new members.</li>
  * </ul>
   * Basis of the worsening rule for accepted risks ({@link AuditAcceptancePolicy});
   * everything unrecognized is ignored.
@@ -48,6 +52,15 @@ public final class EvidenceMetrics {
             Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CASE);
 
     private static final Pattern HOTSPOT_THRESHOLD = Pattern.compile("\\bhotspot\\s+ab\\s+(\\d+)\\b", Pattern.CASE_INSENSITIVE);
+
+    /**
+     * CVE ({@code CVE-2026-47890}) or GitHub advisory ({@code GHSA-j9f9-w8pj-32f8}): what trivy reports as the id of a
+     * vulnerability. Deliberately lenient at the end ({@code \b}): a missed identifier would let an unassessed
+     * vulnerability pass silently, a superfluous one only costs a renewed triage.
+     */
+    private static final Pattern ADVISORY_ID = Pattern.compile(
+            "\\b(?:CVE-\\d{4}-\\d{4,}|GHSA(?:-[0-9a-z]{4}){3})\\b", Pattern.CASE_INSENSITIVE);
+    private static final String GHSA_PREFIX = "GHSA-";
 
     private EvidenceMetrics() {}
 
@@ -85,6 +98,24 @@ public final class EvidenceMetrics {
         if (evidence == null) return OptionalInt.empty();
         Matcher matcher = HOTSPOT_THRESHOLD.matcher(evidence);
         return matcher.find() ? OptionalInt.of(Integer.parseInt(matcher.group(1))) : OptionalInt.empty();
+    }
+
+    /**
+     * @return a new, mutable set of the vulnerability identifiers in the order of their first appearance, in canonical
+     *         spelling (CVE ids upper case, GHSA ids lower case after the prefix, as the advisories write them) so
+     *         that case does not count; empty if the text names none.
+     */
+    public static Set<String> advisoryIds(String evidence) {
+        Set<String> ids = new LinkedHashSet<>();
+        if (evidence == null || evidence.isBlank()) return ids;
+        Matcher matcher = ADVISORY_ID.matcher(evidence);
+        while (matcher.find()) {
+            String id = matcher.group();
+            ids.add(id.regionMatches(true, 0, GHSA_PREFIX, 0, GHSA_PREFIX.length())
+                    ? GHSA_PREFIX + id.substring(GHSA_PREFIX.length()).toLowerCase(Locale.ROOT)
+                    : id.toUpperCase(Locale.ROOT));
+        }
+        return ids;
     }
 
     /** Formats a value including unit for notes, e.g. "320 LOC" or "3.5 MB". */

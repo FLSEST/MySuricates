@@ -11,6 +11,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.OptionalInt;
+import java.util.Set;
 
 /**
  * Rules for accepted audit risks (ACCEPTED_RISK).
@@ -23,12 +24,15 @@ import java.util.OptionalInt;
  *       a "Verschlechtert" hint, the snapshot is kept. The rate of change (churn) fluctuates and
  *       therefore does not count as a percentage: it only degrades if it was below the hotspot threshold in the snapshot
  *       and now reaches it (threshold from "Hotspot ab N" of the current evidence, otherwise
- *       {@value #HOTSPOT_MIN_CHANGES} like HOTSPOT_MIN_CHANGES in scripts/public-readiness/arch-findings.py).</li>
+ *       {@value #HOTSPOT_MIN_CHANGES} like HOTSPOT_MIN_CHANGES in scripts/public-readiness/arch-findings.py).
+ *       A vulnerability identifier (CVE, GHSA, see {@link EvidenceMetrics#advisoryIds}) that the current evidence names
+ *       and the snapshot does not degrades as well ("Verschlechtert: neue Kennung CVE-…"): the security audit keeps one
+ *       finding per package, and an acceptance only covers the identifiers known at the time (TODO 1f4e20f9).</li>
  *   <li><b>Expiry:</b> If the acceptance is older than {@link #REVIEW_INTERVAL}, the finding goes to
  *       AWAITING_VERIFICATION ("Wiedervorlage") the next time it appears. After that the normal
  *       ingestion rules apply; accepting again resets snapshot and deadline.</li>
  * </ul>
- * Without comparable numbers there is no reopening.
+ * Without comparable numbers or a new identifier there is no reopening.
  */
 @Component
 public class AuditAcceptancePolicy {
@@ -37,6 +41,8 @@ public class AuditAcceptancePolicy {
     public static final Duration REVIEW_INTERVAL = Duration.ofDays(180);
     static final String REVIEW_NOTE = "Wiedervorlage nach 180 Tagen";
     static final String DEGRADED_PREFIX = "Verschlechtert: ";
+    static final String NEW_ID = "neue Kennung ";
+    static final String NEW_IDS = "neue Kennungen ";
 
     public enum Outcome { UNCHANGED, REOPENED, REVIEW_DUE }
 
@@ -74,7 +80,8 @@ public class AuditAcceptancePolicy {
 
     /**
      * @return "old → new" per common unit or count whose value rose by more than the threshold,
-     *         plus the rate of change if it newly reached the hotspot threshold.
+     *         plus the rate of change if it newly reached the hotspot threshold,
+     *         plus the identifiers the snapshot does not name yet.
      */
     static List<String> degradations(String snapshotEvidence, String currentEvidence) {
         Map<String, Double> before = EvidenceMetrics.parse(snapshotEvidence);
@@ -90,7 +97,21 @@ public class AuditAcceptancePolicy {
             }
         }
         churnDegradation(snapshotEvidence, currentEvidence).ifPresent(result::add);
+        newAdvisoryIds(snapshotEvidence, currentEvidence).ifPresent(result::add);
         return result;
+    }
+
+    /**
+     * Identifiers that only the current evidence names: nobody assessed them when accepting. Order and spelling do not
+     * matter, vanished identifiers do not reopen. Without a snapshot (acceptance from before V69) there is nothing to
+     * compare against — as with the numbers.
+     */
+    private static Optional<String> newAdvisoryIds(String snapshotEvidence, String currentEvidence) {
+        if (snapshotEvidence == null || snapshotEvidence.isBlank()) return Optional.empty();
+        Set<String> added = EvidenceMetrics.advisoryIds(currentEvidence);
+        added.removeAll(EvidenceMetrics.advisoryIds(snapshotEvidence));
+        if (added.isEmpty()) return Optional.empty();
+        return Optional.of((added.size() == 1 ? NEW_ID : NEW_IDS) + String.join(", ", added));
     }
 
     private static Optional<String> churnDegradation(String snapshotEvidence, String currentEvidence) {
