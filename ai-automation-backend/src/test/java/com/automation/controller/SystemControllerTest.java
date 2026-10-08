@@ -198,6 +198,14 @@ class SystemControllerTest {
         assertThat(SystemController.logField("abcdef", 3)).isEqualTo("abc…");
     }
 
+    /** Format characters (bidi overrides, zero-width marks) cannot reorder or hide parts of a log line either. */
+    @Test
+    void logField_replacesFormatAndBidiControlCharacters() {
+        assertThat(SystemController.logField("ok\u202Eevil\u202C|\u2066x\u2069\u200By\uFEFF", 100))
+                .isEqualTo("ok evil | x y ")
+                .doesNotContainPattern("\\p{Cf}");
+    }
+
     private interface MockMvcCall {
         void run() throws Exception;
     }

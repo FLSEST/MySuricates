@@ -35,8 +35,11 @@ import java.util.regex.Pattern;
 @Slf4j
 public class SystemController {
 
-    /** C0/C1 control characters (CR, LF, TAB, ESC, NEL, …) and the Unicode line and paragraph separators. */
-    private static final Pattern LOG_BREAKING_CHARS = Pattern.compile("[\\p{Cc}\\p{Zl}\\p{Zp}]+");
+    /**
+     * C0/C1 control characters (CR, LF, TAB, ESC, NEL, …), format characters (bidi overrides and isolates,
+     * zero-width marks, BOM) and the Unicode line and paragraph separators.
+     */
+    private static final Pattern LOG_BREAKING_CHARS = Pattern.compile("[\\p{Cc}\\p{Cf}\\p{Zl}\\p{Zp}]+");
     /** Fixed log lengths per field: one client report stays one bounded log line. */
     private static final int LOG_MESSAGE_MAX = 1_000;
     private static final int LOG_SOURCE_MAX = 64;
@@ -164,8 +167,9 @@ public class SystemController {
 
     /**
      * One log-safe line of at most {@code max} characters (plus "…" when cut): every run of control
-     * characters – CR, LF, TAB, ESC, NEL – and of Unicode line/paragraph separators becomes one space,
-     * so a value cannot start a forged log line or steer a terminal. A surrogate pair is never cut in half.
+     * characters – CR, LF, TAB, ESC, NEL –, of format characters such as bidi overrides and of Unicode
+     * line/paragraph separators becomes one space, so a value cannot start a forged log line, reorder one
+     * visually or steer a terminal. A surrogate pair is never cut in half.
      */
     static String logField(String value, int max) {
         if (value == null) return null;

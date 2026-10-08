@@ -103,6 +103,22 @@ class TerminalWebSocketHandlerTest {
         verify(terminal, never()).write(anyString());
     }
 
+    /** Sizes of zero or below fall back to the defaults, absurd sizes are capped before they reach Docker. */
+    @Test
+    void handleTextMessage_resizeOutOfRange_isClampedBeforeDocker() throws Exception {
+        TerminalSession terminal = connectedTerminal("ws-1");
+
+        handler.handleTextMessage(session, new TextMessage("{\"type\":\"resize\",\"cols\":0,\"rows\":-5}"));
+        handler.handleTextMessage(session, new TextMessage(
+                "{\"type\":\"resize\",\"cols\":4294967297,\"rows\":5000}"));
+        handler.handleTextMessage(session, new TextMessage("{\"type\":\"resize\",\"cols\":\"wide\",\"rows\":1}"));
+
+        verify(terminal).resize(80, 24);
+        verify(terminal).resize(1000, 1000);
+        verify(terminal).resize(80, 1);
+        verify(terminal, never()).write(anyString());
+    }
+
     @Test
     void handleTextMessage_inputThatIsNoControlMessage_goesToTheShellUnchanged() throws Exception {
         TerminalSession terminal = connectedTerminal("ws-1");

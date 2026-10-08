@@ -24,6 +24,8 @@ import java.util.concurrent.atomic.AtomicInteger;
 public class TerminalWebSocketHandler extends TextWebSocketHandler {
 
     private static final int MAX_SESSIONS_PER_CONTAINER = 3;
+    /** Upper bound for a terminal dimension passed to Docker; anything wider is no real terminal. */
+    private static final int MAX_TERMINAL_SIZE = 1000;
 
     private final WorkflowExecutionRegistry executionRegistry;
     private final DockerClient dockerClient;
@@ -80,7 +82,7 @@ public class TerminalWebSocketHandler extends TextWebSocketHandler {
             try {
                 JsonNode json = objectMapper.readTree(payload);
                 if ("resize".equals(json.path("type").asText())) {
-                    terminal.resize(json.path("cols").asInt(80), json.path("rows").asInt(24));
+                    terminal.resize(terminalSize(json.path("cols"), 80), terminalSize(json.path("rows"), 24));
                     return;
                 }
             } catch (JsonProcessingException e) {
@@ -113,6 +115,17 @@ public class TerminalWebSocketHandler extends TextWebSocketHandler {
     @Override
     public void handleTransportError(WebSocketSession session, Throwable exception) {
         log.warn("Terminal WebSocket transport error: session={}, error={}", session.getId(), exception.getMessage());
+    }
+
+    /**
+     * One terminal dimension from a resize message: missing, non-numeric or not positive takes
+     * {@code fallback}, anything above {@link #MAX_TERMINAL_SIZE} is capped. Read as long, so a huge
+     * number cannot wrap around into a small or negative int.
+     */
+    static int terminalSize(JsonNode value, int fallback) {
+        long size = value.asLong(fallback);
+        if (size <= 0) return fallback;
+        return (int) Math.min(size, MAX_TERMINAL_SIZE);
     }
 
     private String extractRunId(WebSocketSession session) {
