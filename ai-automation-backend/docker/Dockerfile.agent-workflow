@@ -1,0 +1,69 @@
+# Runtime for the AI CLIs and shell blocks of unattended runs (TODO 6ee57b87): with
+# automation.hardening.unattended-in-container every such process starts in a fresh container of this
+# image instead of on the host, so it cannot reach the instance's key files, its database or other
+# services of the host user. One image for all workflows: the pool needs python3, node, JDK, Maven,
+# git and gh side by side. The AI CLIs are not installed here: the backend binds them in from the host
+# read-only (Claude as one binary; Codex and Pi as their npm packages at /usr/lib/node_modules, which the
+# links below point to), together with exactly one login per provider.
+FROM eclipse-temurin:21-jdk-noble
+
+# Ubuntu 24.04 ships the user ubuntu with UID 1000; the container runs with the host's UID via --user.
+RUN userdel -r ubuntu 2>/dev/null; useradd -m -u 1000 agent
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    git curl jq bash python3 python3-venv maven unzip ca-certificates gnupg && \
+    rm -rf /var/lib/apt/lists/*
+
+# Node for Codex (>= 16), Pi (>= 20.6) and the frontend tooling: the official release tarball with the
+# checksum from SHASUMS256.txt.
+ARG NODE_VERSION=24.21.0
+ARG NODE_LINUX_X64_SHA256=6e1db87ef58b8819e5d5402eff1536491b18edd8eb7bee5ef7897876e88dc5ff
+ARG NODE_LINUX_ARM64_SHA256=724282c3b43aec998aa9527380465b45d229e021b58035f5f4f63095eabfe5d5
+RUN set -eu; \
+    ARCH=$(dpkg --print-architecture); \
+    case "$ARCH" in \
+      amd64) NODE_ARCH=x64; EXPECTED="$NODE_LINUX_X64_SHA256" ;; \
+      arm64) NODE_ARCH=arm64; EXPECTED="$NODE_LINUX_ARM64_SHA256" ;; \
+      *) echo "Unsupported architecture: $ARCH" >&2; exit 1 ;; \
+    esac; \
+    curl -fsSL "https://nodejs.org/dist/v${NODE_VERSION}/node-v${NODE_VERSION}-linux-${NODE_ARCH}.tar.gz" \
+      -o /tmp/node.tar.gz; \
+    echo "${EXPECTED}  /tmp/node.tar.gz" | sha256sum -c -; \
+    tar -xzf /tmp/node.tar.gz -C /opt; \
+    for tool in node npm npx; do \
+      ln -s "/opt/node-v${NODE_VERSION}-linux-${NODE_ARCH}/bin/${tool}" "/usr/local/bin/${tool}"; \
+    done; \
+    rm /tmp/node.tar.gz
+
+# Codex and Pi: links to the packages the backend binds in (same paths as deploy/Dockerfile).
+ARG NODE_MODULES_DIR=/usr/lib/node_modules
+RUN mkdir -p ${NODE_MODULES_DIR} \
+ && ln -sf ${NODE_MODULES_DIR}/@openai/codex/bin/codex.js /usr/local/bin/codex \
+ && ln -sf ${NODE_MODULES_DIR}/@earendil-works/pi-coding-agent/dist/cli.js /usr/local/bin/pi
+
+# Third-party APT repo last and never solely from an old layer cache (see Dockerfile.agent-devops).
+ARG APT_REFRESH=
+
+# GitHub CLI (gh) — official APT repo
+RUN echo "APT_REFRESH=${APT_REFRESH:-unset}" && \
+    mkdir -p /etc/apt/keyrings && \
+    curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg \
+      -o /etc/apt/keyrings/githubcli-archive-keyring.gpg && \
+    chmod go+r /etc/apt/keyrings/githubcli-archive-keyring.gpg && \
+    echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" \
+      > /etc/apt/sources.list.d/github-cli.list && \
+    apt-get update && apt-get install -y gh && \
+    rm -rf /var/lib/apt/lists/*
+
+RUN mkdir -p /home/agent/.cache /home/agent/.config && chown -R agent:agent /home/agent
+
+ENV HOME="/home/agent"
+USER agent
+WORKDIR /home/agent
+
+# Identity of this Dockerfile for the container overview (TODO 244e5de5): scripts/build-agent-images.sh
+# passes its sha256, the backend compares it with its catalog (agent-images.json). Last, so a change
+# above still reuses the cached layers; a plain `docker compose build` leaves it empty (shown as unlabeled).
+ARG DOCKERFILE_SHA256=
+LABEL org.mysuricates.dockerfile-sha256=$DOCKERFILE_SHA256
+CMD ["bash"]

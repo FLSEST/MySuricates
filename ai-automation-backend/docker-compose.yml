@@ -50,6 +50,17 @@ services:
     profiles:
       - build-only
 
+  agent-workflow:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.agent-workflow
+      args:
+        APT_REFRESH: ${AGENT_APT_REFRESH:-}
+        DOCKERFILE_SHA256: ${AGENT_WORKFLOW_DOCKERFILE_SHA256:-}
+    image: automation-agent-workflow:latest
+    profiles:
+      - build-only
+
   agent-java:
     build:
       context: .

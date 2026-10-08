@@ -197,6 +197,50 @@
           "source": "base"
         }
       ]
+    },
+    {
+      "image": "automation-agent-workflow:latest",
+      "service": "agent-workflow",
+      "dockerfile": "docker/Dockerfile.agent-workflow",
+      "dockerfileSha256": "e8c4414d845037736008f7ca4ee6985ab2d2bf20c0839e34eed6f731ce5d3f76",
+      "base": "eclipse-temurin:21-jdk-noble",
+      "purpose": {
+        "de": "Laufzeit für KI-CLIs und Shell-Blöcke unbeaufsichtigter Läufe, wenn der Schalter unattended-in-container an ist: python3, Node, JDK, Maven, git und gh nebeneinander. Claude, Codex und Pi bindet das Backend vom Rechner ein.",
+        "en": "Runtime for the AI CLIs and shell blocks of unattended runs when the switch unattended-in-container is on: python3, Node, JDK, Maven, git and gh side by side. The backend binds Claude, Codex and Pi in from the host."
+      },
+      "tools": [
+        {
+          "name": "JDK",
+          "version": "21",
+          "source": "base"
+        },
+        {
+          "name": "node",
+          "version": "24.21.0",
+          "source": "release",
+          "arg": "NODE_VERSION"
+        },
+        {
+          "name": "maven",
+          "source": "apt"
+        },
+        {
+          "name": "python3",
+          "source": "apt"
+        },
+        {
+          "name": "git",
+          "source": "apt"
+        },
+        {
+          "name": "gh",
+          "source": "apt"
+        },
+        {
+          "name": "jq",
+          "source": "apt"
+        }
+      ]
     }
   ]
 }
