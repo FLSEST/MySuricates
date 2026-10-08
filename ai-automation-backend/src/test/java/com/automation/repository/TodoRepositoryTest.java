@@ -1,5 +1,7 @@
 package com.automation.repository;
 
+import com.automation.dto.projection.PriorityCount;
+import com.automation.dto.projection.TodoHeadline;
 import com.automation.dto.response.TodoCountResponse;
 import com.automation.entity.Project;
 import com.automation.entity.ProjectStatus;
@@ -30,6 +32,9 @@ class TodoRepositoryTest {
 
     @Autowired
     private ProjectRepository projectRepository;
+
+    @Autowired
+    private TodoSummaryRepository summaries;
 
     private String projectId;
 
@@ -300,5 +305,50 @@ class TodoRepositoryTest {
     void should_return_empty_when_no_todo_with_last_fix_run_id() {
         Optional<Todo> found = repository.findByLastFixRunId("nonexistent-run-id");
         assertThat(found).isEmpty();
+    }
+
+    // ── TodoSummaryRepository: assistant context (TODO f1074d2e) ─────────────
+
+    private static final List<Todo.Status> OPEN_STATUSES = List.of(Todo.Status.OPEN, Todo.Status.IN_PROGRESS);
+
+    private Todo todo(String title, Todo.Status status, Todo.Priority priority) {
+        return Todo.builder().title(title).status(status).priority(priority).build();
+    }
+
+    /** BACKLOG, DONE and ARCHIVED are not open; CRITICAL is counted like every other priority. */
+    @Test
+    void should_count_open_todos_per_priority_in_the_query() {
+        repository.save(todo("open-high", Todo.Status.OPEN, Todo.Priority.HIGH));
+        repository.save(todo("progress-critical", Todo.Status.IN_PROGRESS, Todo.Priority.CRITICAL));
+        repository.save(todo("open-low-1", Todo.Status.OPEN, Todo.Priority.LOW));
+        repository.save(todo("open-low-2", Todo.Status.OPEN, Todo.Priority.LOW));
+        repository.save(todo("backlog-high", Todo.Status.BACKLOG, Todo.Priority.HIGH));
+        repository.save(todo("archived-medium", Todo.Status.ARCHIVED, Todo.Priority.MEDIUM));
+        repository.save(todo("done-medium", Todo.Status.DONE, Todo.Priority.MEDIUM));
+
+        List<PriorityCount> counts = summaries.countByPriority(OPEN_STATUSES);
+
+        assertThat(counts).containsExactlyInAnyOrder(
+                new PriorityCount(Todo.Priority.CRITICAL, 1),
+                new PriorityCount(Todo.Priority.HIGH, 1),
+                new PriorityCount(Todo.Priority.LOW, 2));
+    }
+
+    @Test
+    void should_list_open_headlines_critical_first_and_capped() {
+        repository.save(todo("low", Todo.Status.OPEN, Todo.Priority.LOW));
+        repository.save(todo("medium", Todo.Status.IN_PROGRESS, Todo.Priority.MEDIUM));
+        repository.save(todo("high", Todo.Status.OPEN, Todo.Priority.HIGH));
+        repository.save(todo("critical", Todo.Status.OPEN, Todo.Priority.CRITICAL));
+        repository.save(todo("archived-critical", Todo.Status.ARCHIVED, Todo.Priority.CRITICAL));
+        repository.save(todo("backlog-critical", Todo.Status.BACKLOG, Todo.Priority.CRITICAL));
+        repository.save(todo("done-critical", Todo.Status.DONE, Todo.Priority.CRITICAL));
+
+        assertThat(summaries.findHeadlines(OPEN_STATUSES, PageRequest.of(0, 10)))
+                .extracting(TodoHeadline::title)
+                .containsExactly("critical", "high", "medium", "low");
+        assertThat(summaries.findHeadlines(OPEN_STATUSES, PageRequest.of(0, 2)))
+                .containsExactly(new TodoHeadline("critical", Todo.Priority.CRITICAL),
+                        new TodoHeadline("high", Todo.Priority.HIGH));
     }
 }

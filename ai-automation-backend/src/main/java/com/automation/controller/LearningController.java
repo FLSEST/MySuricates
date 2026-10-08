@@ -87,7 +87,11 @@ public class LearningController {
         return learningService.getAgenticAnalytics(workflowId);
     }
 
-    /** Returns which tools the workflow's AI steps used, how often, and recurring tool sequences. */
+    /**
+     * Returns which tools the workflow's AI steps used, how often, and recurring tool sequences.
+     * Counts only the newest 200 runs of the last 90 days – {@code windowDays} and {@code maxRuns} in the
+     * answer name that window –, and runs without a start time not at all.
+     */
     @GetMapping("/workflows/{workflowId}/tool-patterns")
     @RequiresModule(ModuleCatalog.LEARNING)
     public Map<String, Object> getToolPatterns(@PathVariable String workflowId) {

@@ -17,6 +17,7 @@ import com.automation.service.activitylog.ActivityLogService;
 import com.automation.service.chain.ChainExecutor;
 import com.automation.service.workflow.PendingAutoResumes;
 import com.automation.service.workflow.WorkflowExecutor;
+import com.automation.testsupport.FakeTransactions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -24,6 +25,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.time.Clock;
 import java.time.Instant;
@@ -31,6 +33,7 @@ import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
@@ -298,7 +301,7 @@ class ScheduledWorkflowExecutorTest {
                 .build();
         when(scheduledRepository.findById("sched-cron-max")).thenReturn(Optional.of(schedule));
 
-        executor.updateScheduleAfterRun("sched-cron-max", ScheduleType.CRON, "0 0 * * * *");
+        executor.updateScheduleAfterRun("sched-cron-max", schedule.getNextRunAt());
 
         assertThat(schedule.getRunCount()).isEqualTo(5);
         assertThat(schedule.isEnabled()).isFalse();
@@ -322,7 +325,7 @@ class ScheduledWorkflowExecutorTest {
                 .build();
         when(scheduledRepository.findById("sched-cron-end")).thenReturn(Optional.of(schedule));
 
-        executor.updateScheduleAfterRun("sched-cron-end", ScheduleType.CRON, "0 0 * * * *");
+        executor.updateScheduleAfterRun("sched-cron-end", schedule.getNextRunAt());
 
         assertThat(schedule.getRunCount()).isEqualTo(3);
         assertThat(schedule.isEnabled()).isFalse();
@@ -342,7 +345,7 @@ class ScheduledWorkflowExecutorTest {
                 .build();
         when(scheduledRepository.findById("sched-delayed")).thenReturn(Optional.of(schedule));
 
-        executor.updateScheduleAfterRun("sched-delayed", ScheduleType.DELAYED, null);
+        executor.updateScheduleAfterRun("sched-delayed", schedule.getNextRunAt());
 
         assertThat(schedule.isEnabled()).isFalse();
         assertThat(schedule.getNextRunAt()).isNull();
@@ -354,7 +357,7 @@ class ScheduledWorkflowExecutorTest {
     void should_doNothing_when_updateScheduleAfterRun_scheduleNotFound() {
         when(scheduledRepository.findById("missing")).thenReturn(Optional.empty());
 
-        executor.updateScheduleAfterRun("missing", ScheduleType.CRON, "0 0 * * * *");
+        executor.updateScheduleAfterRun("missing", null);
 
         verify(scheduledRepository, never()).save(any());
     }
@@ -582,7 +585,9 @@ class ScheduledWorkflowExecutorTest {
                 workflowExecutor, chainExecutor, activityLogService, executorClock, moduleRegistry,
                 new ScheduleConflictCheck(workflowRunRepository, chainRunRepository, pendingAutoResumes),
                 new ScheduleSkipPolicy(new com.automation.config.SchedulerConfig(), scheduledRepository,
-                        activityLogService, mock(SchedulerMaintenanceMode.class)));
+                        activityLogService, mock(SchedulerMaintenanceMode.class)),
+                new ScheduleAdvancer(scheduledRepository, activityLogService, executorClock,
+                        new TransactionTemplate(FakeTransactions.manager())));
     }
 
     private ScheduledWorkflow hourly(String id, Instant nextRunAt, Instant endDate) {
@@ -807,5 +812,141 @@ class ScheduledWorkflowExecutorTest {
         verify(activityLogService, times(1)).log(eq(LogLevel.INFO), eq(LogCategory.SCHEDULE),
                 eq("Schedule ended (no further occurrence): Test Workflow"), eq("ScheduledWorkflowExecutor"),
                 eq("sched-never"), any());
+    }
+
+    // --- A change saved while the run starts is not overwritten (TODO 0d2704db) ---
+
+    /** An hourly schedule due at 10:00, as stored; each call returns a separate copy. */
+    private ScheduledWorkflow hourlyDueAtTen(String id, ScheduleType type) {
+        return ScheduledWorkflow.builder()
+                .id(id).workflow(testWorkflow).cronExpression(type == ScheduleType.CRON ? "0 0 * * * *" : "")
+                .scheduleType(type).scheduledAt(type == ScheduleType.ONCE ? TEN_O_CLOCK : null).enabled(true)
+                .nextRunAt(TEN_O_CLOCK).inputContext(Map.of()).build();
+    }
+
+    /**
+     * The executor reads the schedule before the start and again for the advance: two copies of one
+     * row, as with the database. {@code duringStart} changes the stored one while the run starts.
+     */
+    private ScheduledWorkflow runWhileTheStoredScheduleChanges(String id, ScheduleType type,
+                                                               java.util.function.Consumer<ScheduledWorkflow> duringStart) {
+        ScheduledWorkflow readBeforeStart = hourlyDueAtTen(id, type);
+        ScheduledWorkflow stored = hourlyDueAtTen(id, type);
+        when(scheduledRepository.findByIdWithWorkflowSkills(id)).thenReturn(Optional.of(readBeforeStart));
+        when(scheduledRepository.findById(id)).thenReturn(Optional.of(stored));
+        when(scheduledRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        targetBusy(false);
+        when(workflowExecutor.execute(eq(testWorkflow), eq(Map.of()), eq(id), isNull(), eq(TriggerSource.SCHEDULE)))
+                .thenAnswer(inv -> {
+                    duringStart.accept(stored);
+                    return null;
+                });
+
+        executorAt(TEN_O_CLOCK.plusSeconds(30)).executeSingleSchedule(id);
+        return stored;
+    }
+
+    @Test
+    void cronChangedWhileTheRunStarts_keepsTheNextRunOfTheNewCron() {
+        Instant halfPastTen = TEN_O_CLOCK.plus(30, ChronoUnit.MINUTES);
+
+        ScheduledWorkflow stored = runWhileTheStoredScheduleChanges("sched-new-cron", ScheduleType.CRON, s -> {
+            // SchedulerService.update: new cron, next run computed from it
+            s.setCronExpression("0 30 * * * *");
+            s.setNextRunAt(halfPastTen);
+        });
+
+        assertThat(stored.getCronExpression()).isEqualTo("0 30 * * * *");
+        // Before: 11:00 — the next run of the cron read before the start.
+        assertThat(stored.getNextRunAt()).isEqualTo(halfPastTen);
+        assertThat(stored.isEnabled()).isTrue();
+        assertThat(stored.getRunCount()).as("the run is still counted").isEqualTo(1);
+        assertThat(stored.getLastRunAt()).isNotNull();
+        verify(scheduledRepository).save(stored);
+    }
+
+    @Test
+    void disabledWhileTheRunStarts_staysDisabledWithoutANextRun() {
+        ScheduledWorkflow stored = runWhileTheStoredScheduleChanges("sched-disabled-meanwhile", ScheduleType.CRON, s -> {
+            // SchedulerService.disable
+            s.setEnabled(false);
+            s.setNextRunAt(null);
+        });
+
+        assertThat(stored.isEnabled()).isFalse();
+        // Before: the advance set the next run of the old cron again.
+        assertThat(stored.getNextRunAt()).isNull();
+        assertThat(stored.getRunCount()).isEqualTo(1);
+        assertThat(stored.getLastRunAt()).isNotNull();
+    }
+
+    @Test
+    void oneOffMovedWhileItRuns_keepsTheNewDate() {
+        Instant tomorrow = TEN_O_CLOCK.plus(1, ChronoUnit.DAYS);
+
+        ScheduledWorkflow stored = runWhileTheStoredScheduleChanges("sched-once-moved", ScheduleType.ONCE, s -> {
+            s.setScheduledAt(tomorrow);
+            s.setNextRunAt(tomorrow);
+        });
+
+        // Before: done and disabled — the new date was dropped.
+        assertThat(stored.isEnabled()).isTrue();
+        assertThat(stored.getNextRunAt()).isEqualTo(tomorrow);
+        assertThat(stored.getLastRunAt()).isNotNull();
+    }
+
+    @Test
+    void cronChangedWhileTheLastAllowedRunStarts_stillEndsTheSchedule() {
+        ScheduledWorkflow stored = runWhileTheStoredScheduleChanges("sched-last-run", ScheduleType.CRON, s -> {
+            s.setMaxRuns(1);
+            s.setCronExpression("0 30 * * * *");
+            s.setNextRunAt(TEN_O_CLOCK.plus(30, ChronoUnit.MINUTES));
+        });
+
+        assertThat(stored.getRunCount()).isEqualTo(1);
+        assertThat(stored.isEnabled()).isFalse();
+        assertThat(stored.getNextRunAt()).isNull();
+    }
+
+    @Test
+    void unchangedSchedule_advancesWithTheStoredValues() {
+        ScheduledWorkflow stored = runWhileTheStoredScheduleChanges("sched-untouched", ScheduleType.CRON, s -> { });
+
+        assertThat(stored.getNextRunAt()).isEqualTo(TEN_O_CLOCK.plus(1, ChronoUnit.HOURS));
+        assertThat(stored.isEnabled()).isTrue();
+        assertThat(stored.getRunCount()).isEqualTo(1);
+    }
+
+    /**
+     * Read and write of the advance share one transaction – no update can fall between them – and the
+     * activity-log entry (a WebSocket broadcast too) is written after it.
+     */
+    @Test
+    void advance_readsAndWritesInOneTransaction_andLogsOutsideIt() {
+        ScheduledWorkflow scheduled = ScheduledWorkflow.builder()
+                .id("sched-tx").workflow(testWorkflow).cronExpression("0 0 0 30 2 *")
+                .scheduleType(ScheduleType.CRON).enabled(true)
+                .nextRunAt(Instant.now().minusSeconds(60)).inputContext(Map.of()).build();
+        List<String> calls = new ArrayList<>();
+        when(scheduledRepository.findByIdWithWorkflowSkills("sched-tx")).thenReturn(Optional.of(scheduled));
+        when(scheduledRepository.findById("sched-tx")).thenAnswer(inv -> {
+            calls.add("read in transaction=" + FakeTransactions.active());
+            return Optional.of(scheduled);
+        });
+        when(scheduledRepository.save(any())).thenAnswer(inv -> {
+            calls.add("write in transaction=" + FakeTransactions.active());
+            return inv.getArgument(0);
+        });
+        when(activityLogService.log(eq(LogLevel.INFO), eq(LogCategory.SCHEDULE),
+                startsWith("Schedule ended (no further occurrence)"), any(), any(), any())).thenAnswer(inv -> {
+                    calls.add("log in transaction=" + FakeTransactions.active());
+                    return null;
+                });
+        targetBusy(false);
+
+        executor.executeSingleSchedule("sched-tx");
+
+        assertThat(calls).containsExactly(
+                "read in transaction=true", "write in transaction=true", "log in transaction=false");
     }
 }
