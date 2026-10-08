@@ -3,8 +3,13 @@ package com.automation.concurrency;
 import com.automation.testsupport.ParkedThreads;
 import org.junit.jupiter.api.Test;
 
+import java.io.InterruptedIOException;
+import java.io.UncheckedIOException;
+import java.net.SocketTimeoutException;
+import java.nio.channels.ClosedByInterruptException;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -121,6 +126,98 @@ class SingleFlightTest {
 
         assertThat(waiterGot.get()).isSameAs(fatal);
         assertThat(flight.inFlight()).isZero();
+    }
+
+    /**
+     * A cancelled run interrupts the leader. That failure says nothing about the work, so the
+     * waiter must not inherit it (with a monitor it would have run the computation itself): it
+     * tries again, becomes the new leader and gets its own result.
+     */
+    @Test
+    void interruptedLeader_waiterTriesAgain_andGetsItsOwnResult() throws Exception {
+        CountDownLatch never = new CountDownLatch(1);
+        Object waiterResult = new Object();
+        AtomicReference<Throwable> leaderGot = new AtomicReference<>();
+        AtomicBoolean leaderStillInterrupted = new AtomicBoolean();
+        AtomicReference<Object> waiterGot = new AtomicReference<>();
+
+        Thread leader = ParkedThreads.start(() -> {
+            try {
+                flight.run("k", () -> {
+                    calls.incrementAndGet();
+                    leaderInside.countDown();
+                    try {
+                        never.await();
+                        return null;
+                    } catch (InterruptedException e) {
+                        Thread.currentThread().interrupt();
+                        throw new IllegalStateException("cancelled", e);
+                    }
+                });
+            } catch (Throwable t) {
+                leaderGot.set(t);
+                leaderStillInterrupted.set(Thread.currentThread().isInterrupted());
+            }
+        });
+        assertThat(leaderInside.await(5, TimeUnit.SECONDS)).as("leader inside").isTrue();
+        Thread waiter = ParkedThreads.start(() -> waiterGot.set(flight.run("k", () -> {
+            calls.incrementAndGet();
+            return waiterResult;
+        })));
+        ParkedThreads.awaitParked(waiter);
+
+        leader.interrupt();
+        ParkedThreads.join(leader);
+        ParkedThreads.join(waiter);
+
+        assertThat(leaderGot.get()).isInstanceOf(IllegalStateException.class).hasMessage("cancelled");
+        assertThat(leaderStillInterrupted.get()).as("the leader keeps its interrupt flag").isTrue();
+        assertThat(waiterGot.get()).as("the waiter runs its own computation").isSameAs(waiterResult);
+        assertThat(calls.get()).isEqualTo(2);
+        assertThat(flight.inFlight()).isZero();
+    }
+
+    /** Same, when only the interrupt flag tells: the failure itself carries no interrupt cause. */
+    @Test
+    void leaderFailingWithItsInterruptFlagSet_letsTheWaiterTryAgain() throws Exception {
+        AtomicReference<Object> waiterGot = new AtomicReference<>();
+
+        Thread leader = ParkedThreads.start(() -> {
+            try {
+                flight.run("k", () -> {
+                    blockingComputation(null);
+                    Thread.currentThread().interrupt();
+                    throw new IllegalStateException("aborted");
+                });
+            } catch (IllegalStateException expected) {
+                // the leader's own failure; the waiter is what this test is about
+            }
+        });
+        assertThat(leaderInside.await(5, TimeUnit.SECONDS)).as("leader inside").isTrue();
+        Thread waiter = ParkedThreads.start(() -> waiterGot.set(flight.run("k", () -> "own")));
+        ParkedThreads.awaitParked(waiter);
+
+        releaseLeader.countDown();
+        ParkedThreads.join(leader);
+        ParkedThreads.join(waiter);
+
+        assertThat(waiterGot.get()).isEqualTo("own");
+        assertThat(flight.inFlight()).isZero();
+    }
+
+    @Test
+    void failedByInterrupt_looksForInterruptsInTheCauseChain_butNotForTimeouts() {
+        assertThat(SingleFlight.failedByInterrupt(new RuntimeException(new InterruptedException()))).isTrue();
+        assertThat(SingleFlight.failedByInterrupt(new UncheckedIOException(new ClosedByInterruptException()))).isTrue();
+        assertThat(SingleFlight.failedByInterrupt(new UncheckedIOException(new InterruptedIOException()))).isTrue();
+        assertThat(SingleFlight.failedByInterrupt(new UncheckedIOException(new SocketTimeoutException())))
+                .as("a read timeout is shared like any other transient failure").isFalse();
+        assertThat(SingleFlight.failedByInterrupt(new IllegalStateException("docker down"))).isFalse();
+
+        RuntimeException a = new RuntimeException("a");
+        RuntimeException b = new RuntimeException("b", a);
+        a.initCause(b);
+        assertThat(SingleFlight.failedByInterrupt(a)).as("a cyclic cause chain terminates").isFalse();
     }
 
     @Test

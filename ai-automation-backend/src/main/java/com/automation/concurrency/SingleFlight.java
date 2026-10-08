@@ -1,5 +1,8 @@
 package com.automation.concurrency;
 
+import java.io.InterruptedIOException;
+import java.net.SocketTimeoutException;
+import java.nio.channels.ClosedByInterruptException;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.ConcurrentHashMap;
@@ -16,12 +19,22 @@ import java.util.function.Supplier;
  * virtual-thread scheduler. Waiting here goes through {@link CompletableFuture#join()}, which
  * parks without pinning. The computation itself runs on the first caller's thread.
  *
+ * <p>Failures are shared on purpose: a transient error (Docker unreachable, a probe timing out)
+ * would most likely hit every waiter too, and letting each of them retry in turn would multiply
+ * the wait. The one exception is a computation that failed because <em>its own</em> thread was
+ * interrupted (a cancelled run): that says nothing about the work, so the waiters do not get
+ * that failure but try again, and one of them becomes the new leader - as they would have done
+ * with a monitor. The interrupted caller still gets its exception and keeps its interrupt flag.
+ *
  * <p>The entry for a key is removed as soon as its computation ends, successfully or not, and
  * before the waiters are released: the map only holds keys with a running computation, and a
  * call after a failure starts afresh. Results are not cached. Not reentrant: a computation must
  * not call {@link #run} for its own key.
  */
 public final class SingleFlight<K, V> {
+
+    /** Cause chains are followed at most this deep (guards against cyclic causes). */
+    private static final int MAX_CAUSE_DEPTH = 32;
 
     private final ConcurrentHashMap<K, CompletableFuture<V>> inFlight = new ConcurrentHashMap<>();
 
@@ -30,22 +43,30 @@ public final class SingleFlight<K, V> {
      * Waiting is not interruptible, like waiting for a monitor was not.
      */
     public V run(K key, Supplier<? extends V> computation) {
-        CompletableFuture<V> mine = new CompletableFuture<>();
-        CompletableFuture<V> running = inFlight.putIfAbsent(key, mine);
-        if (running != null) {
-            return await(running);
+        while (true) {
+            CompletableFuture<V> mine = new CompletableFuture<>();
+            CompletableFuture<V> running = inFlight.putIfAbsent(key, mine);
+            if (running == null) {
+                return lead(key, mine, computation);
+            }
+            try {
+                return running.join();
+            } catch (CompletionException wrapped) {
+                Throwable cause = wrapped.getCause();
+                if (cause instanceof LeaderInterrupted) {
+                    continue;
+                }
+                // Hand the waiter the leader's own exception, so callers and the
+                // GlobalExceptionHandler see the same type whoever ran the computation.
+                if (cause instanceof RuntimeException runtime) {
+                    throw runtime;
+                }
+                if (cause instanceof Error error) {
+                    throw error;
+                }
+                throw wrapped;
+            }
         }
-        V result;
-        try {
-            result = computation.get();
-        } catch (Throwable failure) {
-            inFlight.remove(key, mine);
-            mine.completeExceptionally(failure);
-            throw failure;
-        }
-        inFlight.remove(key, mine);
-        mine.complete(result);
-        return result;
     }
 
     /** Number of keys whose computation is running right now (for tests and diagnostics). */
@@ -53,20 +74,46 @@ public final class SingleFlight<K, V> {
         return inFlight.size();
     }
 
-    private static <V> V await(CompletableFuture<V> running) {
+    private V lead(K key, CompletableFuture<V> mine, Supplier<? extends V> computation) {
+        V result;
         try {
-            return running.join();
-        } catch (CompletionException wrapped) {
-            // Hand the waiter the leader's own exception, so callers and the
-            // GlobalExceptionHandler see the same type whoever ran the computation.
-            Throwable cause = wrapped.getCause();
-            if (cause instanceof RuntimeException runtime) {
-                throw runtime;
+            result = computation.get();
+        } catch (Throwable failure) {
+            inFlight.remove(key, mine);
+            mine.completeExceptionally(failedByInterrupt(failure) ? new LeaderInterrupted(failure) : failure);
+            throw failure;
+        }
+        inFlight.remove(key, mine);
+        mine.complete(result);
+        return result;
+    }
+
+    /**
+     * Whether the leader's failure comes from an interrupt of its own thread: the flag is still
+     * set, or the cause chain holds the exception an interrupted wait or I/O call throws. A
+     * {@link SocketTimeoutException} is an {@link InterruptedIOException} too, but a timeout,
+     * not an interrupt.
+     */
+    static boolean failedByInterrupt(Throwable failure) {
+        if (Thread.currentThread().isInterrupted()) {
+            return true;
+        }
+        Throwable current = failure;
+        for (int depth = 0; current != null && depth < MAX_CAUSE_DEPTH; depth++) {
+            if (current instanceof InterruptedException
+                    || current instanceof ClosedByInterruptException
+                    || (current instanceof InterruptedIOException && !(current instanceof SocketTimeoutException))) {
+                return true;
             }
-            if (cause instanceof Error error) {
-                throw error;
-            }
-            throw wrapped;
+            current = current.getCause();
+        }
+        return false;
+    }
+
+    /** Tells waiters that the leader was interrupted and they should try again. */
+    private static final class LeaderInterrupted extends RuntimeException {
+        LeaderInterrupted(Throwable cause) {
+            super("leader interrupted", cause, false, false);
         }
     }
 }

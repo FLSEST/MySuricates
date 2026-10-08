@@ -312,6 +312,50 @@ class ContainerServiceTest {
         assertThat(creates.get()).as("a later call starts afresh").isEqualTo(2);
     }
 
+    /**
+     * A cancelled run interrupts its thread while it starts the container. The run waiting for
+     * that start must not inherit the failure and silently fall back to the host: it starts the
+     * container itself, as it did when it queued on a monitor.
+     */
+    @Test
+    void createAndStart_cancelledStart_letsTheWaitingRunStartTheContainerItself() throws Exception {
+        AtomicInteger creates = new AtomicInteger();
+        CountDownLatch firstInside = new CountDownLatch(1);
+        CountDownLatch never = new CountDownLatch(1);
+        when(containerRepository.findByProjectId("project-1")).thenReturn(Optional.empty());
+        when(containerRepository.save(any(Container.class))).thenAnswer(inv -> inv.getArgument(0));
+        stubDockerRemoveCommands();
+        stubDockerCreateAndStartBlocking("docker-second", () -> {
+            if (creates.incrementAndGet() == 1) {
+                firstInside.countDown();
+                try {
+                    never.await();
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    throw new RuntimeException("docker call interrupted", e);
+                }
+            }
+        });
+
+        AtomicReference<Throwable> cancelledRun = new AtomicReference<>();
+        AtomicReference<Container> waitingRun = new AtomicReference<>();
+        Thread t1 = ParkedThreads.start(() -> cancelledRun.set(catchThrowable(
+                () -> service.createAndStartContainer(testProject))));
+        assertThat(firstInside.await(5, TimeUnit.SECONDS)).as("T1 inside Docker create").isTrue();
+        Thread t2 = ParkedThreads.start(() -> waitingRun.set(service.createAndStartContainer(sameProjectAgain())));
+        ParkedThreads.awaitParked(t2);
+
+        t1.interrupt();
+        ParkedThreads.join(t1);
+        ParkedThreads.join(t2);
+
+        assertThat(cancelledRun.get()).isInstanceOf(ContainerException.class);
+        assertThat(waitingRun.get()).as("the waiting run starts the container itself").isNotNull();
+        assertThat(waitingRun.get().getDockerContainerId()).isEqualTo("docker-second");
+        assertThat(creates.get()).isEqualTo(2);
+        assertThat(service.startsInFlight()).isZero();
+    }
+
     private Project sameProjectAgain() {
         return Project.builder()
                 .id(testProject.getId())

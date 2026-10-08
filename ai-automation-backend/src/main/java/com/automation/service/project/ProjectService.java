@@ -210,8 +210,9 @@ public class ProjectService {
      * one already running). With HikariCP pool-size 1 an enclosing transaction would pin the single
      * connection for that whole time, so a workflow run that is already starting the container
      * blocks on the pool until connection-timeout (120 s) — a lock-order inversion between the
-     * per-project start and the connection (TODO b3c88eeb). Same shape as ContainerService: short write burst (STARTING) → Docker
-     * outside any transaction → short write burst (RUNNING/ERROR).
+     * per-project start and the connection (TODO b3c88eeb). Same shape as ContainerService:
+     * short write burst (STARTING) → Docker outside any transaction → short write burst
+     * (RUNNING/ERROR).
      */
     public Project startContainer(String id) {
         Project project = transactionTemplate.execute(status -> {
