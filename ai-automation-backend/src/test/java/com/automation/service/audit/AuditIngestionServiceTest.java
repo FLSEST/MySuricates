@@ -245,6 +245,38 @@ class AuditIngestionServiceTest {
     }
 
     @Test
+    void acceptedFinding_withNewAdvisoryIdInEvidence_isReopenedWithHintAndManagedTodo() {
+        AuditFinding finding = acceptedFinding("TREFFER trivy_jar: CVE-2026-47884 (XsltView)", ACCEPTED_AT, true);
+        stubRun("run-1", ACCEPTED_AT.plus(Duration.ofDays(7)), "TREFFER trivy_jar: CVE-2026-47884, CVE-2026-47890");
+        when(todoRepository.save(any())).thenAnswer(inv -> {
+            Todo todo = inv.getArgument(0);
+            todo.setId("todo-1");
+            return todo;
+        });
+
+        service.ingest(event("run-1"));
+
+        assertThat(finding.getStatus()).isEqualTo(AuditFindingStatus.OPEN);
+        assertThat(finding.getDispositionNote()).isEqualTo("Bewusst gross\nVerschlechtert: neue Kennung CVE-2026-47890");
+        assertThat(finding.getDispositionEvidence()).as("snapshot stays for traceability")
+                .isEqualTo("TREFFER trivy_jar: CVE-2026-47884 (XsltView)");
+        verify(todoRepository).save(any());
+        verify(eventPublisher).publishEvent(any(TodoCreatedEvent.class));
+    }
+
+    @Test
+    void acceptedFinding_withTheSameAdvisoryIdsReordered_staysAccepted() {
+        AuditFinding finding = acceptedFinding("TREFFER trivy: CVE-2026-47884, CVE-2026-47890", ACCEPTED_AT, true);
+        stubRun("run-1", ACCEPTED_AT.plus(Duration.ofDays(7)), "TREFFER trivy_jar: CVE-2026-47890; CVE-2026-47884");
+
+        service.ingest(event("run-1"));
+
+        assertThat(finding.getStatus()).isEqualTo(AuditFindingStatus.ACCEPTED_RISK);
+        assertThat(finding.getDispositionNote()).isEqualTo("Bewusst gross");
+        verify(todoRepository, never()).save(any());
+    }
+
+    @Test
     void acceptedFinding_withoutComparableNumbers_staysAccepted() {
         AuditFinding finding = acceptedFinding("Klasse unuebersichtlich", ACCEPTED_AT, true);
         stubRun("run-1", ACCEPTED_AT.plus(Duration.ofDays(7)), "Klasse noch unuebersichtlicher, 900 LOC");

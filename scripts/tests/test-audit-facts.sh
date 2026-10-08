@@ -1646,6 +1646,12 @@ check "Prompt: subject je Paket wie im Bestand (npm:/maven:)" \
 check "Prompt: bekannte Befunde behalten ihr subject"  'grep -qi "bekannte behalten ihr subject" "$TMP/sec-prompt.txt"'
 check "Prompt: Faktenblatt entscheidet ueber Behebung" 'grep -qi "ist das jeweilige Faktenblatt die Messung" "$TMP/sec-prompt.txt"'
 check "Prompt: evidence nennt die Zeile dieses Laufs"  'grep -q "evidence MUSS die FAKT- oder TREFFER-Zeile" "$TMP/sec-prompt.txt"'
+# One finding per package: the platform reopens an acceptance only for an identifier it can see in the evidence
+# (AuditAcceptancePolicy, TODO 1f4e20f9) - so the prompt has to list all of them, and both have to call it degraded.
+check "Prompt: dependency evidence lists every CVE and GHSA id of the package" \
+  'grep -qF "mit ALLEN Kennungen des Pakets: jede CVE-Nummer und GHSA-Kennung" "$TMP/sec-prompt.txt"'
+check "Prompt and platform: a new id reopens an accepted package finding" \
+  'grep -qF "Kennung neu dazu, gilt das bei dieser Regel ebenfalls als Verschlechterung" "$TMP/sec-prompt.txt" && grep -qF "EvidenceMetrics.advisoryIds(currentEvidence)" "$REPO/ai-automation-backend/src/main/java/com/automation/service/audit/AuditAcceptancePolicy.java"'
 check "Prompt: gitleaks-Befunde haben einen festen ruleKey" 'grep -q "gitleaks-Befunde immer ruleKey \"sec.data-exposure\"" "$TMP/sec-prompt.txt"'
 check "Prompt nutzt OWASP Top 10:2025"               'grep -q "OWASP TOP 10:2025" "$TMP/sec-prompt.txt"'
 check "kein npm audit und kein previous_output mehr" '! grep -qF -e "npm audit" -e "{{ previous_output }}" "$TMP/sec-prompt.txt"'

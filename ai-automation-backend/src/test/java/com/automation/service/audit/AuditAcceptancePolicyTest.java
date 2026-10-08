@@ -145,6 +145,89 @@ class AuditAcceptancePolicyTest {
     }
 
     @Test
+    void reassess_newAdvisoryIdInEvidence_reopensAndNamesIt() {
+        AuditFinding finding = accepted("TREFFER trivy_jar: HIGH spring-webmvc-6.2.11.jar CVE-2026-47884 – XsltView",
+                ACCEPTED_AT);
+
+        Outcome outcome = policy.reassess(finding,
+                "TREFFER trivy_jar: CRITICAL spring-webmvc-6.2.11.jar CVE-2026-47884, CVE-2026-47890",
+                ACCEPTED_AT.plus(Duration.ofDays(7)));
+
+        assertThat(outcome).isEqualTo(Outcome.REOPENED);
+        assertThat(finding.getStatus()).isEqualTo(AuditFindingStatus.OPEN);
+        assertThat(finding.getResolvedAt()).isNull();
+        assertThat(finding.getDispositionNote()).isEqualTo("Split geplant\nVerschlechtert: neue Kennung CVE-2026-47890");
+        assertThat(finding.getDispositionEvidence()).as("snapshot stays for traceability")
+                .isEqualTo("TREFFER trivy_jar: HIGH spring-webmvc-6.2.11.jar CVE-2026-47884 – XsltView");
+    }
+
+    @Test
+    void reassess_severalNewAdvisoryIds_areNamedTogetherIncludingGhsa() {
+        AuditFinding finding = accepted("TREFFER trivy: npm:vite CVE-2026-1111", ACCEPTED_AT);
+
+        assertThat(policy.reassess(finding, "TREFFER trivy: npm:vite GHSA-j9f9-w8pj-32f8, CVE-2026-1111, CVE-2026-2222",
+                ACCEPTED_AT.plus(Duration.ofDays(7)))).isEqualTo(Outcome.REOPENED);
+        assertThat(finding.getDispositionNote())
+                .isEqualTo("Split geplant\nVerschlechtert: neue Kennungen GHSA-j9f9-w8pj-32f8, CVE-2026-2222");
+    }
+
+    @Test
+    void reassess_sameAdvisoryIdsInAnotherOrderOrSpelling_staysAccepted() {
+        AuditFinding finding = accepted("TREFFER trivy: CVE-2026-47884, GHSA-j9f9-w8pj-32f8, CVE-2026-47890", ACCEPTED_AT);
+
+        assertThat(policy.reassess(finding, "TREFFER trivy_jar: cve-2026-47890 (SSE), GHSA-J9F9-W8PJ-32F8; CVE-2026-47884",
+                ACCEPTED_AT.plus(Duration.ofDays(7)))).isEqualTo(Outcome.UNCHANGED);
+        assertThat(finding.getStatus()).isEqualTo(AuditFindingStatus.ACCEPTED_RISK);
+        assertThat(finding.getDispositionNote()).isEqualTo("Split geplant");
+    }
+
+    @Test
+    void reassess_vanishedAdvisoryIds_doNotReopen() {
+        assertThat(policy.reassess(accepted("TREFFER trivy: CVE-2026-47884, CVE-2026-47890", ACCEPTED_AT),
+                "TREFFER trivy: CVE-2026-47890", ACCEPTED_AT.plus(Duration.ofDays(7)))).isEqualTo(Outcome.UNCHANGED);
+        assertThat(policy.reassess(accepted("TREFFER trivy: CVE-2026-47884", ACCEPTED_AT),
+                "TREFFER trivy: keine Kennung mehr", ACCEPTED_AT.plus(Duration.ofDays(7)))).isEqualTo(Outcome.UNCHANGED);
+    }
+
+    @Test
+    void reassess_snapshotWithoutAnyAdvisoryId_reopensOnTheFirstOne() {
+        AuditFinding finding = accepted("TREFFER trivy_jar: HIGH spring-webmvc-6.2.11.jar (XsltView)", ACCEPTED_AT);
+
+        assertThat(policy.reassess(finding, "TREFFER trivy_jar: HIGH spring-webmvc-6.2.11.jar CVE-2026-47884",
+                ACCEPTED_AT.plus(Duration.ofDays(7)))).as("an id nobody saw at acceptance is unassessed")
+                .isEqualTo(Outcome.REOPENED);
+        assertThat(finding.getDispositionNote()).isEqualTo("Split geplant\nVerschlechtert: neue Kennung CVE-2026-47884");
+    }
+
+    @Test
+    void reassess_withoutSnapshot_ignoresAdvisoryIds() {
+        assertThat(policy.reassess(accepted(null, ACCEPTED_AT), "TREFFER trivy: CVE-2026-47890",
+                ACCEPTED_AT.plus(Duration.ofDays(7)))).as("legacy acceptance without frozen evidence")
+                .isEqualTo(Outcome.UNCHANGED);
+        assertThat(policy.reassess(accepted("  ", ACCEPTED_AT), "TREFFER trivy: CVE-2026-47890",
+                ACCEPTED_AT.plus(Duration.ofDays(7)))).isEqualTo(Outcome.UNCHANGED);
+    }
+
+    @Test
+    void reassess_newAdvisoryIdAndRisingNumber_areNamedInOneHint() {
+        AuditFinding finding = accepted("2 vulnerabilities: CVE-2026-1111, CVE-2026-2222", ACCEPTED_AT);
+
+        assertThat(policy.reassess(finding, "3 vulnerabilities: CVE-2026-1111, CVE-2026-2222, CVE-2026-3333",
+                ACCEPTED_AT.plus(Duration.ofDays(7)))).isEqualTo(Outcome.REOPENED);
+        assertThat(finding.getDispositionNote()).isEqualTo(
+                "Split geplant\nVerschlechtert: 2 vulnerabilities → 3 vulnerabilities, neue Kennung CVE-2026-3333");
+    }
+
+    @Test
+    void reassess_newAdvisoryIdWinsOverExpiry() {
+        AuditFinding finding = accepted("TREFFER trivy: CVE-2026-47884", ACCEPTED_AT);
+
+        assertThat(policy.reassess(finding, "TREFFER trivy: CVE-2026-47884, CVE-2026-47890",
+                ACCEPTED_AT.plus(Duration.ofDays(400)))).isEqualTo(Outcome.REOPENED);
+        assertThat(finding.getStatus()).isEqualTo(AuditFindingStatus.OPEN);
+    }
+
+    @Test
     void reassess_olderThan180Days_movesToAwaitingVerificationOnce() {
         AuditFinding finding = accepted("Big.java: 320 LOC", ACCEPTED_AT);
 
