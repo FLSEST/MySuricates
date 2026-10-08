@@ -17,14 +17,19 @@ import com.automation.service.workflow.WorkflowService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.RejectedExecutionException;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
@@ -38,6 +43,7 @@ class AutoRepairServiceTest {
     @Mock private AppSettingsRepository appSettingsRepository;
     @Mock private WorkflowRunRepository workflowRunRepository;
     @Mock private WorkflowExecutor workflowExecutor;
+    @Mock private ExecutorService virtualThreadExecutor;
 
     private AutoRepairService service;
 
@@ -46,7 +52,7 @@ class AutoRepairServiceTest {
         service = new AutoRepairService(
                 factoryVerificationService, workflowService, testingService,
                 activityLogService, appSettingsRepository, workflowRunRepository,
-                workflowExecutor);
+                workflowExecutor, virtualThreadExecutor);
         // Default: the AI repair was saved (99a9dfb0); the discarded case stubs its own outcome.
         try {
             lenient().when(factoryVerificationService.autoFixWorkflow(any(), anyString()))
@@ -116,6 +122,57 @@ class AutoRepairServiceTest {
         assertThat(service.repairAllFailed(true)).isZero();
 
         verifyNoInteractions(factoryVerificationService, workflowExecutor);
+    }
+
+    // ── Retroactive repairs run in the background, not in the request (TODO d04398a3) ──
+
+    @Test
+    void repairAllFailed_returnsAtOnce_andEachRepairRunsOnTheExecutor() throws Exception {
+        when(workflowRunRepository.findDistinctWorkflowIdsWithFailedRuns()).thenReturn(List.of("wf-1", "wf-2"));
+        when(workflowService.findById(anyString())).thenReturn(createWorkflow(Map.of("autoRepair", Map.of("mode", "test"))));
+        when(factoryVerificationService.verifyAndFix(anyString(), anyInt()))
+                .thenReturn(new FactoryTestResult("run-x", "PASSED", null));
+        ArgumentCaptor<Runnable> repairs = ArgumentCaptor.forClass(Runnable.class);
+
+        assertThat(service.repairAllFailed(true)).isEqualTo(2);
+
+        verify(virtualThreadExecutor, times(2)).execute(repairs.capture());
+        verifyNoInteractions(factoryVerificationService, workflowExecutor);
+
+        repairs.getAllValues().forEach(Runnable::run);
+        verify(factoryVerificationService).verifyAndFix("wf-1", 2);
+        verify(factoryVerificationService).verifyAndFix("wf-2", 2);
+    }
+
+    @Test
+    void repairAllFailed_doesNotCountARepairTheExecutorRejects() {
+        when(workflowRunRepository.findDistinctWorkflowIdsWithFailedRuns()).thenReturn(List.of("wf-1"));
+        when(workflowService.findById("wf-1")).thenReturn(createWorkflow(Map.of()));
+        doThrow(new RejectedExecutionException("shut down")).when(virtualThreadExecutor).execute(any());
+
+        assertThat(service.repairAllFailed(true)).isZero();
+    }
+
+    @Test
+    void repairWorkflow_workflowDeletedMeanwhile_failureIsLoggedNotLost() {
+        when(workflowService.findById("wf-gone")).thenThrow(new IllegalStateException("Workflow not found: wf-gone"));
+        ArgumentCaptor<Runnable> repair = ArgumentCaptor.forClass(Runnable.class);
+        service.repairWorkflow("wf-gone");
+        verify(virtualThreadExecutor).execute(repair.capture());
+
+        assertThatCode(() -> repair.getValue().run()).doesNotThrowAnyException();
+
+        verify(activityLogService).error(eq(LogCategory.EXECUTION),
+                contains("Retroactive repair error for workflow: wf-gone"), eq("AutoRepairService"), isNull(), eq("wf-gone"));
+        verifyNoInteractions(factoryVerificationService, workflowExecutor);
+    }
+
+    @Test
+    void repairWorkflow_onlyHandsTheRepairToTheExecutor() {
+        service.repairWorkflow("wf-1");
+
+        verify(virtualThreadExecutor).execute(any(Runnable.class));
+        verifyNoInteractions(workflowService, factoryVerificationService, workflowExecutor);
     }
 
     @Test

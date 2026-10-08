@@ -24,6 +24,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutorService;
 
 @Service
 @RequiredArgsConstructor
@@ -43,6 +44,8 @@ public class TestingService {
     private final ApiKeyService apiKeyService;
     private final DockerContainerManager dockerManager;
     private final StagingComposeCommand compose;
+    /** Runs the blocking auto-start, never the common pool. */
+    private final ExecutorService virtualThreadExecutor;
 
     @EventListener(ApplicationReadyEvent.class)
     void autoStartTest() {
@@ -71,7 +74,7 @@ public class TestingService {
             } catch (Exception e) {
                 log.debug("Test auto-start skipped: {}", e.getMessage());
             }
-        });
+        }, virtualThreadExecutor);
     }
 
     public TestingStatusResponse getStatus() {

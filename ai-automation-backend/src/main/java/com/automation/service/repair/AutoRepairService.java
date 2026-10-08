@@ -23,6 +23,7 @@ import org.springframework.stereotype.Service;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ExecutorService;
 
 @Service
 @Slf4j
@@ -43,6 +44,7 @@ public class AutoRepairService {
     private final AppSettingsRepository appSettingsRepository;
     private final WorkflowRunRepository workflowRunRepository;
     private final WorkflowExecutor workflowExecutor;
+    private final ExecutorService virtualThreadExecutor;
 
     public AutoRepairService(FactoryVerificationService factoryVerificationService,
                              WorkflowService workflowService,
@@ -50,7 +52,7 @@ public class AutoRepairService {
                              ActivityLogService activityLogService,
                              AppSettingsRepository appSettingsRepository,
                              WorkflowRunRepository workflowRunRepository,
-                             @Lazy WorkflowExecutor workflowExecutor) {
+                             @Lazy WorkflowExecutor workflowExecutor, ExecutorService virtualThreadExecutor) {
         this.factoryVerificationService = factoryVerificationService;
         this.workflowService = workflowService;
         this.testingService = testingService;
@@ -58,6 +60,7 @@ public class AutoRepairService {
         this.appSettingsRepository = appSettingsRepository;
         this.workflowRunRepository = workflowRunRepository;
         this.workflowExecutor = workflowExecutor;
+        this.virtualThreadExecutor = virtualThreadExecutor;
     }
 
     @Async
@@ -114,21 +117,26 @@ public class AutoRepairService {
     }
 
     /**
-     * Retroactively repair a single workflow by ID.
-     * Uses resolved repair mode (test/local/auto).
+     * Retroactively repair a single workflow by ID in the background (resolved mode test/local/auto); every
+     * failure, a workflow deleted meanwhile included, is logged. Handed to the executor explicitly, not via
+     * {@code @Async}: the batch below calls it from inside this class, bypassing the proxy (TODO d04398a3).
      */
-    @Async
     public void repairWorkflow(String workflowId) {
-        Workflow workflow = workflowService.findById(workflowId);
-        String mode = resolveRepairMode(workflow);
-        int maxRetries = resolveMaxRetries(workflow);
-        long timeoutSeconds = resolveTimeoutSeconds(workflow);
+        virtualThreadExecutor.execute(() -> runRepair(workflowId));
+    }
 
-        activityLogService.info(LogCategory.EXECUTION,
-                "Retroactive repair started for workflow: " + workflow.getName() + " (mode: " + mode + ", retries: " + maxRetries + ", timeout: " + timeoutSeconds + "s)",
-                "AutoRepairService", null, workflowId);
-
+    private void runRepair(String workflowId) {
+        String name = workflowId;
         try {
+            Workflow workflow = workflowService.findById(workflowId);
+            name = workflow.getName();
+            String mode = resolveRepairMode(workflow);
+            int maxRetries = resolveMaxRetries(workflow);
+            long timeoutSeconds = resolveTimeoutSeconds(workflow);
+            activityLogService.info(LogCategory.EXECUTION,
+                    "Retroactive repair started for workflow: " + name + " (mode: " + mode + ", retries: " + maxRetries + ", timeout: " + timeoutSeconds + "s)",
+                    "AutoRepairService", null, workflowId);
+
             FactoryTestResult result;
             if (shouldUseTestInstance(mode)) {
                 result = factoryVerificationService.verifyAndFix(workflowId, maxRetries);
@@ -136,13 +144,12 @@ public class AutoRepairService {
                 String errorMsg = extractLastFailedRunError(workflowId);
                 result = repairLocally(workflowId, errorMsg, maxRetries, timeoutSeconds);
             }
-
-            logRepairResult(result, workflow.getName(), workflowId);
+            logRepairResult(result, name, workflowId);
         } catch (Exception e) {
             activityLogService.error(LogCategory.EXECUTION,
-                    "Retroactive repair error for workflow: " + workflow.getName() + " — " + e.getMessage(),
+                    "Retroactive repair error for workflow: " + name + " — " + e.getMessage(),
                     "AutoRepairService", null, workflowId);
-            log.error("Retroactive repair error for workflow '{}': {}", workflow.getName(), e.getMessage(), e);
+            log.error("Retroactive repair error for workflow '{}': {}", name, e.getMessage(), e);
         }
     }
 
@@ -320,20 +327,13 @@ public class AutoRepairService {
         return switch (mode) {
             case "test" -> true;
             case "local" -> false;
-            case "auto" -> testingService.isHealthy();
-            default -> testingService.isHealthy();
+            default -> testingService.isHealthy(); // "auto"
         };
     }
 
     private String extractErrorMessage(Map<String, Object> error) {
-        if (error == null || error.isEmpty()) {
-            return "Unknown error";
-        }
-        Object message = error.get("message");
-        if (message instanceof String s) {
-            return s;
-        }
-        return error.toString();
+        if (error == null || error.isEmpty()) return "Unknown error";
+        return error.get("message") instanceof String s ? s : error.toString();
     }
 
     private String extractLastFailedRunError(String workflowId) {

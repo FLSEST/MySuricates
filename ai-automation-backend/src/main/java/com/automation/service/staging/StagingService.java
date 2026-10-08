@@ -23,6 +23,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.atomic.AtomicReference;
 
 @Service
@@ -37,6 +38,8 @@ public class StagingService {
     private final ApiKeyService apiKeyService;
     private final DockerContainerManager dockerManager;
     private final StagingComposeCommand compose;
+    /** Runs the auto-start and the promote pipeline (minutes of blocking commands), never the common pool. */
+    private final ExecutorService virtualThreadExecutor;
 
     public enum PromotePhase {
         IDLE, STOPPING, BUILDING_BACKEND, BUILDING_FRONTEND, BUILDING_IMAGE, STARTING, ERROR
@@ -75,7 +78,7 @@ public class StagingService {
             } catch (Exception e) {
                 log.warn("Stable auto-start failed: {}", e.getMessage());
             }
-        });
+        }, virtualThreadExecutor);
     }
 
     public StagingStatusResponse getStatus() {
@@ -207,7 +210,7 @@ public class StagingService {
             } finally {
                 currentProcess = null;
             }
-        });
+        }, virtualThreadExecutor);
     }
 
     public void cancelPromote() {

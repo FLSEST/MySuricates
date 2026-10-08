@@ -21,6 +21,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ExecutorService;
 
 import static org.assertj.core.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
@@ -55,10 +56,33 @@ class TestingServiceTest {
     @Mock
     private StagingComposeCommand stagingComposeCommand;
 
+    @Mock
+    private ExecutorService virtualThreadExecutor;
+
     @InjectMocks
     private TestingService testingService;
 
     private final ObjectMapper objectMapper = new ObjectMapper();
+
+    // --- autoStartTest: the blocking start runs on the injected executor, not the common pool ---
+
+    @Test
+    void autoStartTest_runsOnTheInjectedExecutor() {
+        stagingConfig.setTestAutoStart(true);
+
+        testingService.autoStartTest();
+
+        verify(virtualThreadExecutor).execute(any(Runnable.class));
+    }
+
+    @Test
+    void autoStartTest_disabled_submitsNothing() {
+        stagingConfig.setTestAutoStart(false);
+
+        testingService.autoStartTest();
+
+        verifyNoInteractions(virtualThreadExecutor);
+    }
 
     // --- reportTestResult ---
 
