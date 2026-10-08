@@ -4,11 +4,17 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.LinkOption;
 import java.nio.file.Path;
+import java.nio.file.attribute.PosixFilePermission;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
+import java.util.Set;
+import java.util.function.Predicate;
 import java.util.function.Supplier;
 
 /**
@@ -26,21 +32,29 @@ import java.util.function.Supplier;
  * (macOS, an old kernel) cannot start such a process at all while the switch is on: the helper ends with
  * exit code 126 and says why, rather than running the command unprotected.
  *
- * <p>The helper is passed as {@code python3 -I -S -c <code>}: there is no copy on disk that a sandboxed
- * process could change before the next start.
+ * <p>The helper is passed as {@code <python3> -I -S -c <code>}: there is no copy on disk that a sandboxed
+ * process could change before the next start. The interpreter itself runs before Landlock, so it is never
+ * looked up via {@code PATH} (where {@code ~/.local/bin} comes first on Ubuntu): {@link #trustedPython()}
+ * fixes it once at startup to a file that only root can change (TODO 4c8a0755). Without such a file the
+ * switched-on sandbox refuses to start these processes, like a host without Landlock.
  */
 public final class ProcessSandbox {
 
-    /** What the configuration decides: the switch, and the paths to hide, computed per start. */
-    public record Policy(boolean enabled, Supplier<Collection<Path>> hiddenPaths) {
+    /**
+     * What the configuration decides: the switch, the paths to hide (computed per start) and the python3 that
+     * runs the helper ({@code null} when no {@linkplain #trustedPython() trusted one} exists).
+     */
+    public record Policy(boolean enabled, Supplier<Collection<Path>> hiddenPaths, Path interpreter) {
         public Policy {
             Objects.requireNonNull(hiddenPaths, "hiddenPaths");
         }
     }
 
     static final String HELPER_RESOURCE = "/sandbox/landlock_exec.py";
-    static final String PYTHON = "python3";
-    private static final Policy OFF = new Policy(false, List::of);
+    /** Where python3 may come from — fixed locations only, never {@code PATH}. */
+    static final List<Path> PYTHON_CANDIDATES = List.of(
+            Path.of("/usr/bin/python3"), Path.of("/usr/local/bin/python3"), Path.of("/bin/python3"));
+    private static final Policy OFF = new Policy(false, List::of, null);
     private static final ThreadLocal<Boolean> ATTENDED = new ThreadLocal<>();
     private static volatile Policy policy = OFF;
     private static volatile String helper;
@@ -79,22 +93,31 @@ public final class ProcessSandbox {
 
     /** Whether a process started from this thread now runs behind the sandbox. */
     public static boolean active() {
-        return policy.enabled() && !Boolean.TRUE.equals(ATTENDED.get());
+        return active(policy);
+    }
+
+    private static boolean active(Policy current) {
+        return current.enabled() && !Boolean.TRUE.equals(ATTENDED.get());
     }
 
     /** Puts the sandbox in front of the builder's command when {@link #active()}. */
     public static void apply(ProcessBuilder pb) {
-        if (active()) {
-            pb.command(wrap(pb.command(), policy.hiddenPaths().get()));
+        Policy current = policy;
+        if (active(current)) {
+            pb.command(wrap(current.interpreter(), pb.command(), current.hiddenPaths().get()));
         }
     }
 
-    /** {@code python3 -I -S -c <helper> --hide <path> … -- <command>}. */
-    static List<String> wrap(List<String> command, Collection<Path> hidden) {
+    /** {@code <python3> -I -S -c <helper> --hide <path> … -- <command>}. */
+    static List<String> wrap(Path interpreter, List<String> command, Collection<Path> hidden) {
+        if (interpreter == null) {
+            throw new IllegalStateException("Process sandbox is on but found no python3 that only root can change ("
+                    + PYTHON_CANDIDATES + "): the process does not start unprotected");
+        }
         if (hidden.isEmpty()) {
             throw new IllegalStateException("Process sandbox is on but knows no path to hide");
         }
-        List<String> wrapped = new ArrayList<>(List.of(PYTHON, "-I", "-S", "-c", helper()));
+        List<String> wrapped = new ArrayList<>(List.of(interpreter.toString(), "-I", "-S", "-c", helper()));
         hidden.stream().map(p -> p.toAbsolutePath().normalize().toString()).distinct().forEach(path -> {
             wrapped.add("--hide");
             wrapped.add(path);
@@ -102,6 +125,51 @@ public final class ProcessSandbox {
         wrapped.add("--");
         wrapped.addAll(command);
         return wrapped;
+    }
+
+    /**
+     * The python3 to run the helper with: the first of {@link #PYTHON_CANDIDATES} whose real file (links
+     * resolved) and every directory above it belong to root and are writable by nobody else. Returns that
+     * real file, so a link changed later does not matter; empty when there is none.
+     */
+    public static Optional<Path> trustedPython() {
+        return trustedInterpreter(PYTHON_CANDIDATES, ProcessSandbox::onlyRootCanChange);
+    }
+
+    static Optional<Path> trustedInterpreter(List<Path> candidates, Predicate<Path> onlyRootCanChange) {
+        for (Path candidate : candidates) {
+            Path real;
+            try {
+                real = candidate.toRealPath();
+            } catch (IOException e) {
+                continue; // missing or unreadable: try the next location
+            }
+            if (Files.isRegularFile(real) && Files.isExecutable(real) && everyLevel(real, onlyRootCanChange)) {
+                return Optional.of(real);
+            }
+        }
+        return Optional.empty();
+    }
+
+    private static boolean everyLevel(Path file, Predicate<Path> check) {
+        for (Path level = file; level != null; level = level.getParent()) {
+            if (!check.test(level)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /** Owned by uid 0 and neither group- nor world-writable; anything unreadable counts as not. */
+    static boolean onlyRootCanChange(Path path) {
+        try {
+            Object uid = Files.getAttribute(path, "unix:uid", LinkOption.NOFOLLOW_LINKS);
+            Set<PosixFilePermission> mode = Files.getPosixFilePermissions(path, LinkOption.NOFOLLOW_LINKS);
+            return Integer.valueOf(0).equals(uid)
+                    && !mode.contains(PosixFilePermission.GROUP_WRITE) && !mode.contains(PosixFilePermission.OTHERS_WRITE);
+        } catch (IOException | UnsupportedOperationException | IllegalArgumentException e) {
+            return false;
+        }
     }
 
     static String helper() {
