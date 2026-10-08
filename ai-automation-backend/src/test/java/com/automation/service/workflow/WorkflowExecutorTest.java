@@ -789,7 +789,7 @@ class WorkflowExecutorTest {
 
     @org.junit.jupiter.api.AfterEach
     void switchProcessSandboxOff() {
-        com.automation.util.ProcessSandbox.configure(new com.automation.util.ProcessSandbox.Policy(false, List::of, null));
+        com.automation.util.ProcessSandbox.reset();
     }
 
     @Test

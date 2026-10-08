@@ -27,15 +27,18 @@ import java.util.regex.Pattern;
 import java.util.stream.Stream;
 
 /**
- * Hands {@link ProcessSandbox} the startup switch, the trusted python3 and the instance's secrets (TODO
- * 9525820a): the API key file, the seal and integration keys, the staging target keys, the SQLite database
- * with its journal files, and every copy of that database — it holds the API key in {@code app_settings}.
- * The list is computed per process start, so a key file or backup that appears later is covered as well.
+ * Hands {@link ProcessSandbox} the startup switch, the trusted python3 and the paths to hide (TODO 9525820a):
+ * the API key file, the seal and integration keys, the staging target keys, the SQLite database with its
+ * journal files, and its backups — a copy holds the API key in {@code app_settings}. The list is computed
+ * per process start, so a key file or backup that appears later is covered as well. Only what this list
+ * names is hidden; the sandbox does not stop a process from changing what later runs unsandboxed.
  *
- * <p>Copies (TODO 75890a40): the configured backup directory and the {@code backups} folder of every data
- * directory (where the Stable/Test compose files and {@code staging.sh} put theirs) are hidden as a whole;
- * database files elsewhere below a data directory are found by name. The JAR the backend runs from is
- * hidden too, so that no sandboxed process replaces what the next start runs unsandboxed (TODO 4c8a0755).
+ * <p>Copies (TODO 75890a40): firmly covered are the configured backup directory and the {@code backups}
+ * folder of every data directory (where the Stable/Test compose files and {@code staging.sh} put theirs),
+ * each hidden as a whole. Database files elsewhere below a data directory are found by a name heuristic.
+ * The JAR the backend runs from is hidden when it lies outside the user's home (container, {@code /opt}),
+ * so that no sandboxed process replaces what the next start runs (TODO 4c8a0755); below the home, hiding
+ * it would make {@code ~/.local} and {@code ~/.local/state} way directories where tools create their state.
  */
 @Slf4j
 @Component
@@ -47,8 +50,11 @@ public class ProcessSandboxConfiguration {
     private static final List<String> JOURNAL_SUFFIXES = List.of("-wal", "-shm", "-journal");
     /** The folder below a data directory that holds the backups of dev, Stable and Test. */
     static final String BACKUPS_DIR = "backups";
-    /** A SQLite file or its journal ({@code x.db}, {@code x.db-wal}, {@code x.db.bak}) or a backup by its prefix. */
-    private static final Pattern DATABASE_COPY = Pattern.compile(".+\\.db([-.].*)?|mysuricates-backup-.*");
+    /**
+     * A SQLite file or its journal ({@code x.db}, {@code x.db-wal}, {@code x.db.bak}, {@code x.sqlite},
+     * {@code x.sqlite3}) or a backup by its prefix — a heuristic, unlike the backup folders.
+     */
+    private static final Pattern DATABASE_COPY = Pattern.compile(".+\\.(db|sqlite3?)([-.].*)?|mysuricates-backup-.*");
     /**
      * How deep below a data directory database copies are searched: deeper than anything the platform
      * writes there ({@code backups/<env>/<file>}), shallow enough to stay out of the run workspaces' clones.
@@ -103,7 +109,7 @@ public class ProcessSandboxConfiguration {
         if (backups != null && !backups.isBlank()) {
             configured.add(Path.of(backups.strip())); // whole copies of the database, API key included
         }
-        runningJar(classPath).ifPresent(configured::add);
+        runningJar(classPath).filter(jar -> !below(jar, home)).ifPresent(configured::add);
         List<Path> dataDirs = new ArrayList<>(List.of(dataHome));
         DATA_DIRS.forEach(name -> dataDirs.add(home.resolve(name)));
         return secretPaths(dataDirs, configured, database(environment.getProperty("spring.datasource.url", "")));
@@ -191,10 +197,23 @@ public class ProcessSandboxConfiguration {
         return copies;
     }
 
+    /** Whether {@code path} lies below {@code dir}, as written or with links resolved. */
+    static boolean below(Path path, Path dir) {
+        Path normalizedDir = dir.toAbsolutePath().normalize();
+        if (path.toAbsolutePath().normalize().startsWith(normalizedDir)) {
+            return true;
+        }
+        try {
+            return path.toRealPath().startsWith(dir.toRealPath());
+        } catch (IOException e) {
+            return false;
+        }
+    }
+
     /**
      * The JAR of a {@code java -jar} start (a single class path entry) — empty for a class path of several
-     * entries or directories (IDE, tests). Hiding the real file through a link such as the dev starter's
-     * {@code current.jar} also keeps that link from being replaced: its directory then only allows listing.
+     * entries or directories (IDE, tests). Hiding the real file through a link also keeps that link from
+     * being replaced: its directory then only allows listing.
      */
     static Optional<Path> runningJar(String classPath) {
         if (classPath == null || classPath.isBlank() || classPath.contains(File.pathSeparator)) {

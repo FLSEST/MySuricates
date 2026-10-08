@@ -86,6 +86,8 @@ class ProcessSandboxConfigurationTest {
         Path data = Files.createDirectories(tmp.resolve(".mysuricates"));
         Path manual = write(data.resolve("private/automation.db.bak"));
         Path journal = write(data.resolve("private/automation.db-wal"));
+        Path sqlite = write(data.resolve("private/export.sqlite"));
+        Path sqlite3 = write(data.resolve("private/export.sqlite3-journal"));
         Path stray = write(data.resolve("old/x/mysuricates-backup-2026-04-07_02-00-00"));
         Path ownDb = write(data.resolve("sources/app/automation.db"));
         write(data.resolve("sources/repo/.git/HEAD"));
@@ -98,7 +100,7 @@ class ProcessSandboxConfigurationTest {
 
         List<Path> paths = ProcessSandboxConfiguration.secretPaths(List.of(data), List.of(), null);
 
-        assertThat(paths).contains(manual, journal, stray, ownDb, deepest, data.resolve("backups"));
+        assertThat(paths).contains(manual, journal, sqlite, sqlite3, stray, ownDb, deepest, data.resolve("backups"));
         assertThat(paths).doesNotContain(projectDb, tooDeep, insideBackups, notes, dbusLike);
     }
 
@@ -130,6 +132,21 @@ class ProcessSandboxConfigurationTest {
         List<Path> paths = configuration(tmp.resolve("backups").toString(), "")
                 .hiddenPaths(tmp.resolve("home"), tmp.resolve("data-home"), link.toString());
         assertThat(paths).contains(link);
+    }
+
+    @Test
+    @DisplayName("leaves a JAR below the user's home visible, so ~/.local does not become list-only")
+    void runningJarBelowTheHomeStaysVisible() throws Exception {
+        Path home = Files.createDirectories(tmp.resolve("home"));
+        Path devJar = write(home.resolve(".local/state/mysuricates-dev/runtime/backend-20261008.jar"));
+        Path linkOutside = Files.createSymbolicLink(Files.createDirectories(tmp.resolve("opt")).resolve("app.jar"), devJar);
+        ProcessSandboxConfiguration config = configuration(tmp.resolve("backups").toString(), "");
+
+        assertThat(config.hiddenPaths(home, tmp.resolve("data-home"), devJar.toString()))
+                .noneMatch(p -> p.toString().endsWith(".jar"));
+        assertThat(config.hiddenPaths(home, tmp.resolve("data-home"), linkOutside.toString()))
+                .as("a link outside the home that points into it counts as below the home")
+                .noneMatch(p -> p.toString().endsWith(".jar"));
     }
 
     private ProcessSandboxConfiguration configuration(String backupDirectory, String databaseUrl) {

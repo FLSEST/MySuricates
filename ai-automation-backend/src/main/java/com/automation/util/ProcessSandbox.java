@@ -67,7 +67,8 @@ public final class ProcessSandbox {
         policy = Objects.requireNonNull(newPolicy, "policy");
     }
 
-    static void reset() {
+    /** Switches the sandbox off again — for tests; {@link #configure} can do the same. */
+    public static void reset() {
         policy = OFF;
     }
 
