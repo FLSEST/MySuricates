@@ -6,6 +6,7 @@ import com.automation.service.scheduler.ScheduleSkipPolicy;
 import com.automation.service.scheduler.SchedulerMaintenanceMode;
 import com.automation.service.scheduler.UpcomingRunsCalculator;
 import com.automation.dto.AssistantChatRequest;
+import com.automation.dto.projection.TodoHeadline;
 import com.automation.dto.response.BrokenWorkflowResponse;
 import com.automation.entity.*;
 import com.automation.repository.*;
@@ -52,7 +53,7 @@ import static org.mockito.Mockito.*;
 class AssistantContextBuilderTest {
 
     @Mock private WorkflowRunRepository workflowRunRepository;
-    @Mock private TodoRepository todoRepository;
+    @Mock private TodoSummaryRepository todoSummaryRepository;
     @Mock private ScheduledWorkflowRepository scheduledWorkflowRepository;
     @Mock private ProjectRepository projectRepository;
     @Mock private WishRepository wishRepository;
@@ -73,7 +74,7 @@ class AssistantContextBuilderTest {
     @BeforeEach
     void setUp() {
         RunsContextSection runsSection = new RunsContextSection(workflowRunRepository, systemIdentity);
-        TodosContextSection todosSection = new TodosContextSection(todoRepository);
+        TodosContextSection todosSection = new TodosContextSection(todoSummaryRepository);
         WishesContextSection wishesSection = new WishesContextSection(wishRepository);
         SchedulesContextSection schedulesSection = new SchedulesContextSection(new UpcomingRunsCalculator(
                 scheduledWorkflowRepository, java.time.Clock.systemDefaultZone(),
@@ -305,7 +306,7 @@ class AssistantContextBuilderTest {
             when(workflowRepository.findAllWithActiveProject()).thenReturn(List.of());
             when(workflowRunRepository.findByStatus(RunStatus.RUNNING)).thenReturn(List.of());
             when(workflowRunRepository.findTop10ByOrderByStartedAtDesc()).thenReturn(List.of());
-            when(todoRepository.findAll()).thenReturn(List.of());
+            when(todoSummaryRepository.findHeadlines(any(), any())).thenReturn(List.of());
             when(wishRepository.findAllByOrderByCreatedAtDesc()).thenReturn(List.of());
             when(scheduledWorkflowRepository.findSchedulesInRange(any(), any())).thenReturn(List.of());
             when(projectRepository.findByArchivedAtIsNull()).thenReturn(List.of());
@@ -325,7 +326,7 @@ class AssistantContextBuilderTest {
             when(workflowRepository.findAllWithActiveProject()).thenReturn(List.of());
             when(workflowRunRepository.findByStatus(RunStatus.RUNNING)).thenReturn(List.of());
             when(workflowRunRepository.findTop10ByOrderByStartedAtDesc()).thenReturn(List.of());
-            when(todoRepository.findAll()).thenReturn(List.of());
+            when(todoSummaryRepository.findHeadlines(any(), any())).thenReturn(List.of());
             when(wishRepository.findAllByOrderByCreatedAtDesc()).thenReturn(List.of());
             when(scheduledWorkflowRepository.findSchedulesInRange(any(), any())).thenReturn(List.of());
             when(projectRepository.findByArchivedAtIsNull()).thenReturn(List.of());
@@ -349,9 +350,8 @@ class AssistantContextBuilderTest {
             when(workflowMemoryRepository.findTop8ByActiveTrueOrderByCreatedAtDesc()).thenReturn(List.of());
             when(assistantSessionRepository.findTop5ByOrderByStartedAtDesc()).thenReturn(List.of());
 
-            Todo todo = Todo.builder().id("t1").title("Fix Bug").status(Todo.Status.OPEN)
-                    .priority(Todo.Priority.HIGH).build();
-            when(todoRepository.findAll()).thenReturn(List.of(todo));
+            when(todoSummaryRepository.findHeadlines(any(), any()))
+                    .thenReturn(List.of(new TodoHeadline("Fix Bug", Todo.Priority.HIGH)));
 
             // OVERVIEW page → todos in full mode
             String result = builder.buildSystemPrompt(null, "", null);
@@ -477,7 +477,7 @@ class AssistantContextBuilderTest {
             when(systemIdentity.getVersion()).thenReturn("1.0.0");
             when(workflowRunRepository.findByStatus(RunStatus.RUNNING)).thenReturn(List.of());
             when(workflowRunRepository.findTop10ByOrderByStartedAtDesc()).thenReturn(List.of());
-            when(todoRepository.findAll()).thenReturn(List.of());
+            when(todoSummaryRepository.findHeadlines(any(), any())).thenReturn(List.of());
             when(wishRepository.findAllByOrderByCreatedAtDesc()).thenReturn(List.of());
             when(scheduledWorkflowRepository.findSchedulesInRange(any(), any())).thenReturn(List.of());
 
