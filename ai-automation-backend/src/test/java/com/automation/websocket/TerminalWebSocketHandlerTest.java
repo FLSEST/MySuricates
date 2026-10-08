@@ -8,6 +8,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.web.socket.CloseStatus;
 import org.springframework.web.socket.TextMessage;
 import org.springframework.web.socket.WebSocketSession;
@@ -17,6 +18,8 @@ import java.util.HashMap;
 import java.util.Map;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -75,6 +78,45 @@ class TerminalWebSocketHandlerTest {
         // No exception — silently ignored when no terminal session
     }
 
+    /**
+     * TODO bb86b7ef: a resize message without {@code cols}/{@code rows} used to throw inside the parser
+     * branch, the broad catch swallowed it, and the JSON went into the container shell as keystrokes.
+     * It resizes to the defaults now and writes nothing.
+     */
+    @Test
+    void handleTextMessage_resizeWithoutSize_usesTheDefaultsAndWritesNothing() throws Exception {
+        TerminalSession terminal = connectedTerminal("ws-1");
+
+        handler.handleTextMessage(session, new TextMessage("{\"type\":\"resize\"}"));
+
+        verify(terminal).resize(80, 24);
+        verify(terminal, never()).write(anyString());
+    }
+
+    @Test
+    void handleTextMessage_resizeWithSize_resizesAndWritesNothing() throws Exception {
+        TerminalSession terminal = connectedTerminal("ws-1");
+
+        handler.handleTextMessage(session, new TextMessage("{\"type\":\"resize\",\"cols\":120,\"rows\":40}"));
+
+        verify(terminal).resize(120, 40);
+        verify(terminal, never()).write(anyString());
+    }
+
+    @Test
+    void handleTextMessage_inputThatIsNoControlMessage_goesToTheShellUnchanged() throws Exception {
+        TerminalSession terminal = connectedTerminal("ws-1");
+
+        handler.handleTextMessage(session, new TextMessage("{not json"));
+        handler.handleTextMessage(session, new TextMessage("{\"type\":\"other\"}"));
+        handler.handleTextMessage(session, new TextMessage("ls -la\r"));
+
+        verify(terminal).write("{not json");
+        verify(terminal).write("{\"type\":\"other\"}");
+        verify(terminal).write("ls -la\r");
+        verify(terminal, never()).resize(anyInt(), anyInt());
+    }
+
     @Test
     void handleTransportError_logsWithoutThrowing() {
         when(session.getId()).thenReturn("ws-1");
@@ -82,5 +124,14 @@ class TerminalWebSocketHandlerTest {
         handler.handleTransportError(session, new RuntimeException("network error"));
 
         // Should not throw
+    }
+
+    /** Registers a mocked terminal for {@code sessionId}, as a successful connect would. */
+    @SuppressWarnings("unchecked")
+    private TerminalSession connectedTerminal(String sessionId) {
+        TerminalSession terminal = mock(TerminalSession.class);
+        when(session.getId()).thenReturn(sessionId);
+        ((Map<String, TerminalSession>) ReflectionTestUtils.getField(handler, "sessions")).put(sessionId, terminal);
+        return terminal;
     }
 }

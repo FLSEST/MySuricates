@@ -1,5 +1,6 @@
 package com.automation.websocket;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.github.dockerjava.api.DockerClient;
@@ -72,18 +73,18 @@ public class TerminalWebSocketHandler extends TextWebSocketHandler {
 
         String payload = message.getPayload();
 
-        // Check for JSON control messages (resize)
+        // Check for JSON control messages (resize). A resize without cols/rows takes the defaults instead of
+        // failing – the old NullPointerException was swallowed and the JSON reached the shell as keystrokes
+        // (TODO bb86b7ef). Only input that is no JSON at all falls through as raw input.
         if (payload.startsWith("{")) {
             try {
                 JsonNode json = objectMapper.readTree(payload);
-                if (json.has("type") && "resize".equals(json.get("type").asText())) {
-                    int cols = json.get("cols").asInt(80);
-                    int rows = json.get("rows").asInt(24);
-                    terminal.resize(cols, rows);
+                if ("resize".equals(json.path("type").asText())) {
+                    terminal.resize(json.path("cols").asInt(80), json.path("rows").asInt(24));
                     return;
                 }
-            } catch (Exception e) {
-                // Not a control message, treat as raw input
+            } catch (JsonProcessingException e) {
+                // Not JSON, treat as raw input
             }
         }
 
