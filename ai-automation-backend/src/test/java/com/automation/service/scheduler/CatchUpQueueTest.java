@@ -12,11 +12,20 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.time.Duration;
 import java.time.Instant;
 import java.util.Optional;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.junit.jupiter.api.Assertions.assertTimeoutPreemptively;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.contains;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
@@ -116,5 +125,119 @@ class CatchUpQueueTest {
         assertThat(queue.isEmpty()).isTrue();
         assertThat(queue.drain(executor, NOW)).isNull();
         verifyNoInteractions(executor);
+    }
+
+    // ── Lock scope: starts, run checks and activity logs run outside the queue's lock (TODO 30cd8235) ──
+
+    /** Bound for the reads below: they must return at once, the start they overlap with is held open. */
+    private static final Duration NON_BLOCKING = Duration.ofSeconds(5);
+
+    @Test
+    void readsDoNotBlockWhileARunIsStarting_andASecondDrainStartsNothing() throws Exception {
+        queue.enqueue(schedule("a", "A"), NOW.minusSeconds(7200), "cold-start");
+        queue.enqueue(schedule("b", "B"), NOW.minusSeconds(3600), "cold-start");
+        CountDownLatch entered = new CountDownLatch(1);
+        CountDownLatch release = new CountDownLatch(1);
+        when(executor.executeSingleSchedule("a")).thenAnswer(inv -> {
+            entered.countDown();
+            release.await(30, TimeUnit.SECONDS);
+            return Optional.of(new ScheduledRunRef("run-a", TargetType.WORKFLOW));
+        });
+
+        try (ExecutorService background = Executors.newVirtualThreadPerTaskExecutor()) {
+            Future<CatchUpQueue.Pending> draining = background.submit(() -> queue.drain(executor, NOW));
+            try {
+                assertThat(entered.await(30, TimeUnit.SECONDS)).as("start reached the executor").isTrue();
+                assertTimeoutPreemptively(NON_BLOCKING, () -> {
+                    // The entry being started is neither lost nor startable twice: it heads the waiting list.
+                    assertThat(queue.contains("a")).isTrue();
+                    assertThat(queue.isEmpty()).isFalse();
+                    assertThat(queue.snapshot().active()).isNull();
+                    assertThat(queue.snapshot().pending()).extracting(CatchUpQueue.Pending::scheduleId)
+                            .containsExactly("a", "b");
+                    assertThat(queue.drain(executor, NOW)).isNull();
+                });
+            } finally {
+                release.countDown();
+            }
+            assertThat(draining.get(30, TimeUnit.SECONDS).scheduleId()).isEqualTo("a");
+        }
+        verify(executor, never()).executeSingleSchedule("b");
+        assertThat(queue.snapshot().active().runId()).isEqualTo("run-a");
+        assertThat(queue.snapshot().pending()).extracting(CatchUpQueue.Pending::scheduleId).containsExactly("b");
+    }
+
+    @Test
+    void readsDoNotBlockWhileTheActiveRunIsChecked() throws Exception {
+        queue.enqueue(schedule("a", "A"), NOW.minusSeconds(7200), "cold-start");
+        ScheduledRunRef runA = new ScheduledRunRef("run-a", TargetType.WORKFLOW);
+        when(executor.executeSingleSchedule("a")).thenReturn(Optional.of(runA));
+        queue.drain(executor, NOW);
+        CountDownLatch entered = new CountDownLatch(1);
+        CountDownLatch release = new CountDownLatch(1);
+        when(executor.isFinished(runA)).thenAnswer(inv -> {
+            entered.countDown();
+            release.await(30, TimeUnit.SECONDS);
+            return false;
+        });
+
+        try (ExecutorService background = Executors.newVirtualThreadPerTaskExecutor()) {
+            Future<CatchUpQueue.Pending> draining = background.submit(() -> queue.drain(executor, NOW.plusSeconds(60)));
+            try {
+                assertThat(entered.await(30, TimeUnit.SECONDS)).as("drain reached the run check").isTrue();
+                assertTimeoutPreemptively(NON_BLOCKING, () -> {
+                    assertThat(queue.snapshot().active().runId()).isEqualTo("run-a");
+                    assertThat(queue.contains("a")).isTrue();
+                });
+            } finally {
+                release.countDown();
+            }
+            assertThat(draining.get(30, TimeUnit.SECONDS)).isNull();
+        }
+        assertThat(queue.snapshot().active().runId()).isEqualTo("run-a");
+    }
+
+    @Test
+    void enqueueWritesItsActivityLogOutsideTheLock() throws Exception {
+        CountDownLatch entered = new CountDownLatch(1);
+        CountDownLatch release = new CountDownLatch(1);
+        when(activityLogService.info(eq(LogCategory.SCHEDULE), contains("queued for catch-up"),
+                eq("SchedulerService"), any())).thenAnswer(inv -> {
+            entered.countDown();
+            release.await(30, TimeUnit.SECONDS);
+            return null;
+        });
+
+        try (ExecutorService background = Executors.newVirtualThreadPerTaskExecutor()) {
+            Future<?> enqueueing = background.submit(
+                    () -> queue.enqueue(schedule("a", "A"), NOW.minusSeconds(60), "cold-start"));
+            try {
+                assertThat(entered.await(30, TimeUnit.SECONDS)).as("enqueue reached the activity log").isTrue();
+                assertTimeoutPreemptively(NON_BLOCKING, () -> {
+                    assertThat(queue.contains("a")).isTrue();
+                    assertThat(queue.snapshot().pending()).extracting(CatchUpQueue.Pending::scheduleId)
+                            .containsExactly("a");
+                });
+            } finally {
+                release.countDown();
+            }
+            enqueueing.get(30, TimeUnit.SECONDS);
+        }
+    }
+
+    @Test
+    void failingActivityLogDuringAStartLeavesNoEntryBehind() {
+        queue.enqueue(schedule("boom", "Boom"), NOW.minusSeconds(7200), "cold-start");
+        when(executor.executeSingleSchedule("boom")).thenThrow(new RuntimeException("fail"));
+        when(activityLogService.error(any(), anyString(), anyString(), any()))
+                .thenThrow(new IllegalStateException("activity log unavailable"));
+
+        assertThatThrownBy(() -> queue.drain(executor, NOW)).isInstanceOf(IllegalStateException.class);
+
+        assertThat(queue.contains("boom")).isFalse();
+        assertThat(queue.isEmpty()).isTrue();
+        queue.enqueue(schedule("ok", "Ok"), NOW.minusSeconds(3600), "cold-start");
+        when(executor.executeSingleSchedule("ok")).thenReturn(Optional.of(new ScheduledRunRef("run-ok", TargetType.WORKFLOW)));
+        assertThat(queue.drain(executor, NOW).scheduleId()).isEqualTo("ok");
     }
 }

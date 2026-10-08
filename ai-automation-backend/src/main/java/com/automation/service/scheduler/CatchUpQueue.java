@@ -12,6 +12,8 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.concurrent.locks.ReentrantLock;
+import java.util.function.Supplier;
 
 /**
  * In-memory queue of schedules whose missed occurrence is to be caught up <em>one at a time</em>.
@@ -39,32 +41,50 @@ public class CatchUpQueue {
 
     private final ActivityLogService activityLogService;
 
+    /**
+     * Guards the fields below and is held only for in-memory work: run starts, run checks and
+     * activity-log writes reach the database (pool size 1) and stay outside, so the API's
+     * {@link #snapshot} and the tick's {@link #contains} never wait for them (TODO 30cd8235).
+     */
+    private final ReentrantLock lock = new ReentrantLock();
     private final List<Pending> pending = new ArrayList<>();
     private Active active;
     private ScheduledRunRef activeRef;
+    /** Taken off {@link #pending}, start in progress; still reported as waiting so it cannot be queued twice. */
+    private Pending starting;
+    /** A {@link #drain} call is in progress; a second one returns at once, so only one run starts at a time. */
+    private boolean draining;
 
     /** Queue a schedule for catch-up (ignored when already queued or currently running). */
-    public synchronized void enqueue(ScheduledWorkflow scheduled, Instant missedAt, String reason) {
-        if (contains(scheduled.getId())) return;
-        pending.add(new Pending(scheduled.getId(), scheduled.getTargetName(), missedAt));
-        pending.sort(Comparator.comparing(Pending::missedAt, Comparator.nullsLast(Comparator.naturalOrder())));
-        log.info("Schedule {} queued for catch-up ({}), position {}", scheduled.getId(), reason, pending.size());
+    public void enqueue(ScheduledWorkflow scheduled, Instant missedAt, String reason) {
+        Integer position = withLock(() -> {
+            if (containsLocked(scheduled.getId())) return null;
+            pending.add(new Pending(scheduled.getId(), scheduled.getTargetName(), missedAt));
+            pending.sort(Comparator.comparing(Pending::missedAt, Comparator.nullsLast(Comparator.naturalOrder())));
+            return pending.size();
+        });
+        if (position == null) return;
+        log.info("Schedule {} queued for catch-up ({}), position {}", scheduled.getId(), reason, position);
         activityLogService.info(LogCategory.SCHEDULE,
                 "Schedule queued for catch-up (" + reason + "): " + scheduled.getTargetName(),
                 "SchedulerService", scheduled.getId());
     }
 
-    public synchronized boolean contains(String scheduleId) {
-        if (active != null && active.scheduleId().equals(scheduleId)) return true;
-        return pending.stream().anyMatch(p -> p.scheduleId().equals(scheduleId));
+    public boolean contains(String scheduleId) {
+        return withLock(() -> containsLocked(scheduleId));
     }
 
-    public synchronized boolean isEmpty() {
-        return active == null && pending.isEmpty();
+    public boolean isEmpty() {
+        return withLock(() -> active == null && starting == null && pending.isEmpty());
     }
 
-    public synchronized Snapshot snapshot() {
-        return new Snapshot(active, List.copyOf(pending));
+    public Snapshot snapshot() {
+        return withLock(() -> {
+            List<Pending> waiting = new ArrayList<>();
+            if (starting != null) waiting.add(starting);
+            waiting.addAll(pending);
+            return new Snapshot(active, List.copyOf(waiting));
+        });
     }
 
     /**
@@ -74,35 +94,106 @@ public class CatchUpQueue {
      *
      * @return the schedule started in this call, or {@code null}
      */
-    public synchronized Pending drain(ScheduledWorkflowExecutor executor, Instant now) {
-        if (active != null) {
-            if (!executor.isFinished(activeRef)) {
-                return null;
-            }
-            log.info("Catch-up run {} for schedule {} finished", active.runId(), active.scheduleId());
-            active = null;
-            activeRef = null;
+    public Pending drain(ScheduledWorkflowExecutor executor, Instant now) {
+        Active current;
+        ScheduledRunRef currentRef;
+        lock.lock();
+        try {
+            if (draining) return null;
+            draining = true;
+            current = active;
+            currentRef = activeRef;
+        } finally {
+            lock.unlock();
         }
-        while (!pending.isEmpty()) {
-            Pending next = pending.remove(0);
+        try {
+            if (current != null) {
+                if (!executor.isFinished(currentRef)) return null;
+                log.info("Catch-up run {} for schedule {} finished", current.runId(), current.scheduleId());
+                runLocked(() -> {
+                    active = null;
+                    activeRef = null;
+                });
+            }
+            return startNext(executor, now);
+        } finally {
+            runLocked(() -> draining = false);
+        }
+    }
+
+    /** Only called by the one {@link #drain} in progress, which is the only writer of {@code active}. */
+    private Pending startNext(ScheduledWorkflowExecutor executor, Instant now) {
+        while (true) {
+            Pending next = withLock(() -> {
+                starting = pending.isEmpty() ? null : pending.remove(0);
+                return starting;
+            });
+            if (next == null) return null;
+            ScheduledRunRef ref = null;
+            int waiting;
             try {
-                var ref = executor.executeSingleSchedule(next.scheduleId());
-                if (ref.isPresent()) {
-                    active = new Active(next.scheduleId(), next.targetName(), ref.get().runId(), now);
-                    activeRef = ref.get();
-                    activityLogService.info(LogCategory.SCHEDULE,
-                            "Catch-up started: " + next.targetName()
-                                    + (pending.isEmpty() ? "" : " (" + pending.size() + " waiting)"),
-                            "SchedulerService", next.scheduleId());
-                    return next;
-                }
-                log.info("Catch-up for schedule {} declined by executor — trying next", next.scheduleId());
-            } catch (Exception e) {
-                log.error("Catch-up for schedule {} failed: {}", next.scheduleId(), e.getMessage(), e);
-                activityLogService.error(LogCategory.SCHEDULE,
-                        "Schedule catch-up failed: " + e.getMessage(), "SchedulerService", next.scheduleId());
+                ref = start(executor, next);
+            } finally {
+                waiting = settle(next, ref, now);
+            }
+            if (ref != null) {
+                activityLogService.info(LogCategory.SCHEDULE,
+                        "Catch-up started: " + next.targetName() + (waiting == 0 ? "" : " (" + waiting + " waiting)"),
+                        "SchedulerService", next.scheduleId());
+                return next;
             }
         }
-        return null;
+    }
+
+    /** Starts one schedule outside the lock; {@code null} when the executor declined or failed. */
+    private ScheduledRunRef start(ScheduledWorkflowExecutor executor, Pending next) {
+        try {
+            var ref = executor.executeSingleSchedule(next.scheduleId());
+            if (ref.isEmpty()) {
+                log.info("Catch-up for schedule {} declined by executor — trying next", next.scheduleId());
+            }
+            return ref.orElse(null);
+        } catch (Exception e) {
+            log.error("Catch-up for schedule {} failed: {}", next.scheduleId(), e.getMessage(), e);
+            activityLogService.error(LogCategory.SCHEDULE,
+                    "Schedule catch-up failed: " + e.getMessage(), "SchedulerService", next.scheduleId());
+            return null;
+        }
+    }
+
+    /** The started entry leaves {@code starting} and, if a run was started, becomes the active one. */
+    private int settle(Pending next, ScheduledRunRef ref, Instant now) {
+        return withLock(() -> {
+            starting = null;
+            if (ref != null) {
+                active = new Active(next.scheduleId(), next.targetName(), ref.runId(), now);
+                activeRef = ref;
+            }
+            return pending.size();
+        });
+    }
+
+    private boolean containsLocked(String scheduleId) {
+        if (active != null && active.scheduleId().equals(scheduleId)) return true;
+        if (starting != null && starting.scheduleId().equals(scheduleId)) return true;
+        return pending.stream().anyMatch(p -> p.scheduleId().equals(scheduleId));
+    }
+
+    private <T> T withLock(Supplier<T> action) {
+        lock.lock();
+        try {
+            return action.get();
+        } finally {
+            lock.unlock();
+        }
+    }
+
+    private void runLocked(Runnable action) {
+        lock.lock();
+        try {
+            action.run();
+        } finally {
+            lock.unlock();
+        }
     }
 }
