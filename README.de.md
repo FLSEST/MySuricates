@@ -20,7 +20,7 @@ Nur ausprobieren — dafuer braucht es nur Docker:
 
 ```bash
 git clone https://github.com/FLSEST/MySuricates.git && cd MySuricates
-scripts/tryout.sh build          # baut das Image aus dem neuesten Release, beim ersten Mal einige Minuten
+scripts/tryout.sh build          # baut das Image aus dem neuesten Release; der erste Build dauert je nach Rechner laenger
 scripts/tryout.sh start          # http://localhost:9095 — die Ausgabe zeigt den API-Key fuer die Anmeldung
 scripts/tryout.sh login claude   # optional, fuer KI-Bloecke; ebenso codex oder pi
 ```
@@ -122,10 +122,10 @@ Bekannte harte Grenzen:
 
 Shell-Bloecke und KI-Aufrufe laufen **mit deinen Rechten** — direkt auf dem Rechner oder, bei der
 Instanz im Container, mit deinen eingebundenen Ordnern und Anmeldungen —, nicht je Block in einer
-Sandbox; die KI-CLIs fragen dabei standardmaessig nicht vor Werkzeugnutzung nach. Aus dem Quellcode
-gestartet lauschen Backend und Frontend auf allen Netzwerk-Interfaces (die per Installer
-eingerichtete Instanz bindet standardmaessig nur `127.0.0.1`), und einige Endpunkte brauchen
-keinen API-Key. MySuricates
+Sandbox; die KI-CLIs fragen dabei standardmaessig nicht vor Werkzeugnutzung nach. Auf jedem Weg —
+Installer, Container, Dev-Start aus dem Quellcode — lauschen Backend und Frontend standardmaessig nur
+auf `127.0.0.1` (`MYSURICATES_DEV_BIND` bzw. `…BIND=0.0.0.0` oeffnen das bewusst), und einige
+Endpunkte brauchen keinen API-Key. MySuricates
 ist fuer den lokalen Betrieb durch eine vertrauenswuerdige Person gebaut — fuer Fernzugriff gehoert
 ein VPN davor, kein offener Port. Vollstaendig:
 [Vertrauensmodell und Netzwerk-Exposition](docs/deployment.md#vertrauensmodell-und-netzwerk-exposition).
@@ -136,7 +136,7 @@ Zeitplaene, TODOs. `research` ergaenzt:
 Chains (mehrere Workflows als eine Kette), den Chat-Assistenten, Learning (Auswertungen ueber
 abgelaufene Runs — Kennzahlen und Empfehlungen), Workflow-Memory (Wissen aus Runs, das in spaetere
 Runs eingespielt wird), das Audit Center (die Seite, auf der die Befunde der Audit-Workflows ueber
-die Zeit gefuehrt werden) und BPMN-Export. `full` schaltet alles frei — darunter Integrationen,
+die Zeit gefuehrt werden) und BPMN-Export/-Import. `full` schaltet alles frei — darunter Integrationen,
 Webhooks und Fernzugriff. Der Installer fragt danach; die vollstaendige Liste mit allen Modulen
 steht in [Architektur](docs/architektur.md#module-system-startkonfiguration).
 
@@ -147,14 +147,14 @@ steht in [Architektur](docs/architektur.md#module-system-startkonfiguration).
 | Backend | Spring Boot 3.5, Java 21 |
 | Frontend | React 19, TypeScript 6, Vite 8 |
 | Datenbank | SQLite (WAL-Modus) + Flyway |
-| Container | Docker (Java Docker Client 3.7.1) — optional, nur fuer Shell-Bloecke mit `container_image` |
+| Container | Docker (Java Docker Client 3.7.1) — optional; fuer Shell-Bloecke mit `container_image`, Projekt-Container und Terminal |
 | Styling | Tailwind CSS 4, CSS-Variablen |
 | State | Zustand 5 + TanStack Query 5 |
 | WebSocket | STOMP ueber SockJS |
 | Sicherheit | API-Key-Auth, Rate Limiting, Zulassungspruefung vor jedem Run; optional HMAC-signierte Workflow-Siegel |
 | i18n | Deutsch / Englisch |
 | PWA | Vite PWA Plugin |
-| Integrationen | Google Calendar, Gmail, Jira, Confluence, Trello, GitHub, Gitea/Forgejo, GitLab, Taskwarrior — Modul, im Preset `full` |
+| Integrationen | Plugin-System für externe Dienste, z. B. Google Calendar, Gmail, Jira, Confluence, Trello, GitHub, Gitea/Forgejo, GitLab, Taskwarrior; ein neuer Anbieter ist eine einzelne Klasse — Modul, im Preset `full` |
 
 Ausgefuehrt wird dort, wo die Instanz laeuft — im Container (empfohlen) oder direkt auf dem
 Rechner: Shell-Bloecke ueber die Shell des Benutzers, KI-Bloecke ueber die installierte CLI (im
@@ -204,4 +204,4 @@ GitHub).
 
 ---
 
-> 🌍 **README.de.md ist die Quelle, `README.md` die Übersetzung.** Inhaltliche Änderungen gehören in diese deutsche Datei. Die englische Fassung erzeugt der Autor daraus in seiner MySuricates-Instanz mit dem Workflow „README DE↔EN Sync"; im Repository liegt nur das Ergebnis, der Workflow selbst nicht. Wer von außen beiträgt, ändert also die deutsche Quelle und passt `README.md` im selben Commit von Hand an — oder ändert nur die deutsche und weist im Pull Request darauf hin, dass die Übersetzung noch nachzuziehen ist.
+> 🌍 **README.de.md ist die Quelle, `README.md` die Übersetzung.** Inhaltliche Änderungen gehören in diese deutsche Datei. Die englische Fassung erzeugt der Autor daraus in seiner MySuricates-Instanz mit dem Workflow „README DE↔EN Sync"; im Repository liegen das Ergebnis und der deterministische Teil des Abgleichs (`scripts/readme-sync/readme_sync.py`), die Workflow-Definition selbst nicht. Wer von außen beiträgt, ändert also die deutsche Quelle und passt `README.md` im selben Commit von Hand an — oder ändert nur die deutsche und weist im Pull Request darauf hin, dass die Übersetzung noch nachzuziehen ist.
