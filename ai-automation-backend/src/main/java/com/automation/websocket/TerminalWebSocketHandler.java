@@ -1,5 +1,6 @@
 package com.automation.websocket;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.github.dockerjava.api.DockerClient;
@@ -23,6 +24,8 @@ import java.util.concurrent.atomic.AtomicInteger;
 public class TerminalWebSocketHandler extends TextWebSocketHandler {
 
     private static final int MAX_SESSIONS_PER_CONTAINER = 3;
+    /** Upper bound for a terminal dimension passed to Docker; anything wider is no real terminal. */
+    private static final int MAX_TERMINAL_SIZE = 1000;
 
     private final WorkflowExecutionRegistry executionRegistry;
     private final DockerClient dockerClient;
@@ -72,18 +75,18 @@ public class TerminalWebSocketHandler extends TextWebSocketHandler {
 
         String payload = message.getPayload();
 
-        // Check for JSON control messages (resize)
+        // Check for JSON control messages (resize). A resize without cols/rows takes the defaults instead of
+        // failing – the old NullPointerException was swallowed and the JSON reached the shell as keystrokes
+        // (TODO bb86b7ef). Only input that is no JSON at all falls through as raw input.
         if (payload.startsWith("{")) {
             try {
                 JsonNode json = objectMapper.readTree(payload);
-                if (json.has("type") && "resize".equals(json.get("type").asText())) {
-                    int cols = json.get("cols").asInt(80);
-                    int rows = json.get("rows").asInt(24);
-                    terminal.resize(cols, rows);
+                if ("resize".equals(json.path("type").asText())) {
+                    terminal.resize(terminalSize(json.path("cols"), 80), terminalSize(json.path("rows"), 24));
                     return;
                 }
-            } catch (Exception e) {
-                // Not a control message, treat as raw input
+            } catch (JsonProcessingException e) {
+                // Not JSON, treat as raw input
             }
         }
 
@@ -112,6 +115,17 @@ public class TerminalWebSocketHandler extends TextWebSocketHandler {
     @Override
     public void handleTransportError(WebSocketSession session, Throwable exception) {
         log.warn("Terminal WebSocket transport error: session={}, error={}", session.getId(), exception.getMessage());
+    }
+
+    /**
+     * One terminal dimension from a resize message: missing, non-numeric or not positive takes
+     * {@code fallback}, anything above {@link #MAX_TERMINAL_SIZE} is capped. Read as long, so a huge
+     * number cannot wrap around into a small or negative int.
+     */
+    static int terminalSize(JsonNode value, int fallback) {
+        long size = value.asLong(fallback);
+        if (size <= 0) return fallback;
+        return (int) Math.min(size, MAX_TERMINAL_SIZE);
     }
 
     private String extractRunId(WebSocketSession session) {

@@ -27,6 +27,8 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -152,9 +154,13 @@ class SearchControllerTest {
                 .andExpect(jsonPath("$[0].workflowName").value("(unknown)"));
     }
 
+    /**
+     * Wanted behavior (TODO 8697722b, finding 6a278546): an empty request is not an error but an empty
+     * result – the request record carries no constraint and the endpoint no {@code @Valid}, so a blank
+     * or missing {@code query} reaches the guard and answers 200 with an empty list, without asking the model.
+     */
     @Test
     void semantic_returnsOkEmpty_whenQueryIsBlank() throws Exception {
-        // Controller has no @Valid on @RequestBody — blank query handled by guard → 200 OK empty
         when(semanticSearchService.isEnabled()).thenReturn(true);
 
         mockMvc.perform(post("/api/v1/search/workflows/semantic")
@@ -164,6 +170,20 @@ class SearchControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$").isArray())
                 .andExpect(jsonPath("$.length()").value(0));
+        verify(semanticSearchService, never()).search(anyString(), anyInt());
+    }
+
+    @Test
+    void semantic_returnsOkEmpty_whenQueryIsMissing() throws Exception {
+        when(semanticSearchService.isEnabled()).thenReturn(true);
+
+        mockMvc.perform(post("/api/v1/search/workflows/semantic")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"limit\": 5}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$").isArray())
+                .andExpect(jsonPath("$.length()").value(0));
+        verify(semanticSearchService, never()).search(anyString(), anyInt());
     }
 
     // ── Helpers ──────────────────────────────────────────────────────────────

@@ -71,6 +71,8 @@ public class TodoController {
      * Defaults are OPEN, MEDIUM and source USER; an unknown {@code projectId} or {@code linkedWorkflowId} returns 404,
      * and a new OPEN TODO can start matching TODO triggers. {@code agentSessionRef} keeps only the conversation UUID
      * found in the value (a whole {@code claude --resume} command is accepted); a value without a UUID is dropped.
+     * {@code dueDate} is an ISO timestamp or a plain date ({@code 2026-10-15}, meaning the end of that day in UTC);
+     * anything else returns 400.
      */
     @PostMapping
     public ResponseEntity<TodoResponse> createTodo(@Valid @RequestBody CreateTodoRequest request) {
@@ -87,6 +89,7 @@ public class TodoController {
     /**
      * Updates the fields sent in the body and leaves the others unchanged.
      * An empty {@code dueDate} or {@code linkedWorkflowId} clears it; an unknown project or workflow id returns 404.
+     * {@code dueDate} takes the same forms as on create, anything else returns 400.
      */
     @PutMapping("/{id}")
     public TodoResponse updateTodo(@PathVariable String id, @RequestBody UpdateTodoRequest request) {

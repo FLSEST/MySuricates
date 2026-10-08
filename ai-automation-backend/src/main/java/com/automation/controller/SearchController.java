@@ -6,7 +6,6 @@ import com.automation.mapper.WorkflowMapper;
 import com.automation.service.search.SemanticWorkflowSearchService;
 import com.automation.service.search.SemanticWorkflowSearchService.SemanticHit;
 import com.automation.service.workflow.WorkflowService;
-import jakarta.validation.constraints.NotBlank;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -31,7 +30,11 @@ public class SearchController {
 
     public record SearchResponse(List<WorkflowResponse> workflows) {}
 
-    public record SemanticSearchRequest(@NotBlank String query, Integer limit) {}
+    /**
+     * Deliberately without constraints and without {@code @Valid} at the endpoint: a blank or missing
+     * {@code query} is an empty result (200), not an error.
+     */
+    public record SemanticSearchRequest(String query, Integer limit) {}
 
     public record SemanticSearchResult(
             String workflowId,
