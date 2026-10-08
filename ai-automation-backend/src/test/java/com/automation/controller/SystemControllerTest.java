@@ -1,5 +1,9 @@
 package com.automation.controller;
 
+import ch.qos.logback.classic.Level;
+import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.read.ListAppender;
 import com.automation.exception.GlobalExceptionHandler;
 import com.automation.security.RateLimitConfig;
 import com.automation.service.activitylog.ActivityLogService;
@@ -9,6 +13,7 @@ import com.automation.service.system.SystemIdentityService;
 import com.automation.service.system.TailscaleService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
@@ -21,6 +26,7 @@ import javax.sql.DataSource;
 import java.lang.management.MemoryUsage;
 import java.sql.Connection;
 import java.sql.Statement;
+import java.util.List;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -125,6 +131,96 @@ class SystemControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"message\":\"test error\",\"stack\":\"Error: test\\n  at foo\",\"source\":\"react\",\"url\":\"http://localhost:3000/\",\"timestamp\":\"2026-01-01T00:00:00Z\"}"))
                 .andExpect(status().isAccepted());
+    }
+
+    /** TODO 3af3ac13: line breaks and other control characters in a report must not forge log lines. */
+    @Test
+    void clientErrors_controlCharactersCannotForgeLogLines() throws Exception {
+        Map<String, String> report = Map.of(
+                "message", "boom\r\n2026-10-08 12:00:00.000  ERROR 1 --- [main] forged",
+                "stack", "Error: x forged\n  at foo",
+                "source", "react\u0085forged",
+                "url", "http://localhost:3000/\n\u001b[31mfake",
+                "timestamp", "2026-10-08T12:00:00Z");
+
+        List<String> logged = captureClientErrorLog(() -> mockMvc.perform(post("/api/v1/system/client-errors")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(report)))
+                .andExpect(status().isAccepted()));
+
+        assertThat(logged).singleElement().satisfies(line -> {
+            assertThat(line).doesNotContainPattern("[\\p{Cc}\\p{Zl}\\p{Zp}]");
+            assertThat(line).contains("boom 2026-10-08 12:00:00.000  ERROR 1 --- [main] forged",
+                    "source=react forged", "url=http://localhost:3000/ [31mfake", "Error: x forged");
+        });
+    }
+
+    /** TODO 3af3ac13: an accepted report still ends up as one line of bounded length. */
+    @Test
+    void clientErrors_longFieldsAreCutToAFixedLengthInTheLog() throws Exception {
+        Map<String, String> report = Map.of(
+                "message", "m".repeat(9_000),
+                "stack", "s".repeat(20_000),
+                "source", "react",
+                "url", "http://localhost:3000/?q=" + "u".repeat(5_000));
+
+        List<String> logged = captureClientErrorLog(() -> mockMvc.perform(post("/api/v1/system/client-errors")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(report)))
+                .andExpect(status().isAccepted()));
+
+        assertThat(logged).singleElement().satisfies(line -> {
+            assertThat(line.length()).isLessThan(2_500);
+            assertThat(line).contains("m".repeat(100) + "…", "u".repeat(100) + "…", "s".repeat(100) + "…");
+        });
+    }
+
+    /** TODO 3af3ac13: a report beyond the field limits is refused with 400 and leaves no log line. */
+    @Test
+    void clientErrors_oversizedReport_returns400AndLogsNothing() throws Exception {
+        Map<String, String> report = Map.of("message", "m".repeat(10_001), "source", "react");
+
+        List<String> logged = captureClientErrorLog(() -> mockMvc.perform(post("/api/v1/system/client-errors")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(report)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"))
+                .andExpect(jsonPath("$.fieldErrors.message").exists()));
+
+        assertThat(logged).isEmpty();
+    }
+
+    @Test
+    void logField_keepsShortValues_andNeverCutsASurrogatePairInHalf() {
+        assertThat(SystemController.logField(null, 10)).isNull();
+        assertThat(SystemController.logField("a\tb\r\nc", 10)).isEqualTo("a b c");
+        assertThat(SystemController.logField("a😀b", 2)).isEqualTo("a…");
+        assertThat(SystemController.logField("abcdef", 3)).isEqualTo("abc…");
+    }
+
+    private interface MockMvcCall {
+        void run() throws Exception;
+    }
+
+    /** Formatted messages of the {@code [CLIENT]} lines the controller logs during {@code call}. */
+    private static List<String> captureClientErrorLog(MockMvcCall call) throws Exception {
+        Logger logger = (Logger) LoggerFactory.getLogger(SystemController.class);
+        ListAppender<ILoggingEvent> appender = new ListAppender<>();
+        appender.start();
+        logger.addAppender(appender);
+        // logback-test.xml runs the root at ERROR; the report is a WARN line
+        Level previous = logger.getLevel();
+        logger.setLevel(Level.WARN);
+        try {
+            call.run();
+        } finally {
+            logger.setLevel(previous);
+            logger.detachAppender(appender);
+        }
+        return appender.list.stream()
+                .map(ILoggingEvent::getFormattedMessage)
+                .filter(message -> message.startsWith("[CLIENT]"))
+                .toList();
     }
 
     @Test

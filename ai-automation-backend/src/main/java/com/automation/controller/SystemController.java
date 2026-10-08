@@ -5,6 +5,8 @@ import com.automation.service.project.DockerExpectation;
 import com.automation.service.system.SystemIdentityService;
 import com.automation.service.system.TailscaleService;
 import com.automation.util.RuntimeClasspathGuard;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.Size;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -19,6 +21,7 @@ import java.sql.Statement;
 import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.regex.Pattern;
 
 /**
  * Core information under /api/v1/system: health, platform info, auth status, heap usage and
@@ -31,6 +34,14 @@ import java.util.Map;
 @RequiredArgsConstructor
 @Slf4j
 public class SystemController {
+
+    /** C0/C1 control characters (CR, LF, TAB, ESC, NEL, …) and the Unicode line and paragraph separators. */
+    private static final Pattern LOG_BREAKING_CHARS = Pattern.compile("[\\p{Cc}\\p{Zl}\\p{Zp}]+");
+    /** Fixed log lengths per field: one client report stays one bounded log line. */
+    private static final int LOG_MESSAGE_MAX = 1_000;
+    private static final int LOG_SOURCE_MAX = 64;
+    private static final int LOG_URL_MAX = 500;
+    private static final int LOG_STACK_MAX = 500;
 
     private final DataSource dataSource;
     private final SystemIdentityService systemIdentity;
@@ -127,14 +138,41 @@ public class SystemController {
         return result;
     }
 
-    record ClientErrorReport(String message, String stack, String source, String url, String timestamp) {}
+    /**
+     * Field limits generous enough for a real browser error (a React component stack included) and a hard
+     * stop for a bloated report (TODO 3af3ac13). The client sends fire-and-forget and ignores the status,
+     * so a 400 here cannot turn into a new error report.
+     */
+    record ClientErrorReport(
+            @Size(max = 10_000) String message,
+            @Size(max = 100_000) String stack,
+            @Size(max = 100) String source,
+            @Size(max = 8_192) String url,
+            @Size(max = 64) String timestamp) {}
 
     /** Accepts an error report from the browser client and writes it to the backend log (202). */
     @PostMapping("/client-errors")
-    public ResponseEntity<Void> reportClientError(@RequestBody ClientErrorReport report) {
-        log.warn("[CLIENT] {} | source={} url={} | {}", report.message(), report.source(), report.url(),
-                report.stack() != null ? report.stack().lines().findFirst().orElse("") : "no stack");
+    public ResponseEntity<Void> reportClientError(@Valid @RequestBody ClientErrorReport report) {
+        String firstStackLine = report.stack() != null ? report.stack().lines().findFirst().orElse("") : "no stack";
+        log.warn("[CLIENT] {} | source={} url={} | {}",
+                logField(report.message(), LOG_MESSAGE_MAX),
+                logField(report.source(), LOG_SOURCE_MAX),
+                logField(report.url(), LOG_URL_MAX),
+                logField(firstStackLine, LOG_STACK_MAX));
         return ResponseEntity.accepted().build();
+    }
+
+    /**
+     * One log-safe line of at most {@code max} characters (plus "…" when cut): every run of control
+     * characters – CR, LF, TAB, ESC, NEL – and of Unicode line/paragraph separators becomes one space,
+     * so a value cannot start a forged log line or steer a terminal. A surrogate pair is never cut in half.
+     */
+    static String logField(String value, int max) {
+        if (value == null) return null;
+        String line = LOG_BREAKING_CHARS.matcher(value).replaceAll(" ");
+        if (line.length() <= max) return line;
+        int end = max > 0 && Character.isHighSurrogate(line.charAt(max - 1)) ? max - 1 : max;
+        return line.substring(0, end) + "…";
     }
 
     /** Returns name, version, build, Java version, runtime mode, environment and the rate-limit figures; reachable without a key. */
