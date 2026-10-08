@@ -48,6 +48,8 @@ class UnattendedContainerDockerTest {
         Files.createDirectories(project.resolve(".git/hooks"));
         Files.writeString(project.resolve(".git/config"), "[core]\n\tbare = false\n");
         Files.writeString(project.resolve("seal-signing.key"), "DUMMY-SEAL-KEY");
+        Files.writeString(Files.createDirectories(project.resolve("backend/config")).resolve("application.yml"),
+                "automation:\n  hardening:\n    unattended-in-container: true\n");
         dataDir = Files.createDirectories(tmp.resolve("home/.mysuricates"));
         Files.writeString(dataDir.resolve("api-key"), "DUMMY-INSTANCE-KEY");
     }
@@ -63,13 +65,14 @@ class UnattendedContainerDockerTest {
                 (Integer) Files.getAttribute(probe, "unix:gid"),
                 List.of(dataDir.resolve("api-key"), project.resolve("backend/data/automation.db"),
                         project.resolve("seal-signing.key")),
-                tmp.resolve("home"), List.of(dataDir), "", "", 256, ProcessHandle.current().pid(), clis, List.of(), Map.of());
+                tmp.resolve("home"), List.of(dataDir), List.of(project.resolve("backend/config")), "", "", 256,
+                ProcessHandle.current().pid(), clis, List.of(), Map.of());
         UnattendedContainer.configure(new UnattendedContainer.Policy(true, () -> setup,
                 name -> run(List.of("docker", "rm", "-f", name))));
     }
 
     @Test
-    @DisplayName("an unattended shell block works in its project but reaches no key, no database, no git hook and no socket")
+    @DisplayName("an unattended shell block works in its project but reaches no key, database, git hook, startup config or socket")
     void shellBlockProbe() throws Exception {
         on(Map.of());
         String script = String.join("\n",
@@ -79,13 +82,14 @@ class UnattendedContainerDockerTest {
                 "(echo '[core]' >> .git/config) 2>/dev/null && echo gitconfig=writable || echo gitconfig=readonly",
                 "(touch .git/hooks/pre-commit) 2>/dev/null && echo hooks=writable || echo hooks=readonly",
                 "test -S /var/run/docker.sock && echo socket=yes || echo socket=no",
+                "(echo off >> backend/config/application.yml) 2>/dev/null && echo config=writable || echo config=readonly",
                 "echo written > out.txt",
                 "echo user=$(id -u) pwd=$(pwd)");
 
         ShellCommandService.ShellResult result = new ShellCommandService().execute(script, project.toString(), 120);
 
         assertThat(result.output()).doesNotContain("DUMMY-DB-CONTENT", "DUMMY-SEAL-KEY", "DUMMY-INSTANCE-KEY")
-                .contains("gitconfig=readonly", "hooks=readonly", "socket=no", "pwd=" + project);
+                .contains("gitconfig=readonly", "hooks=readonly", "socket=no", "config=readonly", "pwd=" + project);
         assertThat(Files.readString(project.resolve("out.txt")).strip()).isEqualTo("written");
         assertThat(Files.getAttribute(project.resolve("out.txt"), "unix:uid"))
                 .as("files the container writes belong to the host user").isEqualTo(Files.getAttribute(project, "unix:uid"));

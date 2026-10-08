@@ -129,6 +129,15 @@ M_ports_q="Port for %s (interface and API — one port)"
 M_ports_busy="Port %s is in use — taking %s"
 M_projects_q="Folder with your projects (mounted into the container)"
 M_socket_q="Allow shell blocks with container_image? (mounts the Docker socket — full control over Docker)"
+M_protection_title="Protection of unattended runs (schedules, webhooks, triggers)"
+M_protection_container="Container"
+M_protection_container_hint="every AI and shell step runs in a fresh container: working folder, program and login only (Docker; Claude needs a token from claude setup-token once)"
+M_protection_landlock="Landlock"
+M_protection_landlock_hint="Linux keeps these steps away from the instance's key files and database (file access only, a partial protection)"
+M_protection_off="Off"
+M_protection_off_hint="these steps run with your full rights, like runs you start yourself"
+M_protection_image="image automation-agent-workflow"
+M_protection_image_later="Container protection needs the image: bash scripts/build-agent-images.sh agent-workflow"
 
 # Build and done
 M_build_q="Build and start now?"
@@ -187,6 +196,8 @@ M_help="MySuricates setup — from a bare machine to the login in one pass.
   --bind ADDR                  address (default 127.0.0.1; 0.0.0.0 = from the network, VPN in front)
   --projects DIR               projects folder for the container (default: the folder above the clone)
   --docker-socket              container: allow shell blocks with container_image (full Docker control)
+  --protection MODE            unattended runs: container (on this machine, with Docker), landlock (Linux)
+                               or off (default off; asked in the terminal)
   --with-pi                    also install the AI CLI pi via npm (default: no, also with --yes)
   --store-ai-env               container, login mode: copy an AI login that exists here only as an environment
                                variable into ~/.config/mysuricates/ai.env (default: no, also with --yes)
@@ -215,5 +226,7 @@ M_err_bind="--bind needs an IP address"
 M_err_port="--port needs a number"
 M_err_provider="Unknown provider: %s (known: %s)"
 M_err_ai_from_host="Unknown value for --ai-from-host: %s (programs|login|all)"
+M_err_protection="--protection container|landlock|off, not '%s'"
+M_err_protection_container="--protection container needs the instance on this machine (--runtime host); an instance in a container cannot start containers for its steps yet — use landlock"
 M_err_ai_providers="Unknown provider in --ai-providers: %s (known: %s)"
 M_err_module="Unknown module: %s"

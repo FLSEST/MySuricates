@@ -64,10 +64,20 @@ class UnattendedContainerConfigurationTest {
         assertThat(setup.hiddenPaths()).containsExactly(db);
         assertThat(setup.home()).isEqualTo(Path.of(System.getProperty("user.home")));
         assertThat(setup.dataDirectories()).contains(Path.of(System.getProperty("user.home"), ".mysuricates"));
+        assertThat(setup.readOnlyInMounts()).contains(Path.of(System.getProperty("user.dir"), "config"));
         assertThat(setup.memory()).isEqualTo("6g");
         assertThat(setup.cacheVolume()).isEqualTo("mysuricates-unattended-cache");
         assertThat(setup.ownerPid()).isEqualTo(ProcessHandle.current().pid());
         assertThat(setup.uid()).isPositive();
+    }
+
+    @Test
+    @DisplayName("file locations Spring was pointed at count as startup configuration, classpath ones do not")
+    void configLocations() {
+        environment.setProperty("spring.config.additional-location", "optional:file:/etc/mysuricates/,classpath:/x.yml");
+
+        assertThat(configuration().startupConfiguration()).contains(Path.of("/etc/mysuricates"))
+                .noneMatch(p -> p.toString().contains("x.yml"));
     }
 
     @Test

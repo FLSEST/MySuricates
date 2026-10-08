@@ -40,6 +40,7 @@ MODE=""; RUNTIME=""; PRESET=""; MODULES=""; PROVIDER=""; PORT=""; PROJECTS=""; N
 LANG_OPT=""; YES=0; CHECK=0; DRY=0; SHOW_KEY=0; FROM_SOURCE=0; INSTALL=0; START=0; FORCE=0; RECONF=0
 HELP=0; SOCKET_FLAG=0; CHANGE_NAME=""; PORT_LOADED=0; LOADED_LINES=""
 LOADED_ENVIRONMENT=""; LOADED_SEALING=false; LOADED_REQUIRE_SEALED=false; AI_FROM_HOST=""; AI_PROVIDERS=""; WITH_PI=0; STORE_AI_ENV=0
+PROTECTION=""
 AI_ENV="${XDG_CONFIG_HOME:-$HOME/.config}/mysuricates/ai.env"
 die() { echo "setup.sh: $*" >&2; exit 2; }
 _prev=""
@@ -58,6 +59,7 @@ while [ "$#" -gt 0 ]; do
     --provider) PROVIDER="${2:-}"; shift ;;  --provider=*) PROVIDER="${1#*=}" ;;
     --ai-from-host) AI_FROM_HOST="${2:-}"; shift ;;  --ai-from-host=*) AI_FROM_HOST="${1#*=}" ;;
     --ai-providers) AI_PROVIDERS="${2:-}"; shift ;;  --ai-providers=*) AI_PROVIDERS="${1#*=}" ;;
+    --protection) PROTECTION="${2:-}"; shift ;;      --protection=*) PROTECTION="${1#*=}" ;;
     --port) PORT="${2:-}"; shift ;;          --port=*) PORT="${1#*=}" ;;
     --bind) BIND="${2:-}"; shift ;;          --bind=*) BIND="${1#*=}" ;;
     --projects) PROJECTS="${2:-}"; shift ;;  --projects=*) PROJECTS="${1#*=}" ;;
@@ -93,6 +95,7 @@ if [ -n "$PROVIDER" ]; then
   providers_ids | grep -x "$PROVIDER" >/dev/null || die "$(msg err_provider "$PROVIDER" "$(providers_ids | tr '\n' ' ')")"
 fi
 case "$AI_FROM_HOST" in ""|programs|login|all) ;; *) die "$(msg err_ai_from_host "$AI_FROM_HOST")" ;; esac
+case "$PROTECTION" in ""|container|landlock|off) ;; *) die "$(msg err_protection "$PROTECTION")" ;; esac
 AI_PROVIDERS="$(printf '%s' "$AI_PROVIDERS" | tr 'A-Z ' 'a-z,' | tr -s ',' | sed 's/^,//; s/,$//')"
 for p in $(printf '%s' "$AI_PROVIDERS" | tr ',' ' '); do
   providers_ids | grep -x "$p" >/dev/null || die "$(msg err_ai_providers "$p" "$(providers_ids | tr '\n' ' ')")"
@@ -327,6 +330,7 @@ step_modules() {
   [ -z "$F_PRESET" ] || custom_drop_modules   # --preset: the preset applies, no old overrides
   if [ "$INTERACTIVE" = 1 ] && { [ -z "$PRESET" ] || from_file "$F_PRESET"; }; then
     case "$PRESET" in research) def=1 ;; full) def=2 ;; *) def=0 ;; esac
+    ASKED_MODULES=1
     tui_select choice "$(msg step_of 4 ${#STEPS[@]}) · $(msg modules_title)" "$def" \
       "$(msg modules_standard)|$(msg modules_standard_hint) · $(msg recommended)" \
       "$(msg modules_research)|$(msg modules_research_hint)" \
@@ -336,7 +340,7 @@ step_modules() {
     case "$choice" in
       0) PRESET=core; custom_drop_modules ;; 1) PRESET=research; custom_drop_modules ;; 2) PRESET=full; custom_drop_modules ;;
       3)
-        PRESET=core; label="$(msg modules_custom_done)"; custom_drop_modules all
+        PRESET=core; label="$(msg modules_custom_done)"; custom_drop_modules all; CUSTOM_HARDENING=1
         items=()
         for key in "${MODULE_CATALOG_FEATURE_KEYS[@]}"; do
           tier="$(module_catalog_get TIER "$key")"; on=off; [ "$tier" = standard ] && on=on
@@ -366,8 +370,59 @@ step_modules() {
   for key in $(printf '%s' "$MODULES" | tr ',' ' '); do
     custom_set "$(prop_env "$(module_catalog_get PROPERTY "$key")")=true"
   done
+  step_protection || return $?
   tui_done "$(msg step_modules)" "${label:-$PRESET}${MODULES:+ + $MODULES}$(kept_mark modules)"
   return 0
+}
+
+# --- Protection of unattended runs (TODO 6ee57b87) ------------------------------------------------- ----
+# Keeps AI CLIs and shell blocks outside runs a person started away from the instance's keys: a container
+# per step (backend on this machine, Docker), Landlock (Linux) or nothing. The terminal asks together with the
+# module menu and suggests what this machine can do — not when --preset skipped that menu, and not after
+# "custom", whose hardening checklist already decides both switches.
+protection_container_ok() { [ "$RUNTIME" = host ] && [ "$(deps_docker_state)" = running ]; }
+protection_landlock_ok() { [ "$(uname -s)" = Linux ]; }
+protection_current() {  # what the instance file chose before, else the suggestion
+  case "
+${CUSTOM_LINES:-}" in
+    *"
+AUTOMATION_HARDENING_UNATTENDEDINCONTAINER=true"*) echo container ;;
+    *"
+AUTOMATION_HARDENING_UNATTENDEDSANDBOX=true"*) echo landlock ;;
+    *) if protection_container_ok; then echo container; elif protection_landlock_ok; then echo landlock; else echo off; fi ;;
+  esac
+}
+protection_apply() {  # container|landlock|off
+  local c=false l=false
+  case "$1" in container) c=true ;; landlock) l=true ;; esac
+  custom_set "AUTOMATION_HARDENING_UNATTENDEDINCONTAINER=$c"
+  custom_set "AUTOMATION_HARDENING_UNATTENDEDSANDBOX=$l"
+}
+step_protection() {
+  local choice rc def=0 i current ids=() opts=()
+  [ "$MODE" = staged ] && return 0
+  if [ -n "$PROTECTION" ]; then
+    [ "$PROTECTION" = container ] && [ "$RUNTIME" = container ] && die "$(msg err_protection_container)"
+    protection_apply "$PROTECTION"; return 0
+  fi
+  [ "$INTERACTIVE" = 1 ] && [ "${ASKED_MODULES:-0}" = 1 ] && [ "${CUSTOM_HARDENING:-0}" = 0 ] || return 0
+  current="$(protection_current)"
+  if protection_container_ok; then ids+=(container); opts+=("$(msg protection_container)|$(msg protection_container_hint)"); fi
+  if protection_landlock_ok; then ids+=(landlock); opts+=("$(msg protection_landlock)|$(msg protection_landlock_hint)"); fi
+  ids+=(off); opts+=("$(msg protection_off)|$(msg protection_off_hint)")
+  for i in "${!ids[@]}"; do [ "${ids[$i]}" = "$current" ] && def=$i; done
+  opts[$def]="${opts[$def]} · $(msg recommended)"
+  tui_select choice "$(msg protection_title)" "$def" "${opts[@]}"; rc=$?; [ "$rc" = 0 ] || return "$rc"
+  PROTECTION="${ids[$choice]}"
+  protection_apply "$PROTECTION"
+}
+
+# protection_image — the container protection starts nothing without its image; built with the instance
+protection_image() {
+  [ "$PROTECTION" = container ] && [ "$RUNTIME" = host ] || return 0
+  if [ "$DRY" = 1 ]; then printf '  %s\n' "$(msg dry_run "bash scripts/build-agent-images.sh agent-workflow")"; return 0; fi
+  tui_run "$(msg protection_image)" "$LOG_DIR/agent-workflow-image.log" bash "$SCRIPT_DIR/build-agent-images.sh" agent-workflow \
+    || printf '  %s\n' "$(msg protection_image_later)"
 }
 
 # --- Step 5: AI providers --------------------------------------------------------------------- -----
@@ -783,11 +838,14 @@ step_build() {
   STARTED=0
   if [ "$DO_START" = 0 ] && [ "$INTERACTIVE" = 1 ]; then tui_confirm "$(msg build_q)" y && DO_START=1; fi
   if [ "$DO_START" = 1 ]; then
+    protection_image
     for n in $INSTANCES; do start_instance "$n" || return 1; done
     STARTED=1
     [ "$MODE" = staged ] && fetch_sync_keys
   elif [ "$MODE" = staged ]; then
     printf '  %s\n' "$(msg sync_keys_later "scripts/instance.sh sync-keys --name dev")"
+  elif [ "$PROTECTION" = container ] && [ "$RUNTIME" = host ]; then
+    printf '  %s\n' "$(msg protection_image_later)"
   fi
   return 0
 }

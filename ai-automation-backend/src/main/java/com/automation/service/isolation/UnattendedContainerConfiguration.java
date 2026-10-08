@@ -25,7 +25,8 @@ import java.util.Map;
  * Hands {@link UnattendedContainer} the startup switch {@code automation.hardening.unattended-in-container}
  * and, per start, what a container gets (TODO 6ee57b87): the image, the user, the secrets to cover
  * ({@link ProcessSandboxConfiguration#hiddenPaths()}), the home and data directories that are never mounted
- * as a whole, and the CLI programs with their logins ({@link UnattendedCliAccess}).
+ * as a whole, the backend's startup configuration (read-only where a mount exposes it) and the CLI programs
+ * with their logins ({@link UnattendedCliAccess}).
  *
  * <p>With the switch on it checks once at startup, in the background, that Docker and the image are there
  * and Claude has a login for containers, and removes containers an earlier backend left running. A backend
@@ -83,12 +84,34 @@ public class UnattendedContainerConfiguration {
                 property("image", DEFAULT_IMAGE), ids[0], ids[1],
                 sandbox.hiddenPaths(), home,
                 List.of(DataHome.dir(), home.resolve(".mysuricates"), home.resolve(".autotrigger")),
+                startupConfiguration(),
                 property("cache-volume", "mysuricates-unattended-cache"),
                 property("memory", ""),
                 Integer.parseInt(property("pids-limit", "4096")),
                 ProcessHandle.current().pid(),
                 cliAccess.all(), readOnly,
                 tz == null || tz.isBlank() ? Map.of() : Map.of("TZ", tz.strip()));
+    }
+
+    /**
+     * Where this backend reads its startup configuration from: {@code config/} and {@code application.*} in
+     * its working directory (the dev instance: {@code ai-automation-backend/}, inside the repository) and any
+     * file location Spring was pointed at. Changed by an unattended run, it could turn this mode off for the
+     * next start without git showing it.
+     */
+    List<Path> startupConfiguration() {
+        Path workingDirectory = Path.of(System.getProperty("user.dir"));
+        List<Path> paths = new ArrayList<>(List.of(workingDirectory.resolve("config"),
+                workingDirectory.resolve("application.yml"), workingDirectory.resolve("application.properties")));
+        for (String property : List.of("spring.config.location", "spring.config.additional-location")) {
+            for (String location : environment.getProperty(property, "").split(",")) {
+                String file = location.strip().replaceFirst("^optional:", "").replaceFirst("^file:", "");
+                if (!file.isBlank() && !file.startsWith("classpath:")) {
+                    paths.add(workingDirectory.resolve(file).normalize());
+                }
+            }
+        }
+        return paths;
     }
 
     private String property(String name, String fallback) {

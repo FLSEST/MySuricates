@@ -101,6 +101,21 @@ final class UnattendedContainerMounts {
         return result;
     }
 
+    /** Read-only binds for those of {@code paths} that exist under a mount, in container paths. */
+    static List<UnattendedContainerCommand.Bind> readOnly(List<Path> mounted, Collection<Path> paths) {
+        List<UnattendedContainerCommand.Bind> binds = new ArrayList<>();
+        for (Path root : mounted) {
+            Path realRoot = real(root);
+            for (Path path : paths) {
+                if (Files.exists(path)) {
+                    inside(root, realRoot, path).ifPresent(p -> binds.add(
+                            new UnattendedContainerCommand.Bind(real(path), p, true)));
+                }
+            }
+        }
+        return binds;
+    }
+
     /** {@code path} as seen under {@code root} in the container, compared by real paths (symlinks on either side). */
     private static Optional<String> inside(Path root, Path realRoot, Path path) {
         Path normalized = path.toAbsolutePath().normalize();

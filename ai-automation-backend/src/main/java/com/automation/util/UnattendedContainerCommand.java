@@ -21,8 +21,10 @@ import java.util.Objects;
  * user. Secrets inside a mounted directory are covered: a file by an empty read-only file, the database by an
  * empty directory over its folder (journal files and backups appear there later), a data directory likewise.
  * Git's {@code config} and {@code hooks} are read-only: both run commands on the host the next time anybody
- * uses git there. A working directory that is the home directory, contains it, or is a data directory is
- * refused rather than masked piece by piece.
+ * uses git there, and so is the backend's own startup configuration when the instance's repository is the
+ * working directory (it could turn this mode off for the next start, unseen by git). A working directory
+ * that is the home directory, contains it, or is a data directory is refused rather than masked piece by
+ * piece.
  */
 public final class UnattendedContainerCommand {
 
@@ -62,11 +64,13 @@ public final class UnattendedContainerCommand {
      * @param hiddenPaths    the instance's secrets ({@code ProcessSandboxConfiguration})
      * @param home           the user's home: never mounted, nor anything containing it
      * @param dataDirectories data directories of the instance: never mounted as a whole, empty inside a mount
+     * @param readOnlyInMounts the backend's own startup configuration: read-only where a mount exposes it
      * @param cacheVolume    named volume for Maven/npm/pip downloads shared by unattended runs; blank: none
      * @param memory         {@code --memory} value; blank: no limit
      * @param environment    plain variables set inline (time zone and the like), never secrets
      */
     public record Setup(String image, int uid, int gid, Collection<Path> hiddenPaths, Path home, Collection<Path> dataDirectories,
+                        Collection<Path> readOnlyInMounts,
                         String cacheVolume, String memory, int pidsLimit, long ownerPid,
                         Map<String, CliAccess> clis, List<Bind> extraReadOnly, Map<String, String> environment) {
         public Setup {
@@ -74,6 +78,7 @@ public final class UnattendedContainerCommand {
             hiddenPaths = List.copyOf(hiddenPaths);
             Objects.requireNonNull(home, "home");
             dataDirectories = List.copyOf(dataDirectories);
+            readOnlyInMounts = List.copyOf(readOnlyInMounts);
             clis = Map.copyOf(clis);
             extraReadOnly = List.copyOf(extraReadOnly);
             environment = Map.copyOf(environment);
@@ -136,6 +141,7 @@ public final class UnattendedContainerCommand {
         for (Path git : UnattendedContainerMounts.gitReadOnly(gitDirs)) {
             args.addAll(bind(new Bind(git, git.toString(), true)));
         }
+        UnattendedContainerMounts.readOnly(mounted, setup.readOnlyInMounts()).forEach(b -> args.addAll(bind(b)));
         setup.extraReadOnly().forEach(b -> args.addAll(bind(b)));
 
         List<String> program = new ArrayList<>(command);

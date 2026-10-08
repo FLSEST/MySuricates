@@ -27,7 +27,7 @@ class UnattendedContainerCommandTest {
 
     private Setup setup(List<Path> hidden, List<Path> dataDirectories, Map<String, CliAccess> clis) {
         return new Setup("automation-agent-workflow:latest", 1000, 1001, hidden, tmp.resolve("home/u"), dataDirectories,
-                "", "", 4096, 42L, clis, List.of(), Map.of());
+                List.of(), "", "", 4096, 42L, clis, List.of(), Map.of());
     }
 
     private Setup plain() {
@@ -97,8 +97,8 @@ class UnattendedContainerCommandTest {
         @Test
         @DisplayName("a cache volume holds Maven, npm and pip downloads; memory is limited only when configured")
         void cacheAndMemory() {
-            Setup setup = new Setup("img", 1000, 1000, List.of(), tmp.resolve("home/u"), List.of(), "cache-vol", "6g", 100,
-                    1L, Map.of(), List.of(), Map.of("TZ", "Europe/Berlin"));
+            Setup setup = new Setup("img", 1000, 1000, List.of(), tmp.resolve("home/u"), List.of(), List.of(), "cache-vol",
+                    "6g", 100, 1L, Map.of(), List.of(), Map.of("TZ", "Europe/Berlin"));
 
             Plan plan = build(setup, null, "/bin/bash", "-c", "true");
 
@@ -192,6 +192,19 @@ class UnattendedContainerCommandTest {
 
             assertThat(mounts(build(setup(List.of(db), List.of(), Map.of()), link, "x")))
                     .contains("type=tmpfs,dst=" + link.resolve("data"));
+        }
+
+        @Test
+        @DisplayName("the backend's startup configuration is read-only where the working directory exposes it")
+        void startupConfiguration() throws IOException {
+            Path workdir = project();
+            Path config = Files.createDirectories(workdir.resolve("backend/config"));
+            Setup setup = new Setup("img", 1000, 1000, List.of(), tmp.resolve("home/u"), List.of(),
+                    List.of(config, workdir.resolve("backend/application.yml")), "", "", 64, 1L, Map.of(), List.of(), Map.of());
+
+            assertThat(mounts(build(setup, workdir, "x")))
+                    .contains("type=bind,src=" + config + ",dst=" + config + ",readonly")
+                    .as("a missing file needs no bind").noneMatch(m -> m.contains("application.yml"));
         }
 
         @Test

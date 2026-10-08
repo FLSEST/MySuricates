@@ -128,6 +128,15 @@ M_ports_q="Port für %s (Oberfläche und API — ein Port)"
 M_ports_busy="Port %s ist belegt — nehme %s"
 M_projects_q="Ordner mit deinen Projekten (wird in den Container eingebunden)"
 M_socket_q="Shell-Blöcke mit container_image erlauben? (bindet den Docker-Socket ein — volle Kontrolle über Docker)"
+M_protection_title="Schutz unbeaufsichtigter Läufe (Zeitpläne, Webhooks, Trigger)"
+M_protection_container="Container"
+M_protection_container_hint="jeder KI- und Shell-Schritt läuft in einem frischen Container: nur Arbeitsordner, Programm und Anmeldung (Docker; Claude braucht einmal ein Token aus claude setup-token)"
+M_protection_landlock="Landlock"
+M_protection_landlock_hint="Linux hält diese Schritte von Schlüsseldateien und Datenbank der Instanz fern (nur Dateizugriffe, ein Teilschutz)"
+M_protection_off="Aus"
+M_protection_off_hint="diese Schritte laufen mit deinen vollen Rechten, wie selbst gestartete Läufe"
+M_protection_image="Image automation-agent-workflow"
+M_protection_image_later="Der Container-Schutz braucht das Image: bash scripts/build-agent-images.sh agent-workflow"
 
 # Build and done
 M_build_q="Jetzt bauen und starten?"
@@ -186,6 +195,8 @@ M_help="MySuricates-Einrichtung — von der nackten Maschine bis zum Login in ei
   --bind ADDR                  Adresse (Default 127.0.0.1; 0.0.0.0 = aus dem Netz, VPN davor)
   --projects DIR               Projektordner für den Container (Default: Ordner über dem Klon)
   --docker-socket              Container: Shell-Blöcke mit container_image erlauben (volle Docker-Kontrolle)
+  --protection ART             unbeaufsichtigte Läufe: container (auf dem Rechner, mit Docker), landlock (Linux)
+                               oder off (Standard off; im Terminal gefragt)
   --with-pi                    die KI-CLI pi per npm mitinstallieren (Default: nein, auch mit --yes)
   --store-ai-env               Container, Modus login: eine KI-Anmeldung, die hier nur als Umgebungsvariable
                                besteht, nach ~/.config/mysuricates/ai.env übernehmen (Default: nein, auch mit --yes)
@@ -214,5 +225,7 @@ M_err_bind="--bind braucht eine IP-Adresse"
 M_err_port="--port braucht eine Zahl"
 M_err_provider="Unbekannter Anbieter: %s (bekannt: %s)"
 M_err_ai_from_host="Unbekannter Wert für --ai-from-host: %s (programs|login|all)"
+M_err_protection="--protection container|landlock|off, nicht '%s'"
+M_err_protection_container="--protection container braucht die Instanz direkt auf dem Rechner (--runtime host); eine Instanz im Container kann für ihre Schritte noch keine Container starten — nimm landlock"
 M_err_ai_providers="Unbekannter Anbieter in --ai-providers: %s (bekannt: %s)"
 M_err_module="Unbekanntes Modul: %s"

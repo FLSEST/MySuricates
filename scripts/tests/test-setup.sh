@@ -252,6 +252,23 @@ check "--bind 0.0.0.0 for access from the network" '[ "$(run --yes --dry-run --r
 check "bound to 127.0.0.1 by default"             'rm -rf "$INST"; [ "$(run --yes --dry-run --runtime host)" = 0 ] && [ "$(val main MYSURICATES_BIND)" = 127.0.0.1 ]'
 check "--bind rejects non-addresses"              '[ "$(run --bind "x;y")" = 2 ]'
 
+echo "6a) protection of unattended runs (6ee57b87)"
+rm -rf "$INST"
+check "unknown --protection exits 2"                    '[ "$(run --yes --dry-run --protection moon)" = 2 ] && out | grep -- "--protection" >/dev/null'
+check "without the flag nothing is switched"            '[ "$(run --yes --dry-run --runtime host)" = 0 ] && [ -z "$(val main AUTOMATION_HARDENING_UNATTENDEDINCONTAINER)" ] && [ -z "$(val main AUTOMATION_HARDENING_UNATTENDEDSANDBOX)" ]'
+rm -rf "$INST"
+check "container on this machine: switch on, sandbox off, image built with the start" \
+  '[ "$(run --yes --dry-run --runtime host --protection container)" = 0 ] && [ "$(val main AUTOMATION_HARDENING_UNATTENDEDINCONTAINER)" = true ] && [ "$(val main AUTOMATION_HARDENING_UNATTENDEDSANDBOX)" = false ] && out | grep -F "build-agent-images.sh agent-workflow" >/dev/null'
+rm -rf "$INST"
+check "landlock for an instance in a container"         '[ "$(run --yes --dry-run --runtime container --protection landlock)" = 0 ] && [ "$(val main AUTOMATION_HARDENING_UNATTENDEDSANDBOX)" = true ] && [ "$(val main AUTOMATION_HARDENING_UNATTENDEDINCONTAINER)" = false ]'
+rm -rf "$INST"
+check "container for an instance in a container exits 2 and says why" \
+  '[ "$(run --yes --dry-run --runtime container --protection container)" = 2 ] && out | grep -- "--runtime host" >/dev/null'
+rm -rf "$INST"
+check "off writes both switches off"                    '[ "$(run --yes --dry-run --runtime host --protection off)" = 0 ] && [ "$(val main AUTOMATION_HARDENING_UNATTENDEDINCONTAINER)" = false ] && [ "$(val main AUTOMATION_HARDENING_UNATTENDEDSANDBOX)" = false ]'
+check "--help names --protection in both languages"     'bash "$SETUP" --help | grep -- "--protection" >/dev/null && bash "$SETUP" --help --lang de | grep -- "--protection" >/dev/null'
+rm -rf "$INST"; mkdir -p "$INST"
+
 echo "6b) --bind on one address: the port choice asks there, not on 127.0.0.1 (065144ee)"
 # Like instance.sh (3d002903): with --bind to an address the instance only listens there. The port choice
 # asked 127.0.0.1 — an occupation on the bound address it did not see (up then refused), one
@@ -416,25 +433,27 @@ if command -v script >/dev/null 2>&1 && script -qec true /dev/null >/dev/null 2>
   C8="$(firstfree 19820)"; C8N="$(firstfree $((C8 + 1)))"
   c8_file() { rm -rf "$INST"; mkdir -p "$INST"; printf 'MYSURICATES_RUNTIME=host\nMYSURICATES_PORT=%s\nMYSURICATES_PRESET=full\nAUTOMATION_AI_DEFAULT_PROVIDER=PI\n' "$C8" > "$INST/main.env"; }
   asked() { grep -F "$1" "$TMP/menu.txt" >/dev/null; }
-  # mode Enter · modules Enter · install pi n · provider Enter · port Enter · build n
-  c8_file; pty_run '\n|\n|n\n|\n|\n|n\n' --reconfigure
+  # mode Enter · modules Enter · protection Enter · install pi n · provider Enter · port Enter · build n
+  c8_file; pty_run '\n|\n|\n|n\n|\n|\n|n\n' --reconfigure
   check "--reconfigure: mode, modules, provider and port are asked" 'asked "Step 2 of 8" && asked "Step 4 of 8" && asked "Which provider should workflows use by default?" && asked "[$C8]:"'
+  check "... with the modules the protection of unattended runs, suggesting the container here" \
+    'asked "Protection of unattended runs" && [ "$(val main AUTOMATION_HARDENING_UNATTENDEDINCONTAINER)" = true ] && [ "$(val main AUTOMATION_HARDENING_UNATTENDEDSANDBOX)" = false ]'
   check "... Enter everywhere keeps the file's values"   '[ "$(val main MYSURICATES_RUNTIME)" = host ] && [ "$(val main MYSURICATES_PRESET)" = full ] && [ "$(val main AUTOMATION_AI_DEFAULT_PROVIDER)" = PI ] && [ "$(val main MYSURICATES_PORT)" = "$C8" ]'
   # Modules 2 (research), new port — the rest stays
-  c8_file; pty_run "\\n|2|n\\n|\\n|$C8N\\n|n\\n" --reconfigure
+  c8_file; pty_run "\\n|2|\\n|n\\n|\\n|$C8N\\n|n\\n" --reconfigure
   check "... a choice changes only that value"           '[ "$(val main MYSURICATES_PRESET)" = research ] && [ "$(val main MYSURICATES_PORT)" = "$C8N" ] && [ "$(val main MYSURICATES_RUNTIME)" = host ] && [ "$(val main AUTOMATION_AI_DEFAULT_PROVIDER)" = PI ]'
   # Without --reconfigure: „Einstellungen aendern“ in the selection menu (Enter), then the same questions
-  c8_file; pty_run '\n|\n|\n|n\n|\n|\n|n\n'
+  c8_file; pty_run '\n|\n|\n|\n|n\n|\n|\n|n\n'
   check "change settings: asked with the file's values"  'asked "Change settings of main" && asked "Step 4 of 8" && asked "[$C8]:" && [ "$(val main MYSURICATES_PRESET)" = full ] && [ "$(val main MYSURICATES_RUNTIME)" = host ] && [ "$(val main AUTOMATION_AI_DEFAULT_PROVIDER)" = PI ]'
   # „Eigene“ in the file, a preset chosen in the menu: the old module overrides no longer apply
   c8_file; printf 'AUTOMATION_MODULES_CHAINS=true\nAUTOMATION_MODULES_GOALS=false\nAUTOMATION_HARDENING_SEALING=true\n' >> "$INST/main.env"
-  pty_run '\n|1|n\n|\n|\n|n\n' --reconfigure
+  pty_run '\n|1|\n|n\n|\n|\n|n\n' --reconfigure
   check "custom → preset in the menu: old module overrides gone, hardening stays" '[ "$(val main MYSURICATES_PRESET)" = core ] && ! grep -q "^AUTOMATION_MODULES_" "$INST/main.env" && [ "$(val main AUTOMATION_HARDENING_SEALING)" = true ]'
   # Given by flag: not asked again (pi n · build n)
   c8_file; pty_run 'n\n|n\n' --reconfigure --runtime host --preset core --provider codex --port "$C8N"
   check "flags are not asked again"                      '! asked "Step 2 of 8" && ! asked "Step 4 of 8" && ! asked "[$C8N]:" && [ "$(val main MYSURICATES_PRESET)" = core ] && [ "$(val main AUTOMATION_AI_DEFAULT_PROVIDER)" = CODEX ]'
-  # „Neu einrichten“ does not start from the file: selection 2 · mode 2 (machine) · modules · pi n · port · build n
-  c8_file; pty_run '2|2|\n|n\n|\n|n\n'
+  # „Neu einrichten“ does not start from the file: selection 2 · mode 2 (machine) · modules · protection · pi n · port · build n
+  c8_file; pty_run '2|2|\n|\n|n\n|\n|n\n'
   check "set up anew: the file's values do not count"    'asked "Set up again" && [ "$(val main MYSURICATES_PRESET)" = core ] && [ "$(val main AUTOMATION_AI_DEFAULT_PROVIDER)" = CODEX ] && [ "$(val main MYSURICATES_PORT)" = "$(firstfree 9090)" ]'
   rm -rf "$INST"
 else

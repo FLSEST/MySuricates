@@ -32,7 +32,7 @@ class UnattendedContainerTest {
 
     private static UnattendedContainerCommand.Setup setup() {
         return new UnattendedContainerCommand.Setup("img", 1000, 1000, List.of(), Path.of("/nonexistent/home"), List.of(),
-                "", "", 64, 1L, Map.of(), List.of(), Map.of());
+                List.of(), "", "", 64, 1L, Map.of(), List.of(), Map.of());
     }
 
     private static void on(java.util.function.Consumer<String> remover) {
@@ -53,7 +53,7 @@ class UnattendedContainerTest {
     @DisplayName("outside an attended run the process becomes a container start, and the sandbox stays out of it")
     void unattendedRunsInContainer() {
         on(name -> { });
-        ProcessSandbox.configure(new ProcessSandbox.Policy(true, () -> List.of(Path.of("/srv/api-key"))));
+        ProcessSandbox.configure(new ProcessSandbox.Policy(true, () -> List.of(Path.of("/srv/api-key")), Path.of("/usr/bin/python3")));
         ProcessBuilder pb = new ProcessBuilder("/bin/bash", "-c", "echo hi");
 
         ChildProcessEnv.isolate(pb);
