@@ -185,6 +185,21 @@ class ProbeFindings(unittest.TestCase):
         self.assertEqual(len((Path(tmp.name) / "runs/r/accepted.jsonl").read_text().splitlines()), 1)
 
 
+class FullRunFindings(unittest.TestCase):
+    """False alarms from the first 14 batches of the full run (2026-10-08)."""
+
+    def test_decimal_comma_and_inflected_identifiers_survive(self):
+        self.assertTrue(hm.survives("3,33", "takes 3.33 s"))
+        self.assertTrue(hm.survives("MvcRequestMatchern", "with MvcRequestMatchers"))
+        self.assertFalse(hm.survives("3,33", "takes 3 s"))
+        self.assertFalse(hm.survives("Wort", "word"))  # no identifier: inflection rule does not apply
+
+    def test_enumerations_with_slashes_are_no_paths(self):
+        for token in ("Port/-Duser.home/DB/Key", ".java/.ts/.tsx-Datei"):
+            self.assertFalse(hm.is_path(token), token)
+        self.assertTrue(hm.is_path("src/main/App.java"))
+
+
 class NeedsTranslation(unittest.TestCase):
     def test_english_message_with_german_todo_title_needs_none(self):
         msg = f"test(scripts): green again\n\nBody in English.\n\nTodo: {UUID_A} (Rote Shell-Suiten auf main beheben)\n"

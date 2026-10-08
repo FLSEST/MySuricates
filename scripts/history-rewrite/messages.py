@@ -199,6 +199,7 @@ PATH_ROOTS = frozenset('''
     ai-automation-backend ai-automation-frontend .github .claude node_modules target playwright cypress
 '''.split())
 FILE_EXT = re.compile(r'\.[A-Za-z][A-Za-z0-9]{0,5}$')
+GERMAN_COMPOUND_TAIL = re.compile(r'-[A-ZÄÖÜ][a-zäöüß]+$')
 
 
 def is_path(token):
@@ -208,10 +209,12 @@ def is_path(token):
     if token.startswith(('/', './', '../', '~/')):
         return True
     segments = token.split('/')
+    # Enumerations, not paths: "Port/-Duser.home/DB", ".java/.ts/.tsx-Datei", "Maven-/Spring-Logzeilen".
+    if any(seg.endswith('-') or seg.startswith('-') or not seg or GERMAN_COMPOUND_TAIL.search(seg)
+           for seg in segments):
+        return False
     if any(FILE_EXT.search(seg) for seg in segments):
         return True
-    if any(seg.endswith('-') or seg.startswith('-') or not seg for seg in segments):
-        return False
     if not all(re.fullmatch(r'[a-z0-9._-]+', seg) for seg in segments):
         return False
     return segments[0] in PATH_ROOTS or len(segments) >= 3
@@ -399,6 +402,21 @@ def private_terms():
             if t.strip() and not t.startswith('#')]
 
 
+def survives(token, text):
+    """A preserved token is still there - allowing what a correct translation changes: the German
+    decimal comma becomes a point ("1,5" -> "1.5"), and German inflection on an identifier goes
+    ("MvcRequestMatchern" -> "MvcRequestMatchers")."""
+    if token in text:
+        return True
+    if re.fullmatch(r'\d+(?:,\d+)+', token) and token.replace(',', '.') in text:
+        return True
+    for ending in ('n', 'en', 's', 'e', 'es'):
+        if token.endswith(ending) and len(token) - len(ending) >= 4 and re.search(r'[A-Z_]', token) \
+                and token[:-len(ending)] in text:
+            return True
+    return False
+
+
 def problems(source, translated, terms):
     """(errors, warnings) for one translated message against its (trailer-moved) source."""
     errors, warnings = [], []
@@ -407,7 +425,7 @@ def problems(source, translated, terms):
     if t_trailers != s_trailers:
         errors.append('trailers changed')  # check() restores them before calling this
     src_text, out_text = s_subj + '\n' + s_body, t_subj + '\n' + t_body
-    missing = sorted(t for t in preserved_tokens(src_text) if t not in out_text)
+    missing = sorted(t for t in preserved_tokens(src_text) if not survives(t, out_text))
     if missing:
         errors.append('lost: ' + ', '.join(missing[:6]))
     prefix = re.match(r'^(\w+(?:\([^)]*\))?!?: |Merge \S+: |Merge )', s_subj)
