@@ -170,6 +170,42 @@ class BlockConfigSummaryFormatterTest {
         verifyNoInteractions(workflowRepository);
     }
 
+    /** The list both the workflow and the pool detail show: numbered, labelled, each block with its summary. */
+    @Test
+    void appendBlockList_numbersBlocksWithLabelAndSummary() {
+        Map<String, Object> blankLabel = new LinkedHashMap<>();
+        blankLabel.put("label", " ");
+        blankLabel.put("question", "Deployen?");
+        List<BlockDefinition> blocks = List.of(
+                BlockDefinition.builder().type("shell").config(Map.of("label", "Build", "command", "make")).build(),
+                BlockDefinition.builder().type("approval").config(blankLabel).build(),
+                BlockDefinition.builder().type("sub-workflow").config(Map.of("workflow_id", "wf-1")).build(),
+                BlockDefinition.builder().type("approval").config(null).build());
+        when(workflowRepository.findIdAndNameByIdIn(Set.of("wf-1")))
+                .thenReturn(List.<Object[]>of(new Object[]{"wf-1", "Nachtlauf"}));
+        StringBuilder sb = new StringBuilder("head\n");
+
+        formatter.appendBlockList(sb, blocks);
+
+        assertThat(sb).hasToString("head\n\nBlocks (4):\n"
+                + "  1. [shell] Build\n     command: make\n"
+                + "  2. [approval]\n     question: Deployen?\n"
+                + "  3. [sub-workflow]\n     sub-workflow: Nachtlauf\n"
+                + "  4. [approval]\n");
+        verify(workflowRepository, times(1)).findIdAndNameByIdIn(any());
+    }
+
+    @Test
+    void appendBlockList_withoutBlocks_appendsNothing() {
+        StringBuilder sb = new StringBuilder("head\n");
+
+        formatter.appendBlockList(sb, null);
+        formatter.appendBlockList(sb, List.of());
+
+        assertThat(sb).hasToString("head\n");
+        verifyNoInteractions(workflowRepository);
+    }
+
     @Test
     void humanInput_showsPromptInputTypeAndFormFields() {
         assertThat(summary("human-input", Map.of("prompt", "Welche Version?", "input_type", "select",

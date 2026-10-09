@@ -1,6 +1,7 @@
 package com.automation.service.assistant.fetch;
 
 import com.automation.entity.BlockDefinition;
+import com.automation.entity.Workflow;
 import com.automation.repository.WorkflowRepository;
 import com.automation.service.assistant.format.AssistantFormatUtils;
 import lombok.RequiredArgsConstructor;
@@ -25,79 +26,75 @@ public class WorkflowFetchHandler {
 
     public String formatWorkflowDetail(String workflowId) {
         try {
-            return workflowRepository.findById(workflowId).map(wf -> {
-                var sb = new StringBuilder();
-                String projectName = wf.getProject() != null ? wf.getProject().getName() : "—";
-                String projectId = wf.getProject() != null ? wf.getProject().getId() : "—";
-                sb.append("**Workflow: ").append(wf.getName()).append("** (").append(projectName).append(")\n");
-                sb.append("Project ID: ").append(projectId).append("\n");
-                if (wf.getDescription() != null && !wf.getDescription().isBlank()) {
-                    sb.append("Description: ").append(AssistantFormatUtils.truncate(wf.getDescription().trim(), 150)).append("\n");
-                }
-                if (wf.getModel() != null && !wf.getModel().isBlank()) {
-                    sb.append("Model: ").append(wf.getModel()).append("\n");
-                }
-                if (wf.getInstructions() != null && !wf.getInstructions().isBlank()) {
-                    sb.append("Instructions: ").append(AssistantFormatUtils.truncate(wf.getInstructions().trim(), 400)).append("\n");
-                }
-                var blocks = wf.getBlocks();
-                if (blocks != null && !blocks.isEmpty()) {
-                    sb.append("\nBlocks (").append(blocks.size()).append("):\n");
-                    Map<String, String> subWorkflowNames = blockConfigSummaryFormatter.subWorkflowNames(blocks);
-                    for (int i = 0; i < blocks.size(); i++) {
-                        BlockDefinition block = blocks.get(i);
-                        Map<String, Object> cfg = block.getConfig() != null ? block.getConfig() : Map.of();
-                        String label = cfg.containsKey("label") ? String.valueOf(cfg.get("label")) : "";
-                        sb.append("  ").append(i + 1).append(". [").append(block.getType()).append("]");
-                        if (!label.isBlank()) sb.append(" ").append(label);
-                        sb.append("\n");
-                        blockConfigSummaryFormatter.appendBlockConfigSummary(sb, block.getType(), cfg, subWorkflowNames);
-                    }
-                }
-                return sb.toString();
-            }).orElse("Workflow " + workflowId + " not found.\n");
+            return workflowRepository.findById(workflowId).map(this::workflowDetail)
+                    .orElse("Workflow " + workflowId + " not found.\n");
         } catch (Exception e) {
             log.debug("Could not fetch workflow detail for {}", workflowId, e);
             return "";
         }
     }
 
+    private String workflowDetail(Workflow wf) {
+        var sb = new StringBuilder();
+        String projectName = wf.getProject() != null ? wf.getProject().getName() : "—";
+        String projectId = wf.getProject() != null ? wf.getProject().getId() : "—";
+        sb.append("**Workflow: ").append(wf.getName()).append("** (").append(projectName).append(")\n");
+        sb.append("Project ID: ").append(projectId).append("\n");
+        if (wf.getDescription() != null && !wf.getDescription().isBlank()) {
+            sb.append("Description: ").append(AssistantFormatUtils.truncate(wf.getDescription().trim(), 150)).append("\n");
+        }
+        if (wf.getModel() != null && !wf.getModel().isBlank()) {
+            sb.append("Model: ").append(wf.getModel()).append("\n");
+        }
+        if (wf.getInstructions() != null && !wf.getInstructions().isBlank()) {
+            sb.append("Instructions: ").append(AssistantFormatUtils.truncate(wf.getInstructions().trim(), 400)).append("\n");
+        }
+        blockConfigSummaryFormatter.appendBlockList(sb, wf.getBlocks());
+        return sb.toString();
+    }
+
     public String formatWorkflowFull(String workflowId) {
         try {
-            return workflowRepository.findById(workflowId).map(wf -> {
-                var sb = new StringBuilder();
-                String projectName = wf.getProject() != null ? wf.getProject().getName() : "—";
-                sb.append("**Workflow (full): ").append(wf.getName()).append("** (").append(projectName).append(")\n");
-                sb.append("ID: ").append(wf.getId()).append("\n");
-                if (wf.getModel() != null && !wf.getModel().isBlank()) {
-                    sb.append("Model: ").append(wf.getModel()).append("\n");
-                }
-                if (wf.getInstructions() != null && !wf.getInstructions().isBlank()) {
-                    sb.append("Instructions: ").append(AssistantFormatUtils.truncate(wf.getInstructions().trim(), 600)).append("\n");
-                }
-                if (wf.getDefaultContext() != null && !wf.getDefaultContext().isEmpty()) {
-                    sb.append("Default inputs: ").append(wf.getDefaultContext()).append("\n");
-                }
-                var blocks = wf.getBlocks();
-                if (blocks != null && !blocks.isEmpty()) {
-                    sb.append("\nBlocks (").append(blocks.size()).append(", full config):\n");
-                    for (int i = 0; i < blocks.size(); i++) {
-                        BlockDefinition block = blocks.get(i);
-                        Map<String, Object> cfg = block.getConfig() != null ? block.getConfig() : Map.of();
-                        sb.append("  ").append(i + 1).append(". type: ").append(block.getType()).append("\n");
-                        cfg.forEach((k, v) -> {
-                            String valStr = v == null ? "null" : String.valueOf(v);
-                            sb.append("       ").append(k).append(": ")
-                              .append(AssistantFormatUtils.truncate(valStr, 300)).append("\n");
-                        });
-                    }
-                }
-                return sb.toString();
-            }).orElse("Workflow '" + workflowId + "' not found.\n");
+            return workflowRepository.findById(workflowId).map(this::workflowFull)
+                    .orElse("Workflow '" + workflowId + "' not found.\n");
         } catch (Exception e) {
             log.debug("Could not fetch workflow-full for {}", workflowId, e);
             return "";
         }
+    }
+
+    private String workflowFull(Workflow wf) {
+        var sb = new StringBuilder();
+        String projectName = wf.getProject() != null ? wf.getProject().getName() : "—";
+        sb.append("**Workflow (full): ").append(wf.getName()).append("** (").append(projectName).append(")\n");
+        sb.append("ID: ").append(wf.getId()).append("\n");
+        if (wf.getModel() != null && !wf.getModel().isBlank()) {
+            sb.append("Model: ").append(wf.getModel()).append("\n");
+        }
+        if (wf.getInstructions() != null && !wf.getInstructions().isBlank()) {
+            sb.append("Instructions: ").append(AssistantFormatUtils.truncate(wf.getInstructions().trim(), 600)).append("\n");
+        }
+        if (wf.getDefaultContext() != null && !wf.getDefaultContext().isEmpty()) {
+            sb.append("Default inputs: ").append(wf.getDefaultContext()).append("\n");
+        }
+        var blocks = wf.getBlocks();
+        if (blocks != null && !blocks.isEmpty()) {
+            sb.append("\nBlocks (").append(blocks.size()).append(", full config):\n");
+            for (int i = 0; i < blocks.size(); i++) {
+                appendFullBlock(sb, i + 1, blocks.get(i));
+            }
+        }
+        return sb.toString();
+    }
+
+    private static void appendFullBlock(StringBuilder sb, int number, BlockDefinition block) {
+        Map<String, Object> cfg = block.getConfig() != null ? block.getConfig() : Map.of();
+        sb.append("  ").append(number).append(". type: ").append(block.getType()).append("\n");
+        cfg.forEach((k, v) -> {
+            String valStr = v == null ? "null" : String.valueOf(v);
+            sb.append("       ").append(k).append(": ")
+              .append(AssistantFormatUtils.truncate(valStr, 300)).append("\n");
+        });
     }
 
     public String formatFindWorkflow(String query) {
@@ -105,7 +102,7 @@ public class WorkflowFetchHandler {
             return "Search term missing. Expected: <fetch type=\"find_workflow\" id=\"<name-or-substring>\"/>\n";
         }
         try {
-            List<com.automation.entity.Workflow> matches = workflowRepository.findByNameContainingIgnoreCase(query.trim());
+            List<Workflow> matches = workflowRepository.findByNameContainingIgnoreCase(query.trim());
             if (matches.isEmpty()) {
                 return "No workflow found whose name contains '" + query + "'.\n";
             }
