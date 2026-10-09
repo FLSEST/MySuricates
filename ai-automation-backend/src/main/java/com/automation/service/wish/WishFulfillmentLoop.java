@@ -59,8 +59,9 @@ public class WishFulfillmentLoop {
     // ── Async Orchestration ──────────────────────────────────────
 
     public void fulfillAsync(String wishId) {
-        activeCancellations.put(wishId, new AtomicBoolean(false));
-        virtualThreadExecutor.submit(() -> fulfillWish(wishId));
+        AtomicBoolean cancelFlag = new AtomicBoolean(false);
+        activeCancellations.put(wishId, cancelFlag);
+        virtualThreadExecutor.submit(() -> fulfillWish(wishId, cancelFlag));
     }
 
     public void cancel(String wishId) {
@@ -78,7 +79,7 @@ public class WishFulfillmentLoop {
 
     // ── Meta-Loop ────────────────────────────────────────────────
 
-    private void fulfillWish(String wishId) {
+    private void fulfillWish(String wishId, AtomicBoolean cancelFlag) {
         Instant deadline = Instant.now().plus(Duration.ofMinutes(wishConfig.getTotalTimeoutMinutes()));
 
         try {
@@ -102,11 +103,13 @@ public class WishFulfillmentLoop {
                 Wish wish = findById(wishId);
 
                 if (WishStatusHelper.isTerminal(wish.getStatus()) || WishStatusHelper.isPaused(wish.getStatus())) return;
+                boolean phaseRan = false;
 
                 // Phase 1: Decompose
                 if (wish.getStatus() == WishStatus.RECEIVED || wish.getStatus() == WishStatus.REFINING) {
                     WishStatusHelper.updateStatus(wishRepository, messagingTemplate, wish, WishStatus.DECOMPOSING);
                     decomposeService.decompose(wish);
+                    phaseRan = true;
                     wish = findById(wishId);
                     if (WishStatusHelper.isTerminal(wish.getStatus()) || WishStatusHelper.isPaused(wish.getStatus())) return;
                 }
@@ -115,6 +118,7 @@ public class WishFulfillmentLoop {
                 wish = findById(wishId);
                 if (wish.getStatus() == WishStatus.EXECUTING) {
                     executionService.execute(wish, () -> isCancelled(wishId));
+                    phaseRan = true;
                     wish = findById(wishId);
                     if (WishStatusHelper.isTerminal(wish.getStatus()) || WishStatusHelper.isPaused(wish.getStatus())) return;
                 }
@@ -123,9 +127,19 @@ public class WishFulfillmentLoop {
                 wish = findById(wishId);
                 if (wish.getStatus() == WishStatus.EVALUATING) {
                     evaluationService.evaluate(wish);
+                    phaseRan = true;
                     wish = findById(wishId);
                     if (WishStatusHelper.isTerminal(wish.getStatus()) || WishStatusHelper.isPaused(wish.getStatus())) return;
                     // If REFINING, loop continues
+                }
+
+                // No phase owns the status, typically DECOMPOSING: fulfillAsync has no run lock, so a second
+                // loop for the same wish meets the first one mid-decompose. Stop this one instead of spinning
+                // without a pause on the single DB connection until the total timeout.
+                if (!phaseRan) {
+                    log.warn("Wish {}: no phase handles status {} (another loop may own the wish) - stopping this loop",
+                            wishId, wish.getStatus());
+                    return;
                 }
             }
         } catch (Exception e) {
@@ -140,7 +154,8 @@ public class WishFulfillmentLoop {
                 log.error("Failed to update wish status after error", ex);
             }
         } finally {
-            activeCancellations.remove(wishId);
+            // Only this loop's own flag: a later fulfillAsync for the same wish has registered its own one
+            activeCancellations.remove(wishId, cancelFlag);
         }
     }
 
