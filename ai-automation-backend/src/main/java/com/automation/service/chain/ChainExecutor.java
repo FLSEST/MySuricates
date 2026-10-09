@@ -15,6 +15,7 @@ import org.springframework.stereotype.Service;
 import java.time.Clock;
 import java.time.Duration;
 import java.util.*;
+import java.util.concurrent.CancellationException;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -184,6 +185,14 @@ public class ChainExecutor {
             // Fresh read to avoid stale Hibernate cache
             completed = workflowRunRepository.findById(completed.getId()).orElseThrow();
             return recordOutcome(progress, entry, runEntry, completed);
+        } catch (CancellationException e) {
+            // The user cancelled the chain while waiting: like a cancelled entry run, not like a failure
+            log.info("Chain {}: cancelled while waiting for workflow {}", progress.chain.getName(), workflow.getName());
+            markCompleted(runEntry);
+            runEntry.setStatus(RunStatus.CANCELLED);
+            progress.run.setStatus(RunStatus.CANCELLED);
+            saveAndBroadcast(progress);
+            return true;
         } catch (Exception e) {
             log.error("Chain {}: Error executing workflow {}", progress.chain.getName(), workflow.getName(), e);
             return failEntry(progress, entry, runEntry, e.getMessage());

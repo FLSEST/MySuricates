@@ -11,6 +11,8 @@ import com.automation.service.workflow.WorkflowService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -623,6 +625,38 @@ class ChainExecutorTest {
         chainExecutor.execute(testChain, null);
 
         assertThat(broadcastStatuses()).containsExactly("RUNNING", "FAILED");
+    }
+
+    /**
+     * A user's cancel while an entry's run is awaited ends the entry and the chain CANCELLED, whatever
+     * stop-on-failure says — it used to count as a failed entry (chain FAILED with stop-on-failure).
+     */
+    @ParameterizedTest(name = "stopOnFailure={0}")
+    @ValueSource(booleans = {true, false})
+    void executeEntries_cancelWhileAnEntryRuns_endsTheChainCancelled(boolean stopOnFailure) {
+        setupSynchronousExecutor();
+        testChain.setStopOnFailure(stopOnFailure);
+        testChain.getEntries().forEach(entry -> entry.setStopOnFailure(stopOnFailure));
+        Workflow wf1 = Workflow.builder().id("wf-1").name("WF1").build();
+        when(workflowService.findByIdEager("wf-1")).thenReturn(wf1);
+        when(workflowExecutor.execute(eq(wf1), any(), eq(TriggerSource.CHAIN))).thenAnswer(inv -> {
+            chainExecutor.cancel("run-1");   // the user cancels while the entry's run is in motion
+            return WorkflowRun.builder().id("wfr-1").status(RunStatus.RUNNING).build();
+        });
+
+        chainExecutor.execute(testChain, null);
+
+        ChainRun saved = captureLastSavedRun();
+        assertThat(saved.getStatus()).isEqualTo(RunStatus.CANCELLED);
+        assertThat(saved.getError()).isNull();
+        assertThat(saved.getEntryRuns()).singleElement().satisfies(entry -> {
+            assertThat(entry.getStatus()).isEqualTo(RunStatus.CANCELLED);
+            assertThat(entry.getCompletedAt()).isNotNull();
+        });
+        verify(workflowService, never()).findByIdEager("wf-2");
+        verify(activityLogService).warn(eq(ActivityLog.LogCategory.EXECUTION), eq("Chain execution cancelled: Test Chain"),
+                eq("ChainExecutor"), eq("run-1"), isNull());
+        verify(activityLogService, never()).error(any(), any(), any(), any(), any());
     }
 
     /** A clock that moves one second ahead on every read, so a second read shows in a duration. */
