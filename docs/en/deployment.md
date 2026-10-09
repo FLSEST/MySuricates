@@ -281,7 +281,7 @@ matches the user to the machine through the ARGs `HOST_USER`, `HOST_UID`, `HOST_
 | `AUTOMATION_MODULES_PRESET` | `core` | Optional modules at startup: `core`, `research` or `full` (see [Module System](architektur.md#module-system-startup-configuration)) |
 | `AUTOMATION_MODULES_<NAME>` | (preset) | Switch a single module, e.g. `AUTOMATION_MODULES_REMOTE_ACCESS=true` — wins over the preset |
 | `AUTOMATION_MODULES_UI_EDITABLE` | `false` | `true` = feature modules can also be switched in the settings (applies immediately). Anyone with the API key can then turn on e.g. webhooks or the terminal — keep it off on publicly reachable instances |
-| `AUTOMATION_HARDENING_<NAME>` | `provenance`, `private-network-guard`: `true`, others `false` | Hardening flags `PROVENANCE`, `SEALING` (requires provenance), `REQUIRE_SEALED_FOR_UNATTENDED` (requires sealing), `WEBHOOK_SIGNATURES` (requires module webhooks), `PRIVATE_NETWORK_GUARD` (iCal/RSS feeds only to public addresses), `PRIVATE_NETWORK_GUARD_HTTP_API` (the same for http-api, default `false`), `PRIVATE_NETWORK_GUARD_OWN_SERVICES` (the same for CalDAV, Gitea, GitLab, ntfy and webhook notifications, default `false`) — see [Workflow Hardening](architektur.md#workflow-hardening-optional) |
+| `AUTOMATION_HARDENING_<NAME>` | `provenance`, `private-network-guard`: `true`, others `false` | Hardening flags `PROVENANCE`, `SEALING` (requires provenance), `REQUIRE_SEALED_FOR_UNATTENDED` (requires sealing), `WEBHOOK_SIGNATURES` (requires module webhooks), `PRIVATE_NETWORK_GUARD` (iCal/RSS feeds only to public addresses), `PRIVATE_NETWORK_GUARD_HTTP_API` (the same for http-api, default `false`), `PRIVATE_NETWORK_GUARD_OWN_SERVICES` (the same for CalDAV, Gitea, GitLab, ntfy and webhook notifications, default `false`), `UNATTENDED_SANDBOX` (Landlock for processes of unattended runs, default `false`), `UNATTENDED_IN_CONTAINER` (the same processes in a container, default `false`; see [Protection of unattended runs](#protection-of-unattended-runs)) — see [Workflow Hardening](architektur.md#workflow-hardening-optional) |
 | `AUTOMATION_HOST_CLAUDE_TIMEOUT` | `300` | Global Claude CLI timeout in seconds (declared in `application.yml`) |
 | `AUTOMATION_HOST_CLAUDE_MAX_TOKENS` | (empty) | Optional per-call token limit for Claude CLI |
 | `AUTOMATION_DISCOVERY_AUTO_TAGGING_ENABLED` | `true` | Tags and category of a workflow via AI (`suggestions-model`), after every create/change and at startup for untagged workflows — `false` saves these background calls (test and side instances) |
@@ -331,6 +331,8 @@ AUTOMATION_HARDENING_WEBHOOK_SIGNATURES=false
 AUTOMATION_HARDENING_PRIVATE_NETWORK_GUARD=false
 AUTOMATION_HARDENING_PRIVATE_NETWORK_GUARD_HTTP_API=false
 AUTOMATION_HARDENING_PRIVATE_NETWORK_GUARD_OWN_SERVICES=false
+AUTOMATION_HARDENING_UNATTENDED_SANDBOX=false
+AUTOMATION_HARDENING_UNATTENDED_IN_CONTAINER=false
 ```
 
 ```bash
@@ -344,6 +346,8 @@ AUTOMATION_HARDENING_WEBHOOK_SIGNATURES=true
 AUTOMATION_HARDENING_PRIVATE_NETWORK_GUARD=true
 AUTOMATION_HARDENING_PRIVATE_NETWORK_GUARD_HTTP_API=true
 AUTOMATION_HARDENING_PRIVATE_NETWORK_GUARD_OWN_SERVICES=true
+AUTOMATION_HARDENING_UNATTENDED_SANDBOX=false   # Landlock; not with the container switch
+AUTOMATION_HARDENING_UNATTENDED_IN_CONTAINER=true   # needs Docker, the image automation-agent-workflow and a Claude token, see below
 ```
 
 > **Before "maximal":** `require-sealed-for-unattended` refuses every unattended run of an unsealed workflow (schedules, webhooks, TODO/completion triggers, auto-repair, wishes — also through chains and sub-workflows). Seal the affected workflows first, or keep this one switch `false`. With `full` and `ui-editable`, anyone holding the API key can also turn on modules with network, credential and host access — only on instances that are not publicly reachable.
@@ -563,6 +567,48 @@ The Claude CLI is also invoked with `automation.cli.skip-permissions` = **`true`
 (`AUTOMATION_CLI_SKIP_PERMISSIONS`), so it does not prompt before using a tool. The exception: when
 a call carries an explicit tool whitelist, the flag is dropped and the CLI enforces the list — this
 is how `skill-capability` blocks without `allow_writes` stay read-only.
+
+### Protection of unattended runs
+
+Schedules, webhooks and triggers start runs nobody watches. Two startup switches (both off by default)
+keep the AI CLIs and shell blocks of such runs away from the instance's keys and database; runs
+started by a person (UI, API, resume) keep running as before. Which applies in which setup is in the
+README table under "Before you start it"; the mechanics are in
+[Workflow Hardening](architektur.md#workflow-hardening-optional).
+
+| Switch | What it does | Needs |
+|---|---|---|
+| `unattended-sandbox` | Linux Landlock hides key files, database and backups from the process — file access only, other services of the user (Docker, for example) stay reachable: a partial protection | Linux with Landlock (Ubuntu 22.04+), `python3` |
+| `unattended-in-container` | Every AI and shell process runs in a fresh container of the image `automation-agent-workflow` and sees only the working directory, the CLI program and its login — no home, no data directories, no Docker socket | Instance directly on the machine, Docker, the image, a token for Claude |
+
+**Switching on.** The installer asks for the protection in the modules step and suggests what the
+machine can do (`./scripts/setup.sh --protection container|landlock|off` without the question; with
+`container` it builds the image as well). Later: set `AUTOMATION_HARDENING_UNATTENDED_IN_CONTAINER=true`
+(or `…_UNATTENDED_SANDBOX=true`) in `deploy/instances/<name>.env` and restart the instance
+(`scripts/instance.sh down --name main`, then `up`); in the source setup put it under
+`automation.hardening:` in `ai-automation-backend/config/application.yml` and restart the backend.
+`bash scripts/build-agent-images.sh agent-workflow` builds the image; the **Containers** menu entry
+shows whether it exists and is current. Claude needs a long-lived token in containers: run
+`claude setup-token` once and put it as `CLAUDE_CODE_OAUTH_TOKEN=…` into
+`~/.config/mysuricates/ai.env` (chmod 600) — the same file as for instances in a container. Codex and
+Pi take their `auth.json` from the machine. The log line `Unattended container mode on: image …,
+CLIs […]` at startup shows the mode is active; when Docker, the image or the token is missing, the
+message next to it says so.
+
+**What changes for workflows.** Unattended shell blocks see only the run's working directory
+(project or isolated workspace) and, for a worktree, its repository. Everything else is missing:
+`docker` (blocks with `container_image` still work), `{{ home_dir }}`, files under `~`, programs
+from `~/.local/bin`, the machine's caches. Maven, npm and pip download into a shared volume
+(`mysuricates-unattended-cache`). What a run changes in the project stays — including changes the
+machine executes later (scripts, build files): review them before taking them over. Without Docker or
+the image these processes do not start at all instead of running unprotected on the machine; the
+step fails with a message.
+
+**Limits.** The container's network is not restricted; services listening on `0.0.0.0` stay
+reachable (without a key). If the backend dies, a container keeps running until the next backend
+start, which then removes it. Submodules and nested repositories are not read-only. An instance that
+runs in a container itself cannot use the mode yet — Landlock remains there. Codex' own sandbox does
+not start in the container either.
 
 ### Three trust classes for context values
 

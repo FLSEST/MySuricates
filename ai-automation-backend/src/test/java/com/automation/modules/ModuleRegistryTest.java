@@ -150,6 +150,21 @@ class ModuleRegistryTest {
     }
 
     @Test
+    void bindsTheContainerSwitchInBothSpellings() {
+        // deployment.md documents the underscored name, setup.sh writes the one without (prop_env strips dashes)
+        for (String name : java.util.List.of("AUTOMATION_HARDENING_UNATTENDED_IN_CONTAINER",
+                "AUTOMATION_HARDENING_UNATTENDEDINCONTAINER")) {
+            StandardEnvironment env = new StandardEnvironment();
+            env.getPropertySources().replace(StandardEnvironment.SYSTEM_ENVIRONMENT_PROPERTY_SOURCE_NAME,
+                    new SystemEnvironmentPropertySource(StandardEnvironment.SYSTEM_ENVIRONMENT_PROPERTY_SOURCE_NAME,
+                            Map.of(name, "true")));
+
+            assertThat(ModuleRegistry.fromEnvironment(env).isEnabled(ModuleCatalog.UNATTENDED_IN_CONTAINER))
+                    .as(name).isTrue();
+        }
+    }
+
+    @Test
     void catalogKeysPropertiesAndEnvVarsAreConsistent() {
         assertThat(ModuleCatalog.REMOTE_ACCESS.property()).isEqualTo("automation.modules.remote-access");
         assertThat(ModuleCatalog.REMOTE_ACCESS.envVar()).isEqualTo("AUTOMATION_MODULES_REMOTE_ACCESS");

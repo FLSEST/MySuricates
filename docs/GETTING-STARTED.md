@@ -97,7 +97,10 @@ Bauen · Fertig. Mit `b` geht es einen Schritt zurück, mit `q` wird abgebrochen
   (Abschnitt 4), im Zweifel Standard nehmen. Was die Module tun, steht in
   [architektur.md](architektur.md) und [deployment.md](deployment.md).
   Beim gestaffelten Betrieb bekommt Dev alle Module und Siegel (ohne Pflicht), Test und Prod Standard
-  mit Siegeln („unbeaufsichtigt nur versiegelte Workflows“).
+  mit Siegeln („unbeaufsichtigt nur versiegelte Workflows“). Dazu fragt der Schritt nach dem **Schutz
+  unbeaufsichtigter Läufe** (Zeitpläne, Webhooks, Trigger) und schlägt vor, was der Rechner kann:
+  Container (Instanz auf dem Rechner, Docker da), sonst Landlock (Linux), sonst aus — was das heißt:
+  [deployment.md](deployment.md#schutz-unbeaufsichtigter-läufe).
 - **KI:** claude, codex und pi gleichrangig mit Anmeldestatus; du wählst den Standard-Anbieter.
   Fehlt pi, bietet der Installer an, es per npm mitzuinstallieren — in der geprüften, festen Version
   (Vorgabe nein, ohne Terminal `--with-pi`); für claude und codex nennt er den Befehl. Anmelden musst du dich selbst.
@@ -220,6 +223,9 @@ Oder direkt die Datei `deploy/instances/main.env` bearbeiten und die Instanz neu
 - `MYSURICATES_PORT`, `MYSURICATES_BIND`, `MYSURICATES_PRESET`, `MYSURICATES_PROJECTS`
 - `MYSURICATES_DOCKER_SOCKET=1` (oder `setup.sh --docker-socket`) — erlaubt Shell-Blöcke mit
   `container_image`, gibt der Instanz aber volle Kontrolle über Docker auf dem Rechner
+- `AUTOMATION_HARDENING_UNATTENDED_IN_CONTAINER=true` oder `…_UNATTENDED_SANDBOX=true` (oder
+  `setup.sh --protection container|landlock|off`) — Schutz unbeaufsichtigter Läufe, siehe
+  [deployment.md](deployment.md#schutz-unbeaufsichtigter-läufe)
 - jede `AUTOMATION_…`-Zeile geht unverändert an die Instanz, z. B. `AUTOMATION_MODULES_WEBHOOKS=true`
   oder `AUTOMATION_AI_DEFAULT_PROVIDER=CODEX`
 

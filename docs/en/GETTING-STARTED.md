@@ -95,7 +95,10 @@ Done. `b` goes one step back, `q` quits.
   in doubt take Standard. What the modules do is in [architektur.md](architektur.md) and
   [deployment.md](deployment.md).
   Staged: Dev gets all modules and seals (not required), Test and Prod get Standard with seals
-  ("unattended runs only sealed").
+  ("unattended runs only sealed"). The step also asks for the **protection of unattended runs**
+  (schedules, webhooks, triggers) and suggests what the machine can do: container (instance on the
+  machine, Docker present), else Landlock (Linux), else off — what that means:
+  [deployment.md](deployment.md#protection-of-unattended-runs).
 - **AI:** claude, codex and pi side by side with their login state; you pick the default provider.
   If pi is missing, the installer offers to install it via npm — in the tested, fixed version
   (default no, without a terminal `--with-pi`); for claude and codex it names the command. Logging in is up to you.
@@ -215,6 +218,9 @@ flags given change something (`--reconfigure --yes --port 9095` moves only the p
 - `MYSURICATES_PORT`, `MYSURICATES_BIND`, `MYSURICATES_PRESET`, `MYSURICATES_PROJECTS`
 - `MYSURICATES_DOCKER_SOCKET=1` (or `setup.sh --docker-socket`) — allows shell blocks with
   `container_image`, but gives the instance full control over Docker on the machine
+- `AUTOMATION_HARDENING_UNATTENDED_IN_CONTAINER=true` or `…_UNATTENDED_SANDBOX=true` (or
+  `setup.sh --protection container|landlock|off`) — protection of unattended runs, see
+  [deployment.md](deployment.md#protection-of-unattended-runs)
 - every `AUTOMATION_…` line reaches the instance unchanged, e.g. `AUTOMATION_MODULES_WEBHOOKS=true`
   or `AUTOMATION_AI_DEFAULT_PROVIDER=CODEX`
 
