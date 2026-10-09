@@ -12,8 +12,8 @@ import org.springframework.context.annotation.Lazy;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 
+import java.time.Clock;
 import java.time.Duration;
-import java.time.Instant;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
@@ -36,6 +36,7 @@ public class ChainExecutor {
     private final ExecutorService virtualThreadExecutor;
     private final ActivityLogService activityLogService;
     private final ChainRunWaiter runWaiter;
+    private final Clock clock;
 
     private final Map<String, AtomicBoolean> activeCancellations = new ConcurrentHashMap<>();
 
@@ -47,7 +48,8 @@ public class ChainExecutor {
             SimpMessagingTemplate messagingTemplate,
             ExecutorService virtualThreadExecutor,
             ActivityLogService activityLogService,
-            ChainRunWaiter runWaiter
+            ChainRunWaiter runWaiter,
+            Clock clock
     ) {
         this.chainRunRepository = chainRunRepository;
         this.workflowRunRepository = workflowRunRepository;
@@ -57,6 +59,7 @@ public class ChainExecutor {
         this.virtualThreadExecutor = virtualThreadExecutor;
         this.activityLogService = activityLogService;
         this.runWaiter = runWaiter;
+        this.clock = clock;
     }
 
     public ChainRun execute(WorkflowChain chain, Map<String, Object> inputContext) {
@@ -74,7 +77,7 @@ public class ChainExecutor {
         ChainRun run = ChainRun.builder()
                 .chain(chain)
                 .status(RunStatus.RUNNING)
-                .startedAt(Instant.now())
+                .startedAt(clock.instant())
                 .inputContext(inputContext != null ? new HashMap<>(inputContext) : new HashMap<>())
                 .entryRuns(new ArrayList<>())
                 .triggeredByScheduleId(triggeredByScheduleId)
@@ -125,7 +128,7 @@ public class ChainExecutor {
                         .entryIndex(i)
                         .workflowId(entry.getWorkflowId())
                         .status(RunStatus.RUNNING)
-                        .startedAt(Instant.now())
+                        .startedAt(clock.instant())
                         .build();
 
                 Workflow workflow;
@@ -138,8 +141,8 @@ public class ChainExecutor {
                 } catch (Exception e) {
                     log.error("Chain {}: Workflow {} not found", chain.getName(), entry.getWorkflowId(), e);
                     runEntry.setStatus(RunStatus.FAILED);
-                    runEntry.setCompletedAt(Instant.now());
-                    runEntry.setDurationMs(Duration.between(runEntry.getStartedAt(), Instant.now()).toMillis());
+                    runEntry.setCompletedAt(clock.instant());
+                    runEntry.setDurationMs(Duration.between(runEntry.getStartedAt(), runEntry.getCompletedAt()).toMillis());
                     run.getEntryRuns().add(runEntry);
                     hasFailures = true;
                     chainRunRepository.save(run);
@@ -183,7 +186,7 @@ public class ChainExecutor {
                     // Fresh read to avoid stale Hibernate cache
                     completed = workflowRunRepository.findById(completed.getId()).orElseThrow();
 
-                    runEntry.setCompletedAt(Instant.now());
+                    runEntry.setCompletedAt(clock.instant());
                     runEntry.setDurationMs(Duration.between(runEntry.getStartedAt(), runEntry.getCompletedAt()).toMillis());
 
                     if (completed.getStatus() == RunStatus.COMPLETED) {
@@ -215,8 +218,8 @@ public class ChainExecutor {
                 } catch (Exception e) {
                     log.error("Chain {}: Error executing workflow {}", chain.getName(), workflow.getName(), e);
                     runEntry.setStatus(RunStatus.FAILED);
-                    runEntry.setCompletedAt(Instant.now());
-                    runEntry.setDurationMs(Duration.between(runEntry.getStartedAt(), Instant.now()).toMillis());
+                    runEntry.setCompletedAt(clock.instant());
+                    runEntry.setDurationMs(Duration.between(runEntry.getStartedAt(), runEntry.getCompletedAt()).toMillis());
                     hasFailures = true;
                     chainRunRepository.save(run);
                     broadcastStatus(runId, run);
@@ -250,7 +253,7 @@ public class ChainExecutor {
             run.setStatus(RunStatus.FAILED);
             run.setError(e.getMessage());
         } finally {
-            run.setCompletedAt(Instant.now());
+            run.setCompletedAt(clock.instant());
             if (run.getStartedAt() != null) {
                 run.setDurationMs(Duration.between(run.getStartedAt(), run.getCompletedAt()).toMillis());
             }

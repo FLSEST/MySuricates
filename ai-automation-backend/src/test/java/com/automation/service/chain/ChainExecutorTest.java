@@ -16,7 +16,11 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 
+import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
+import java.time.ZoneId;
+import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -62,19 +66,7 @@ class ChainExecutorTest {
 
     @BeforeEach
     void setUp() {
-        ChainConfig chainConfig = new ChainConfig();
-        chainConfig.setWorkflowTimeoutMinutes(180);
-
-        chainExecutor = new ChainExecutor(
-                chainRunRepository,
-                workflowRunRepository,
-                workflowService,
-                workflowExecutor,
-                messagingTemplate,
-                virtualThreadExecutor,
-                activityLogService,
-                new ChainRunWaiter(chainConfig, workflowRunRepository, stepResultRepository)
-        );
+        chainExecutor = newChainExecutor(Clock.systemUTC());
 
         testChain = WorkflowChain.builder()
                 .id("chain-1")
@@ -521,7 +513,81 @@ class ChainExecutorTest {
         assertThat(saved.getStatus()).isEqualTo(RunStatus.COMPLETED_WITH_ERRORS);
     }
 
+    /**
+     * Every failed entry's duration is completedAt − startedAt, as for a finished one. The "workflow not
+     * found" and the "execution threw" branches used to read the clock a second time for the duration.
+     */
+    @Test
+    void executeEntries_failedEntryDurationIsCompletedMinusStarted() {
+        chainExecutor = newChainExecutor(new TickingClock());
+        setupSynchronousExecutor();
+        WorkflowChain noStopChain = WorkflowChain.builder()
+                .id("chain-4").name("Failing Chain").stopOnFailure(false)
+                .entries(new ArrayList<>(List.of(
+                        ChainEntry.builder().workflowId("wf-missing").sortOrder(0).stopOnFailure(false).build(),
+                        ChainEntry.builder().workflowId("wf-1").sortOrder(1).stopOnFailure(false).build(),
+                        ChainEntry.builder().workflowId("wf-2").sortOrder(2).stopOnFailure(false).build())))
+                .build();
+        Workflow wf1 = Workflow.builder().id("wf-1").name("WF1").build();
+        Workflow wf2 = Workflow.builder().id("wf-2").name("WF2").build();
+        when(workflowService.findByIdEager("wf-missing")).thenThrow(new RuntimeException("Workflow not found"));
+        when(workflowService.findByIdEager("wf-1")).thenReturn(wf1);
+        when(workflowService.findByIdEager("wf-2")).thenReturn(wf2);
+        when(workflowExecutor.execute(eq(wf1), any(), eq(TriggerSource.CHAIN))).thenThrow(new IllegalStateException("refused"));
+        when(workflowExecutor.execute(eq(wf2), any(), eq(TriggerSource.CHAIN)))
+                .thenReturn(WorkflowRun.builder().id("wfr-2").status(RunStatus.RUNNING).build());
+        when(workflowRunRepository.findById("wfr-2"))
+                .thenReturn(Optional.of(WorkflowRun.builder().id("wfr-2").status(RunStatus.FAILED).build()));
+
+        chainExecutor.execute(noStopChain, null);
+
+        ChainRun saved = captureLastSavedRun();
+        assertThat(saved.getStatus()).isEqualTo(RunStatus.FAILED);
+        assertThat(saved.getEntryRuns()).hasSize(3).allSatisfy(entry -> {
+            assertThat(entry.getStatus()).isEqualTo(RunStatus.FAILED);
+            assertThat(entry.getDurationMs()).as("entry %s", entry.getWorkflowId())
+                    .isEqualTo(Duration.between(entry.getStartedAt(), entry.getCompletedAt()).toMillis());
+        });
+    }
+
+    /** A clock that moves one second ahead on every read, so a second read shows in a duration. */
+    private static final class TickingClock extends Clock {
+        private Instant now = Instant.parse("2026-10-09T10:00:00Z");
+
+        @Override
+        public ZoneId getZone() {
+            return ZoneOffset.UTC;
+        }
+
+        @Override
+        public Clock withZone(ZoneId zone) {
+            return this;
+        }
+
+        @Override
+        public Instant instant() {
+            now = now.plusSeconds(1);
+            return now;
+        }
+    }
+
     // --- Helpers ---
+
+    private ChainExecutor newChainExecutor(Clock clock) {
+        ChainConfig chainConfig = new ChainConfig();
+        chainConfig.setWorkflowTimeoutMinutes(180);
+        return new ChainExecutor(
+                chainRunRepository,
+                workflowRunRepository,
+                workflowService,
+                workflowExecutor,
+                messagingTemplate,
+                virtualThreadExecutor,
+                activityLogService,
+                new ChainRunWaiter(chainConfig, workflowRunRepository, stepResultRepository),
+                clock
+        );
+    }
 
     private void setupSynchronousExecutor() {
         lenient().doAnswer(inv -> {
