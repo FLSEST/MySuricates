@@ -22,9 +22,11 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Post-processes a finished block loop: parses gate/todo markers from all step outputs into
- * the context's run metadata, finalizes RUNNING -> COMPLETED, records template verification,
- * writes the activity-log entry and the dead-letter entry for FAILED runs.
+ * Post-processes a finished block loop: writes the gate verdict ({@link GateAggregation}, with the
+ * gate-missing fallback), the todo_item markers and the dashboard widget into the context's run metadata,
+ * resolves RUNNING to COMPLETED or COMPLETED_WITH_ERRORS, records template verification and writes the
+ * activity-log entry. The dead-letter entry of a FAILED run comes from {@code DeadLetterService} via
+ * {@code WorkflowRunCompletedEvent} (TODO d55c55de).
  *
  * <p>Does <b>not</b> persist the run — the final save stays in {@code WorkflowExecutor}'s
  * finally block. Extracted from {@code WorkflowExecutor} (review C1, roadmap 3.3).
