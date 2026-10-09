@@ -104,22 +104,38 @@ public class ChainExecutor {
         }
     }
 
+    /** Whether {@code runId} still has a cancel flag: from its start until its execution ended. */
+    boolean isCancellable(String runId) {
+        return activeCancellations.containsKey(runId);
+    }
+
+    /** Runs on the chain's own thread; whatever happens, the run's cancel flag goes at the end. */
     private void executeEntries(String runId, WorkflowChain chain, Map<String, Object> inputContext, TriggerSource startedBy) {
-        ChainRun run = chainRunRepository.findById(runId).orElseThrow();
-        ChainRunProgress progress = new ChainRunProgress(runId, run, chain, inputContext, startedBy,
-                activeCancellations.get(runId));
-
-        List<ChainEntry> sortedEntries = chain.getEntries().stream()
-                .sorted(Comparator.comparingInt(ChainEntry::getSortOrder))
-                .toList();
-
         try {
-            boolean stoppedEarly = runEntries(progress, sortedEntries);
+            Optional<ChainRun> run = chainRunRepository.findById(runId);
+            if (run.isEmpty()) {
+                log.error("Chain {}: run {} not found, nothing executed", chain.getName(), runId);
+                return;
+            }
+            runToEnd(new ChainRunProgress(runId, run.get(), chain, inputContext, startedBy, activeCancellations.get(runId)));
+        } catch (Exception e) {
+            // Nothing escapes the thread unnoticed: the run could not be loaded, or its end not saved
+            log.error("Chain {}: run {} could not be loaded or saved", chain.getName(), runId, e);
+        } finally {
+            activeCancellations.remove(runId);
+        }
+    }
+
+    /** Runs the entries; the run always ends with a final status, completedAt and duration, saved and broadcast. */
+    private void runToEnd(ChainRunProgress progress) {
+        ChainRun run = progress.run;
+        try {
+            boolean stoppedEarly = runEntries(progress);
             if (!stoppedEarly) {
                 run.setStatus(progress.finalStatus());
             }
         } catch (Exception e) {
-            log.error("Chain {} execution failed unexpectedly", chain.getName(), e);
+            log.error("Chain {} execution failed unexpectedly", progress.chain.getName(), e);
             run.setStatus(RunStatus.FAILED);
             run.setError(e.getMessage());
         } finally {
@@ -128,8 +144,7 @@ public class ChainExecutor {
                 run.setDurationMs(Duration.between(run.getStartedAt(), run.getCompletedAt()).toMillis());
             }
             saveAndBroadcast(progress);
-            activeCancellations.remove(runId);
-            logOutcome(chain, runId, run.getStatus());
+            logOutcome(progress.chain, progress.runId, run.getStatus());
         }
     }
 
@@ -137,7 +152,8 @@ public class ChainExecutor {
      * Runs the entries in order. True when the chain stopped early — cancelled, or a failed entry with
      * stop-on-failure — and then already carries its final status.
      */
-    private boolean runEntries(ChainRunProgress progress, List<ChainEntry> entries) {
+    private boolean runEntries(ChainRunProgress progress) {
+        List<ChainEntry> entries = progress.sortedEntries();
         for (int i = 0; i < entries.size(); i++) {
             if (progress.isCancelled()) {
                 progress.run.setStatus(RunStatus.CANCELLED);

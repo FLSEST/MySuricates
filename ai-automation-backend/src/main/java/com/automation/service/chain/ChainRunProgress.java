@@ -7,7 +7,9 @@ import com.automation.entity.TriggerSource;
 import com.automation.entity.WorkflowChain;
 import lombok.RequiredArgsConstructor;
 
+import java.util.Comparator;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -32,6 +34,13 @@ final class ChainRunProgress {
 
     boolean isCancelled() {
         return cancelled != null && cancelled.get();
+    }
+
+    /** The chain's entries in their order. */
+    List<ChainEntry> sortedEntries() {
+        return chain.getEntries().stream()
+                .sorted(Comparator.comparingInt(ChainEntry::getSortOrder))
+                .toList();
     }
 
     /** The entry run's context: chain input, then the entry's own input, then the keys only the chain sets. */

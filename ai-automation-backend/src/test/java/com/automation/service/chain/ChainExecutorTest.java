@@ -31,6 +31,7 @@ import java.util.Optional;
 import java.util.concurrent.ExecutorService;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
@@ -657,6 +658,61 @@ class ChainExecutorTest {
         verify(activityLogService).warn(eq(ActivityLog.LogCategory.EXECUTION), eq("Chain execution cancelled: Test Chain"),
                 eq("ChainExecutor"), eq("run-1"), isNull());
         verify(activityLogService, never()).error(any(), any(), any(), any(), any());
+    }
+
+    /** A run that cannot be loaded is logged and leaves nothing behind — no escaping exception, no cancel flag. */
+    @Test
+    void executeEntries_runCannotBeLoaded_logsAndDropsTheCancelFlag() {
+        lenient().doAnswer(inv -> {
+            ((Runnable) inv.getArgument(0)).run();
+            return null;
+        }).when(virtualThreadExecutor).submit(any(Runnable.class));
+        when(chainRunRepository.findById("run-1")).thenThrow(new IllegalStateException("db locked"));
+
+        assertThatCode(() -> chainExecutor.execute(testChain, null)).doesNotThrowAnyException();
+        assertThat(chainExecutor.isCancellable("run-1")).isFalse();
+
+        doReturn(Optional.empty()).when(chainRunRepository).findById("run-1");
+
+        assertThatCode(() -> chainExecutor.execute(testChain, null)).doesNotThrowAnyException();
+        assertThat(chainExecutor.isCancellable("run-1")).isFalse();
+        verify(chainRunRepository, times(2)).save(any(ChainRun.class));   // only the two creations
+        verifyNoInteractions(workflowService, messagingTemplate);
+    }
+
+    /** A loaded run never stays RUNNING: an error before the first entry ends it FAILED with that error. */
+    @Test
+    void executeEntries_errorBeforeTheFirstEntry_failsTheRun() {
+        setupSynchronousExecutor();
+        testChain.setEntries(null);
+
+        assertThatCode(() -> chainExecutor.execute(testChain, null)).doesNotThrowAnyException();
+
+        ChainRun saved = captureLastSavedRun();
+        assertThat(saved.getStatus()).isEqualTo(RunStatus.FAILED);
+        assertThat(saved.getError()).isNotBlank();
+        assertThat(saved.getCompletedAt()).isNotNull();
+        assertThat(broadcastStatuses()).containsExactly("FAILED");
+        assertThat(chainExecutor.isCancellable("run-1")).isFalse();
+        verify(activityLogService).error(eq(ActivityLog.LogCategory.EXECUTION), eq("Chain execution failed: Test Chain"),
+                eq("ChainExecutor"), eq("run-1"), isNull());
+    }
+
+    /** The cancel flag goes even when saving the run's end fails. */
+    @Test
+    void executeEntries_endCannotBeSaved_stillDropsTheCancelFlag() {
+        setupSynchronousExecutor();
+        when(workflowService.findByIdEager(any())).thenThrow(new RuntimeException("Workflow not found"));
+        when(chainRunRepository.save(any(ChainRun.class))).thenAnswer(inv -> {
+            ChainRun r = inv.getArgument(0);
+            if (r.getCompletedAt() != null) throw new IllegalStateException("db locked");
+            if (r.getId() == null) r.setId("run-1");
+            return r;
+        });
+
+        assertThatCode(() -> chainExecutor.execute(testChain, null)).doesNotThrowAnyException();
+
+        assertThat(chainExecutor.isCancellable("run-1")).isFalse();
     }
 
     /** A clock that moves one second ahead on every read, so a second read shows in a duration. */
