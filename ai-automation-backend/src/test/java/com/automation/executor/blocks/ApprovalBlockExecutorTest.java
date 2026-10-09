@@ -5,14 +5,15 @@ import com.automation.entity.StepResult;
 import com.automation.entity.StepStatus;
 import com.automation.executor.ApprovalRequest;
 import com.automation.executor.ExecutionContext;
+import com.automation.service.workflow.ExecutionBroadcaster;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -22,6 +23,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.verifyNoInteractions;
 
 @ExtendWith(MockitoExtension.class)
 class ApprovalBlockExecutorTest {
@@ -29,13 +31,13 @@ class ApprovalBlockExecutorTest {
     @Mock
     private SimpMessagingTemplate messagingTemplate;
 
-    @InjectMocks
     private ApprovalBlockExecutor executor;
 
     private ExecutionContext context;
 
     @BeforeEach
     void setUp() {
+        executor = new ApprovalBlockExecutor(new ExecutionBroadcaster(messagingTemplate));
         context = ExecutionContext.builder()
                 .containerId("container-1")
                 .workflowRunId("run-1")
@@ -68,6 +70,60 @@ class ApprovalBlockExecutorTest {
 
         assertThat(result.getStatus()).isEqualTo(StepStatus.COMPLETED);
         assertThat(result.getOutput()).contains("Approved");
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void execute_askMode_broadcastsTheQuestionAndTheAnswer_withEveryField() {
+        List<Map<String, Object>> payloads = new ArrayList<>();
+        doAnswer(invocation -> {
+            Map<String, Object> payload = invocation.getArgument(1);
+            payloads.add(new HashMap<>(payload));
+            if ("approval_required".equals(payload.get("type"))) context.resolveApproval("No");
+            return null;
+        }).when(messagingTemplate).convertAndSend(eq("/topic/executions/run-1/logs"), any(Map.class));
+        BlockDefinition block = BlockDefinition.builder()
+                .type("approval")
+                .config(new HashMap<>(Map.of("question", "Ship it?", "mode", "ask")))
+                .build();
+
+        StepResult result = executor.execute(block, context);
+
+        int stepIndex = result.getStepIndex();
+        assertThat(payloads).hasSize(2);
+        // Sent through ExecutionBroadcaster.broadcastLogMessage, like every other run log event
+        assertThat(payloads).allSatisfy(payload ->
+                assertThat(payload).containsEntry("runId", "run-1").containsKey("timestamp"));
+        assertThat(payloads.get(0))
+                .containsEntry("type", "approval_required")
+                .containsEntry("blockId", "approval-" + stepIndex)
+                .containsEntry("question", "Ship it?")
+                .containsEntry("options", List.of("Yes", "Yes always", "No"))
+                .containsEntry("rejectOptions", List.of("No"))
+                .containsEntry("stepIndex", stepIndex);
+        assertThat(payloads.get(1))
+                .containsEntry("type", "approval_resolved")
+                .containsEntry("stepIndex", stepIndex)
+                .containsEntry("answer", "No");
+    }
+
+    @Test
+    void execute_autoModeOrRememberedAnswer_asksNobody() {
+        context.rememberApproval("Deploy?", "Yes always");
+        BlockDefinition auto = BlockDefinition.builder()
+                .type("approval")
+                .config(new HashMap<>(Map.of("question", "Release?", "mode", "auto", "auto_answer", "Yes")))
+                .build();
+        BlockDefinition remembered = BlockDefinition.builder()
+                .type("approval")
+                .config(new HashMap<>(Map.of("question", "Deploy?", "mode", "ask")))
+                .build();
+
+        executor.execute(auto, context);
+        executor.execute(remembered, context);
+
+        assertThat(context.getCurrentApprovalRequest().get()).isNull();
+        verifyNoInteractions(messagingTemplate);
     }
 
     @Test
