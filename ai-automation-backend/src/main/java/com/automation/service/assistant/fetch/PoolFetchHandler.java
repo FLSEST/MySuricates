@@ -1,7 +1,6 @@
 package com.automation.service.assistant.fetch;
 
 import com.automation.dto.response.PoolWorkflowEntry;
-import com.automation.entity.BlockDefinition;
 import com.automation.service.assistant.format.AssistantFormatUtils;
 import com.automation.service.pool.WorkflowPoolService;
 import lombok.RequiredArgsConstructor;
@@ -9,7 +8,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
-import java.util.Map;
 
 /**
  * Fetch handler for the workflow pool: template index and per-template detail
@@ -62,19 +60,7 @@ public class PoolFetchHandler {
                 sb.append("Instructions: ").append(AssistantFormatUtils.truncate(entry.instructions(), 500)).append("\n");
             if (entry.defaultContext() != null && !entry.defaultContext().isEmpty())
                 sb.append("Default variables: ").append(entry.defaultContext()).append("\n");
-            if (entry.blocks() != null && !entry.blocks().isEmpty()) {
-                sb.append("\nBlocks (").append(entry.blocks().size()).append("):\n");
-                Map<String, String> subWorkflowNames = blockConfigSummaryFormatter.subWorkflowNames(entry.blocks());
-                for (int i = 0; i < entry.blocks().size(); i++) {
-                    BlockDefinition block = entry.blocks().get(i);
-                    Map<String, Object> cfg = block.getConfig() != null ? block.getConfig() : Map.of();
-                    String label = cfg.containsKey("label") ? String.valueOf(cfg.get("label")) : "";
-                    sb.append("  ").append(i + 1).append(". [").append(block.getType()).append("]");
-                    if (!label.isBlank()) sb.append(" ").append(label);
-                    sb.append("\n");
-                    blockConfigSummaryFormatter.appendBlockConfigSummary(sb, block.getType(), cfg, subWorkflowNames);
-                }
-            }
+            blockConfigSummaryFormatter.appendBlockList(sb, entry.blocks());
             return sb.toString();
         } catch (Exception e) {
             log.debug("Could not load pool workflow detail for {}", poolId, e);

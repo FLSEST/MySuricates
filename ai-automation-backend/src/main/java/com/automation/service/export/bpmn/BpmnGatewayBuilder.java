@@ -130,7 +130,7 @@ final class BpmnGatewayBuilder {
             seg.edges.add(direct);
             split.defaultFlowId = direct.id;
         } else {
-            nextRowAxis = attachRow(seg, split, merge, defaultRow, "default", nextRowAxis, true);
+            attachRow(seg, split, merge, defaultRow, "default", nextRowAxis, true);
         }
 
         seg.nodes.add(merge);

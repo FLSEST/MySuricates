@@ -15,8 +15,9 @@ import java.util.Set;
 
 /**
  * Renders a one-glance summary of a block's config (prompt/command/condition/…)
- * per block type. Shared by {@link WorkflowFetchHandler} and {@link PoolFetchHandler}
- * so stored workflows and pool templates read identically.
+ * per block type, and the numbered block list around it ({@link #appendBlockList}). Shared by
+ * {@link WorkflowFetchHandler} and {@link PoolFetchHandler} so stored workflows and pool templates
+ * read identically.
  *
  * <p>It shows the keys the executors read ({@link #SHOWN}); {@code BlockSpecConfigKeysGateTest}
  * checks each against the executor source. It used to read {@code prompt}, {@code true_blocks},
@@ -98,6 +99,28 @@ public class BlockConfigSummaryFormatter {
 
     private static boolean showsWorkflowId(String type) {
         return SHOWN.getOrDefault(type, List.of()).stream().anyMatch(item -> WORKFLOW_ID.equals(item.key()));
+    }
+
+    /**
+     * Appends the numbered block list — a {@code Blocks (n):} heading, then per block {@code [type] label}
+     * and its config summary — or nothing when there are no blocks. Resolves the sub-workflow names
+     * once for the whole list.
+     */
+    public void appendBlockList(StringBuilder sb, List<BlockDefinition> blocks) {
+        if (blocks == null || blocks.isEmpty()) {
+            return;
+        }
+        sb.append("\nBlocks (").append(blocks.size()).append("):\n");
+        Map<String, String> subWorkflowNames = subWorkflowNames(blocks);
+        for (int i = 0; i < blocks.size(); i++) {
+            BlockDefinition block = blocks.get(i);
+            Map<String, Object> cfg = block.getConfig() != null ? block.getConfig() : Map.of();
+            String label = cfg.containsKey("label") ? String.valueOf(cfg.get("label")) : "";
+            sb.append("  ").append(i + 1).append(". [").append(block.getType()).append("]");
+            if (!label.isBlank()) sb.append(" ").append(label);
+            sb.append("\n");
+            appendBlockConfigSummary(sb, block.getType(), cfg, subWorkflowNames);
+        }
     }
 
     /**

@@ -40,89 +40,11 @@ public class CommandExecutorService {
         }
     }
 
-    public CliSession.EnrichedCommandResult executeCommandEnriched(String containerId, String cliType, String command) {
-        try {
-            CliSession session = sessionManager.getOrCreateSession(containerId, cliType);
-            return session.sendCommandEnriched(command);
-        } catch (IOException e) {
-            throw new WorkflowExecutionException("Failed to execute command in container: " + containerId, e);
-        }
-    }
-
-    public CliSession.EnrichedCommandResult executeCommandEnriched(String containerId, String cliType, String command, String model) {
-        return executeCommandEnriched(containerId, cliType, command, model, null);
-    }
-
-    public CliSession.EnrichedCommandResult executeCommandEnriched(String containerId, String cliType,
-                                                                     String command, String model, String systemPrompt) {
-        try {
-            CliSession session = sessionManager.getOrCreateSession(containerId, cliType);
-            return session.sendCommandEnriched(command, model, systemPrompt);
-        } catch (IOException e) {
-            throw new WorkflowExecutionException("Failed to execute command in container: " + containerId, e);
-        }
-    }
-
-    public void injectSkillContext(String containerId, String cliType, List<Skill> activatedSkills) {
-        if (activatedSkills == null || activatedSkills.isEmpty()) {
-            return;
-        }
-
-        String aggregatedContext = buildSkillContext(activatedSkills);
-        if (!aggregatedContext.isEmpty()) {
-            executeCommand(containerId, cliType, aggregatedContext);
-        }
-    }
-
     public String buildSkillContext(List<Skill> skills) {
         return skills.stream()
                 .filter(s -> s.getAiContext() != null && !s.getAiContext().isBlank())
                 .map(s -> "=== Skill: " + s.getName() + " ===\n" + s.getAiContext())
                 .collect(Collectors.joining("\n\n"));
-    }
-
-    public StepResult executeStep(String containerId, String cliType, BlockDefinition block, int stepIndex,
-                                   String instructionPrefix, String model) {
-        return executeStepInternal(containerId, cliType, block, stepIndex, model, instructionPrefix);
-    }
-
-    public StepResult executeStep(String containerId, String cliType, BlockDefinition block, int stepIndex) {
-        return executeStepInternal(containerId, cliType, block, stepIndex, null, null);
-    }
-
-    private StepResult executeStepInternal(String containerId, String cliType, BlockDefinition block,
-                                            int stepIndex, String model, String systemPrompt) {
-        StepResult step = new StepResult();
-        step.setStepIndex(stepIndex);
-        step.setStartedAt(Instant.now());
-
-        String command = extractCommand(block);
-        step.setInput(command);
-        step.setStatus(StepStatus.RUNNING);
-
-        try {
-            CliSession.EnrichedCommandResult result =
-                    executeCommandEnriched(containerId, cliType, command, model, systemPrompt);
-            step.setOutput(result.output());
-            step.setStatus(result.exitCode() == 0 ? StepStatus.COMPLETED : StepStatus.FAILED);
-
-            if (result.parsed() != null) {
-                Map<String, Object> meta = new LinkedHashMap<>(result.parsed().toMetadata());
-                step.setMetadata(meta);
-            }
-        } catch (Exception e) {
-            log.error("Step execution failed for command in container {}: {}", containerId, e.getMessage(), e);
-            step.setOutput("Error: " + e.getMessage());
-            step.setStatus(StepStatus.FAILED);
-            step.setMetadata(Map.of("error", e.getMessage()));
-        }
-
-        step.setCompletedAt(Instant.now());
-        step.setDurationMs(
-                step.getCompletedAt().toEpochMilli() - step.getStartedAt().toEpochMilli()
-        );
-
-        return step;
     }
 
     // === Host-based execution (consolidated API) ===
@@ -197,10 +119,6 @@ public class CommandExecutorService {
         );
 
         return step;
-    }
-
-    public void injectSkillContextOnHost(String projectPath, List<Skill> skills) {
-        writeSkillContextToProject(projectPath, skills);
     }
 
     /**

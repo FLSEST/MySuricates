@@ -82,96 +82,17 @@ class CommandExecutorServiceTest {
     }
 
     @Test
-    void executeStep_successfulCommand_returnsCompletedStep() throws IOException {
-        when(cliSession.sendCommandEnriched(eq("npm test"), any(), any()))
-                .thenReturn(new CliSession.EnrichedCommandResult("All tests passed", 0, null));
-
-        BlockDefinition block = BlockDefinition.builder()
-                .type("simple")
-                .config(Map.of("command", "npm test"))
-                .build();
-
-        StepResult result = commandExecutorService.executeStep("container-1", "claude", block, 0);
-
-        assertThat(result.getStatus()).isEqualTo(StepStatus.COMPLETED);
-        assertThat(result.getOutput()).isEqualTo("All tests passed");
-        assertThat(result.getStepIndex()).isEqualTo(0);
-        assertThat(result.getInput()).isEqualTo("npm test");
-        assertThat(result.getDurationMs()).isNotNull();
-    }
-
-    @Test
-    void executeStep_nonZeroExitCode_returnsFailedStep() throws IOException {
-        when(cliSession.sendCommandEnriched(eq("npm test"), any(), any()))
-                .thenReturn(new CliSession.EnrichedCommandResult("Error: test suite failed", 1, null));
-
-        BlockDefinition block = BlockDefinition.builder()
-                .type("simple")
-                .config(Map.of("command", "npm test"))
-                .build();
-
-        StepResult result = commandExecutorService.executeStep("container-1", "claude", block, 0);
-
-        assertThat(result.getStatus()).isEqualTo(StepStatus.FAILED);
-    }
-
-    @Test
-    void executeStep_exception_returnsFailedWithErrorMessage() throws IOException {
-        when(cliSession.sendCommandEnriched(anyString(), any(), any())).thenThrow(new IOException("Session dead"));
-
-        BlockDefinition block = BlockDefinition.builder()
-                .type("simple")
-                .config(Map.of("command", "some command"))
-                .build();
-
-        StepResult result = commandExecutorService.executeStep("container-1", "claude", block, 0);
-
-        assertThat(result.getStatus()).isEqualTo(StepStatus.FAILED);
-        assertThat(result.getOutput()).contains("container-1");
-    }
-
-    @Test
-    void executeStep_noCommandInConfig_throwsException() {
+    void executeStepOnHost_noCommandInConfig_throwsException() {
         BlockDefinition block = BlockDefinition.builder()
                 .type("simple")
                 .config(Map.of())
                 .build();
 
-        assertThatThrownBy(() ->
-                commandExecutorService.executeStep("container-1", "claude", block, 0))
+        assertThatThrownBy(() -> commandExecutorService.executeStepOnHost(
+                HostExecutionRequest.builder().projectPath("/project").block(block).build()))
                 .isInstanceOf(WorkflowExecutionException.class)
                 .hasMessageContaining("command");
-    }
-
-    @Test
-    void injectSkillContext_withSkills_sendsAggregatedContext() throws IOException {
-        when(cliSession.sendCommand(contains("Code Reviewer")))
-                .thenReturn(new CliSession.CommandResult("ok", 0));
-
-        Skill skill = Skill.builder()
-                .id("skill-1")
-                .name("Code Reviewer")
-                .category(SkillCategory.CODE)
-                .aiContext("You are a code reviewer.")
-                .build();
-
-        commandExecutorService.injectSkillContext("container-1", "claude", List.of(skill));
-
-        verify(cliSession).sendCommand(contains("Code Reviewer"));
-    }
-
-    @Test
-    void injectSkillContext_nullSkills_doesNothing() throws IOException {
-        commandExecutorService.injectSkillContext("container-1", "claude", null);
-
-        verify(cliSession, never()).sendCommand(anyString());
-    }
-
-    @Test
-    void injectSkillContext_emptySkills_doesNothing() throws IOException {
-        commandExecutorService.injectSkillContext("container-1", "claude", List.of());
-
-        verify(cliSession, never()).sendCommand(anyString());
+        verifyNoInteractions(aiProvider);
     }
 
     @Test

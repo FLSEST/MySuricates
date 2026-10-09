@@ -243,48 +243,6 @@ public class ConfluenceProvider implements IntegrationProvider {
         }
     }
 
-    private Object httpPost(String url, Object body, String accessToken) {
-        try {
-            String json = objectMapper.writeValueAsString(body);
-            HttpRequest request = HttpRequest.newBuilder()
-                    .uri(URI.create(url))
-                    .header("Authorization", "Bearer " + accessToken)
-                    .header("Content-Type", "application/json")
-                    .POST(HttpRequest.BodyPublishers.ofString(json))
-                    .timeout(Duration.ofSeconds(15))
-                    .build();
-
-            HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
-            checkResponse(response);
-            return objectMapper.readValue(response.body(), Object.class);
-        } catch (IllegalStateException e) {
-            throw e;
-        } catch (Exception e) {
-            throw new IllegalStateException("Confluence API request failed: " + e.getMessage(), e);
-        }
-    }
-
-    private Object httpPut(String url, Object body, String accessToken) {
-        try {
-            String json = objectMapper.writeValueAsString(body);
-            HttpRequest request = HttpRequest.newBuilder()
-                    .uri(URI.create(url))
-                    .header("Authorization", "Bearer " + accessToken)
-                    .header("Content-Type", "application/json")
-                    .PUT(HttpRequest.BodyPublishers.ofString(json))
-                    .timeout(Duration.ofSeconds(15))
-                    .build();
-
-            HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
-            checkResponse(response);
-            return objectMapper.readValue(response.body(), Object.class);
-        } catch (IllegalStateException e) {
-            throw e;
-        } catch (Exception e) {
-            throw new IllegalStateException("Confluence API request failed: " + e.getMessage(), e);
-        }
-    }
-
     private void checkResponse(HttpResponse<String> response) {
         if (response.statusCode() >= 400) {
             throw new IllegalStateException("Confluence API error " + response.statusCode() + ": " + response.body());
