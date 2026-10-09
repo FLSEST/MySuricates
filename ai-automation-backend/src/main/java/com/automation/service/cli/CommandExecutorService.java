@@ -121,10 +121,6 @@ public class CommandExecutorService {
         return step;
     }
 
-    public void injectSkillContextOnHost(String projectPath, List<Skill> skills) {
-        writeSkillContextToProject(projectPath, skills);
-    }
-
     /**
      * Writes aggregated skill AI context to the project's .claude/rules/skills-context.md file.
      * This file is automatically picked up by subsequent Claude CLI calls.
