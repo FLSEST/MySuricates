@@ -1,6 +1,5 @@
 package com.automation.util;
 
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -16,7 +15,8 @@ import java.util.Objects;
  *
  * <p>What goes in: the working directory under its own path (paths in prompts, outputs and the database
  * stay valid), the git metadata of a worktree, directories the caller names as writable (Codex' answer
- * file), and for an AI CLI its program (read-only) and its login. What stays out: the user's home, the data
+ * file), and for an AI CLI its program (read-only) and its login. Every directory on the way to a read-only
+ * path is a mountpoint itself, so it cannot be renamed away. What stays out: the user's home, the data
  * directories with the instance's keys, the database, the Docker socket and every other service of the host
  * user. Secrets inside a mounted directory are covered: a file by an empty read-only file, the database by an
  * empty directory over its folder (journal files and backups appear there later), a data directory likewise.
@@ -97,15 +97,12 @@ public final class UnattendedContainerCommand {
             throw new IllegalArgumentException("Empty command");
         }
         List<Path> roots = new ArrayList<>();
-        List<Path> gitDirs = new ArrayList<>();
+        UnattendedContainerMounts.GitLayout git = UnattendedContainerMounts.GitLayout.NONE;
         Path workdir = workingDirectory == null ? null : workingDirectory.toAbsolutePath().normalize();
         if (workdir != null) {
             roots.add(workdir);
-            gitDirs.addAll(UnattendedContainerMounts.gitDirectories(workdir));
-            roots.addAll(gitDirs);
-            if (Files.isDirectory(workdir.resolve(".git"))) {
-                gitDirs.add(workdir.resolve(".git"));
-            }
+            git = UnattendedContainerMounts.gitLayout(workdir);
+            roots.addAll(git.extraRoots());
         }
         writable.stream().map(p -> p.toAbsolutePath().normalize()).forEach(roots::add);
         List<Path> mounted = UnattendedContainerMounts.distinctOutermost(roots);
@@ -138,10 +135,13 @@ public final class UnattendedContainerCommand {
                     ? List.of("--mount", "type=tmpfs,dst=" + checked(mask.substring("tmpfs:".length())))
                     : bind(new Bind(Path.of("/dev/null"), mask, true)));
         }
-        for (Path git : UnattendedContainerMounts.gitReadOnly(gitDirs)) {
-            args.addAll(bind(new Bind(git, git.toString(), true)));
-        }
-        UnattendedContainerMounts.readOnly(mounted, setup.readOnlyInMounts()).forEach(b -> args.addAll(bind(b)));
+        List<Path> gitReadOnly = UnattendedContainerMounts.gitReadOnly(git);
+        List<Bind> readOnly = new ArrayList<>(UnattendedContainerMounts.readOnly(mounted, gitReadOnly));
+        readOnly.addAll(UnattendedContainerMounts.readOnly(mounted, setup.readOnlyInMounts()));
+        List<Path> protectedPaths = new ArrayList<>(gitReadOnly);
+        protectedPaths.addAll(setup.readOnlyInMounts());
+        UnattendedContainerMounts.pins(mounted, protectedPaths).forEach(b -> args.addAll(bind(b)));
+        readOnly.forEach(b -> args.addAll(bind(b)));
         setup.extraReadOnly().forEach(b -> args.addAll(bind(b)));
 
         List<String> program = new ArrayList<>(command);

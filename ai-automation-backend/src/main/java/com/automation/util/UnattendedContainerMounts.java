@@ -3,6 +3,7 @@ package com.automation.util;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.nio.file.LinkOption;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -20,33 +21,87 @@ final class UnattendedContainerMounts {
     private UnattendedContainerMounts() {
     }
 
-    /** {@code <dir>/.git} when it is a file: the worktree's git directory and the repository's common directory. */
-    static List<Path> gitDirectories(Path workdir) {
+    /**
+     * What of git a working directory needs: further roots to mount (the repository of a worktree), the git
+     * directories whose config and hooks turn read-only, and pointer files that turn read-only themselves.
+     */
+    record GitLayout(List<Path> extraRoots, List<Path> gitDirs, List<Path> readOnlyFiles) {
+        static final GitLayout NONE = new GitLayout(List.of(), List.of(), List.of());
+    }
+
+    /**
+     * A {@code .git} directory as it is; a {@code .git} file only when its pointers hold up: the git directory
+     * it names carries a {@code gitdir} file pointing back at this {@code .git}, and lies under
+     * {@code <common>/worktrees} of a real git directory. Only git writes such a back-pointer into a directory
+     * a run cannot reach, so a pointer an agent rewrote cannot steer a mount at another host directory (review
+     * 2026-10-09). The three pointer files are mounted read-only.
+     */
+    static GitLayout gitLayout(Path workdir) {
         Path dotGit = workdir.resolve(".git");
-        if (!Files.isRegularFile(dotGit)) {
-            return List.of();
+        if (Files.isDirectory(dotGit, LinkOption.NOFOLLOW_LINKS)) {
+            return new GitLayout(List.of(), List.of(dotGit), List.of());
+        }
+        if (!Files.isRegularFile(dotGit, LinkOption.NOFOLLOW_LINKS)) {
+            return GitLayout.NONE;
         }
         try {
             String line = Files.readString(dotGit, StandardCharsets.UTF_8).strip();
             if (!line.startsWith("gitdir:")) {
-                return List.of();
+                return GitLayout.NONE;
             }
-            Path gitDir = workdir.resolve(line.substring("gitdir:".length()).strip()).normalize();
-            Path common = gitDir;
+            Path gitDir = real(workdir.resolve(line.substring("gitdir:".length()).strip()));
+            Path back = gitDir.resolve("gitdir");
             Path commonFile = gitDir.resolve("commondir");
-            if (Files.isRegularFile(commonFile)) {
-                common = gitDir.resolve(Files.readString(commonFile, StandardCharsets.UTF_8).strip()).normalize();
+            if (!Files.isRegularFile(back, LinkOption.NOFOLLOW_LINKS)
+                    || !Files.isRegularFile(commonFile, LinkOption.NOFOLLOW_LINKS)
+                    || !real(workdir.resolve(Files.readString(back, StandardCharsets.UTF_8).strip())).equals(real(dotGit))) {
+                return GitLayout.NONE;
             }
-            return Files.isDirectory(common) ? List.of(common, gitDir) : List.of();
+            Path common = real(gitDir.resolve(Files.readString(commonFile, StandardCharsets.UTF_8).strip()));
+            if (!real(common.resolve("worktrees")).equals(gitDir.getParent()) || !isGitDirectory(common)) {
+                return GitLayout.NONE;
+            }
+            return new GitLayout(List.of(common), List.of(common, gitDir), List.of(dotGit, back, commonFile));
         } catch (IOException | RuntimeException e) {
-            return List.of();
+            return GitLayout.NONE;
         }
     }
 
-    /** Git's config and hooks in every git directory a mount exposes: read-only. */
-    static List<Path> gitReadOnly(List<Path> gitDirs) {
-        Set<Path> paths = new LinkedHashSet<>();
-        for (Path gitDir : gitDirs) {
+    private static boolean isGitDirectory(Path dir) {
+        return Files.isRegularFile(dir.resolve("HEAD")) && Files.isDirectory(dir.resolve("objects"))
+                && Files.isDirectory(dir.resolve("refs"));
+    }
+
+    /**
+     * Every directory strictly between a mount root and one of {@code paths}, bound onto itself: a mountpoint
+     * cannot be renamed or removed, so a read-only path cannot be moved aside and replaced by a writable
+     * one (review 2026-10-09). In container paths, without duplicates.
+     */
+    static List<UnattendedContainerCommand.Bind> pins(List<Path> mounted, Collection<Path> paths) {
+        Set<String> seen = new LinkedHashSet<>();
+        List<UnattendedContainerCommand.Bind> binds = new ArrayList<>();
+        for (Path root : mounted) {
+            Path realRoot = real(root);
+            for (Path path : paths) {
+                Path realPath = real(path);
+                if (!realPath.startsWith(realRoot) || realPath.equals(realRoot)) {
+                    continue;
+                }
+                for (Path dir = realPath.getParent(); dir != null && !dir.equals(realRoot); dir = dir.getParent()) {
+                    String target = root.resolve(realRoot.relativize(dir)).toString();
+                    if (seen.add(target)) {
+                        binds.add(new UnattendedContainerCommand.Bind(dir, target, false));
+                    }
+                }
+            }
+        }
+        return binds;
+    }
+
+    /** Git's config and hooks in every git directory a mount exposes, plus the pointer files: read-only. */
+    static List<Path> gitReadOnly(GitLayout git) {
+        Set<Path> paths = new LinkedHashSet<>(git.readOnlyFiles());
+        for (Path gitDir : git.gitDirs()) {
             for (String name : List.of("config", "hooks", "config.worktree")) {
                 Path p = gitDir.resolve(name);
                 if (Files.exists(p)) {

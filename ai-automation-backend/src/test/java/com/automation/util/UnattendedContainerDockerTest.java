@@ -83,13 +83,17 @@ class UnattendedContainerDockerTest {
                 "(touch .git/hooks/pre-commit) 2>/dev/null && echo hooks=writable || echo hooks=readonly",
                 "test -S /var/run/docker.sock && echo socket=yes || echo socket=no",
                 "(echo off >> backend/config/application.yml) 2>/dev/null && echo config=writable || echo config=readonly",
+                "mv .git git.old 2>/dev/null && echo gitdir=movable || echo gitdir=pinned",
+                "mv backend backend.old 2>/dev/null && echo backend=movable || echo backend=pinned",
+                "mv .git/hooks hooks.old 2>/dev/null && echo hooks=movable || echo hooks=pinned",
                 "echo written > out.txt",
                 "echo user=$(id -u) pwd=$(pwd)");
 
         ShellCommandService.ShellResult result = new ShellCommandService().execute(script, project.toString(), 120);
 
         assertThat(result.output()).doesNotContain("DUMMY-DB-CONTENT", "DUMMY-SEAL-KEY", "DUMMY-INSTANCE-KEY")
-                .contains("gitconfig=readonly", "hooks=readonly", "socket=no", "config=readonly", "pwd=" + project);
+                .contains("gitconfig=readonly", "hooks=readonly", "socket=no", "config=readonly", "pwd=" + project,
+                        "gitdir=pinned", "backend=pinned", "hooks=pinned");
         assertThat(Files.readString(project.resolve("out.txt")).strip()).isEqualTo("written");
         assertThat(Files.getAttribute(project.resolve("out.txt"), "unix:uid"))
                 .as("files the container writes belong to the host user").isEqualTo(Files.getAttribute(project, "unix:uid"));

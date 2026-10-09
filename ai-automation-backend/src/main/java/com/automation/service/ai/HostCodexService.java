@@ -151,11 +151,11 @@ public class HostCodexService {
 
                 String processOutput = new String(outputFuture.get(1, TimeUnit.SECONDS), StandardCharsets.UTF_8);
 
-                // Read result from output file
-                if (Files.exists(outputFile) && Files.size(outputFile) > 0) {
-                    String answer = Files.readString(outputFile).trim();
-                    failOnBrokenSandbox(processOutput, answer, prompt);
-                    return answer;
+                // Read result from output file — a plain file only, never a link Codex left there
+                Optional<String> answer = CodexAnswerFile.read(outputFile);
+                if (answer.isPresent()) {
+                    failOnBrokenSandbox(processOutput, answer.get(), prompt);
+                    return answer.get();
                 }
 
                 // Fallback: use stdout

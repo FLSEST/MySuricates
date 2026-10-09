@@ -203,7 +203,8 @@ class UnattendedContainerCommandTest {
                     List.of(config, workdir.resolve("backend/application.yml")), "", "", 64, 1L, Map.of(), List.of(), Map.of());
 
             assertThat(mounts(build(setup, workdir, "x")))
-                    .contains("type=bind,src=" + config + ",dst=" + config + ",readonly")
+                    .contains("type=bind,src=" + config + ",dst=" + config + ",readonly",
+                            "type=bind,src=" + workdir.resolve("backend") + ",dst=" + workdir.resolve("backend"))
                     .as("a missing file needs no bind").noneMatch(m -> m.contains("application.yml"));
         }
 
@@ -250,24 +251,73 @@ class UnattendedContainerCommandTest {
                     "type=bind,src=" + git.resolve("hooks") + ",dst=" + git.resolve("hooks") + ",readonly");
         }
 
-        @Test
-        @DisplayName("a worktree also gets its repository's git directory, with config and hooks read-only")
-        void worktree() throws IOException {
+        /** A repository with one worktree, as git lays it out; returns {common, gitDir, workdir}. */
+        private Path[] worktreeLayout() throws IOException {
             Path common = Files.createDirectories(tmp.resolve("repo/.git"));
             Files.createDirectories(common.resolve("hooks"));
+            Files.createDirectories(common.resolve("objects"));
+            Files.createDirectories(common.resolve("refs"));
+            Files.writeString(common.resolve("HEAD"), "ref: refs/heads/main\n");
             Files.writeString(common.resolve("config"), "[core]\n");
             Path gitDir = Files.createDirectories(common.resolve("worktrees/wt"));
+            Files.writeString(gitDir.resolve("commondir"), "../..\n");
+            Path workdir = project();
+            Files.writeString(gitDir.resolve("gitdir"), workdir.resolve(".git") + "\n");
+            Files.writeString(workdir.resolve(".git"), "gitdir: " + gitDir + "\n");
+            return new Path[] {common, gitDir, workdir};
+        }
+
+        @Test
+        @DisplayName("a worktree also gets its repository's git directory, with config, hooks and the pointer files read-only")
+        void worktree() throws IOException {
+            Path[] layout = worktreeLayout();
+            Path common = layout[0], gitDir = layout[1], workdir = layout[2];
+
+            List<String> mounts = mounts(build(plain(), workdir, "x"));
+
+            assertThat(mounts).contains("type=bind,src=" + common + ",dst=" + common,
+                    "type=bind,src=" + common.resolve("config") + ",dst=" + common.resolve("config") + ",readonly",
+                    "type=bind,src=" + common.resolve("hooks") + ",dst=" + common.resolve("hooks") + ",readonly",
+                    "type=bind,src=" + workdir.resolve(".git") + ",dst=" + workdir.resolve(".git") + ",readonly",
+                    "type=bind,src=" + gitDir.resolve("gitdir") + ",dst=" + gitDir.resolve("gitdir") + ",readonly",
+                    "type=bind,src=" + gitDir.resolve("commondir") + ",dst=" + gitDir.resolve("commondir") + ",readonly");
+        }
+
+        @Test
+        @DisplayName("the directories on the way to a read-only file are mountpoints, so none can be renamed away")
+        void ancestorsPinned() throws IOException {
+            Path[] layout = worktreeLayout();
+            Path common = layout[0], gitDir = layout[1], workdir = layout[2];
+            Path repo = Files.createDirectories(tmp.resolve("projects/repo"));
+            Files.createDirectories(repo.resolve(".git/hooks"));
+
+            assertThat(mounts(build(plain(), workdir, "x"))).contains(
+                    "type=bind,src=" + common.resolve("worktrees") + ",dst=" + common.resolve("worktrees"),
+                    "type=bind,src=" + gitDir + ",dst=" + gitDir);
+            assertThat(mounts(build(plain(), repo, "x"))).contains(
+                    "type=bind,src=" + repo.resolve(".git") + ",dst=" + repo.resolve(".git"));
+        }
+
+        @Test
+        @DisplayName("a .git pointer without git's own back-pointer mounts nothing beyond the working directory")
+        void forgedPointer() throws IOException {
+            Path elsewhere = Files.createDirectories(tmp.resolve("elsewhere/.git"));
+            for (String n : List.of("objects", "refs")) {
+                Files.createDirectories(elsewhere.resolve(n));
+            }
+            Files.writeString(elsewhere.resolve("HEAD"), "ref: refs/heads/main\n");
+            Path gitDir = Files.createDirectories(elsewhere.resolve("worktrees/wt"));
             Files.writeString(gitDir.resolve("commondir"), "../..\n");
             Path workdir = project();
             Files.writeString(workdir.resolve(".git"), "gitdir: " + gitDir + "\n");
 
             List<String> mounts = mounts(build(plain(), workdir, "x"));
 
-            assertThat(mounts).contains("type=bind,src=" + common + ",dst=" + common,
-                    "type=bind,src=" + common.resolve("config") + ",dst=" + common.resolve("config") + ",readonly",
-                    "type=bind,src=" + common.resolve("hooks") + ",dst=" + common.resolve("hooks") + ",readonly")
-                    .as("the worktree's own git directory lies inside the repository's").noneMatch(m -> m.equals(
-                            "type=bind,src=" + gitDir + ",dst=" + gitDir));
+            assertThat(mounts).noneMatch(m -> m.contains("elsewhere"));
+            Files.writeString(gitDir.resolve("gitdir"), tmp.resolve("other/.git") + "\n");
+            assertThat(mounts(build(plain(), workdir, "x"))).as("a back-pointer to another place").noneMatch(m -> m.contains("elsewhere"));
+            Files.writeString(gitDir.resolve("gitdir"), workdir.resolve(".git") + "\n");
+            assertThat(mounts(build(plain(), workdir, "x"))).as("the real layout").anyMatch(m -> m.contains("elsewhere"));
         }
     }
 
