@@ -146,7 +146,8 @@ Statt eines Laufs sind auch mehrere Läufe desselben Workflows oder eine Kette m
   angezeigt wird, und antwortet wie `POST /executions/{id}/approve`. Verlangt der Lauf keine
   Freigabe mehr, ist das ein Fehler.
 - **`markers`:** wie viele `gate_status`- und `todo_item`-Marker der Lauf gezählt hat
-  (`gate_summary.items`, `todo_items`). Eine Kopie darf nicht noch einmal zählen.
+  (`gate_summary.items`, `todo_items`). Eine Kopie darf nicht noch einmal zählen. Der Ersatzeintrag
+  eines bestellten, aber ausgebliebenen Urteils (`synthetic`) ist kein Marker und zählt nicht mit.
 - **`auditReport`**, **`auditFindingCount`**, **`auditFindings`:** was die Audit-Auswertung aus dem
   Lauf gemacht hat: den Status des Reports (`VALID`/`INVALID`), die Zahl der Findings im Projekt
   (eines je Identität) und einzelne Findings, gefunden über ihr `subject`.

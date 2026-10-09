@@ -97,7 +97,8 @@ class RunCompletionHandlerTest {
         assertThat(summary).containsEntry("highest", "RED");
         Map<String, Integer> counts = (Map<String, Integer>) summary.get("counts_by_status");
         assertThat(counts).containsEntry("GREEN", 1).containsEntry("RED", 1).containsEntry("YELLOW", 1);
-        assertThat((List<Map<String, Object>>) summary.get("items")).hasSize(3);
+        assertThat((List<Map<String, Object>>) summary.get("items")).hasSize(3)
+                .allSatisfy(item -> assertThat(item).containsKey("step_index").doesNotContainKey("synthetic"));
         verify(activityLogService).warn(eq(LogCategory.EXECUTION), contains("critical findings"),
                 eq("WorkflowExecutor"), eq("run-1"), eq("wf-1"));
     }
@@ -424,6 +425,30 @@ class RunCompletionHandlerTest {
                 .containsEntry("gate_category", RunCompletionHandler.GATE_MISSING_CATEGORY);
         verify(activityLogService).warn(eq(LogCategory.EXECUTION), contains("warnings"),
                 eq("WorkflowExecutor"), eq("run-1"), eq("wf-1"));
+    }
+
+    /**
+     * The fallback verdict lands in gate_summary too, so trend tooling reads the same verdict as gate_status.
+     * Its item is marked synthetic and has no step_index: no step delivered it.
+     */
+    @Test
+    @SuppressWarnings("unchecked")
+    void orderedButMissingVerdict_alsoWritesAConsistentGateSummary() {
+        WorkflowRun run = run(RunStatus.RUNNING, "Ich habe alles geprueft, sieht gut aus.");
+
+        handler.complete(run, ctx, "wf-1", "Demo", null, "proj-1", blocksOrderingAGate());
+
+        Map<String, Object> summary = (Map<String, Object>) ctx.getRunMetadata().get("gate_summary");
+        assertThat(summary).as("gate_summary next to the fallback gate_status").isNotNull()
+                .containsEntry("highest", "YELLOW")
+                .containsEntry("counts_by_status", Map.of("YELLOW", 1));
+        assertThat((List<Map<String, Object>>) summary.get("items")).singleElement()
+                .satisfies(item -> assertThat(item)
+                        .containsEntry("status", "YELLOW")
+                        .containsEntry("category", RunCompletionHandler.GATE_MISSING_CATEGORY)
+                        .containsEntry("description", RunCompletionHandler.GATE_MISSING_DESCRIPTION)
+                        .containsEntry("synthetic", true)
+                        .doesNotContainKey("step_index"));
     }
 
     @Test

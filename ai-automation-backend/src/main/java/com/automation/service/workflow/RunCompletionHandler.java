@@ -161,6 +161,17 @@ public class RunCompletionHandler {
             context.setRunMetadata("gate_status", highestGate.name());
             context.setRunMetadata("gate_category", gateCategory);
             context.setRunMetadata("gate_description", gateDescription);
+            // gate_summary says the same, with one synthetic item: no step delivered it, so no step_index.
+            Map<String, Object> item = new HashMap<>();
+            item.put("status", highestGate.name());
+            item.put("category", gateCategory);
+            item.put("description", gateDescription);
+            item.put("synthetic", true);
+            Map<String, Object> gateSummary = new HashMap<>();
+            gateSummary.put("highest", highestGate.name());
+            gateSummary.put("counts_by_status", new HashMap<>(Map.of(highestGate.name(), 1)));
+            gateSummary.put("items", new ArrayList<>(List.of(item)));
+            context.setRunMetadata("gate_summary", gateSummary);
             log.warn("Workflow {} orders a gate verdict but delivered none (run {})", workflowName, run.getId());
         }
 
