@@ -110,7 +110,7 @@ public class SchedulerTick {
     }
 
     private void runDueSchedules(Instant now) {
-        fireOrSkipUntil(dueSchedulesNotQueued(now), now, activeSkipUntil(now));
+        fireOrSkipUntil(dueSchedulesNotQueued(now), activeSkipUntil(now));
     }
 
     /** The manual skip-until window, if it is still ahead of {@code now}. */
@@ -118,7 +118,7 @@ public class SchedulerTick {
         return skipPolicy.parseSkipUntil().filter(now::isBefore);
     }
 
-    private void fireOrSkipUntil(List<ScheduledWorkflow> due, Instant now, Optional<Instant> skipUntil) {
+    private void fireOrSkipUntil(List<ScheduledWorkflow> due, Optional<Instant> skipUntil) {
         for (ScheduledWorkflow scheduled : due) {
             if (skipUntil.isPresent()) {
                 runIsolated(scheduled, "skip", () -> skipPolicy.skipScheduleUntil(scheduled, skipUntil.get()));
@@ -171,7 +171,7 @@ public class SchedulerTick {
             log.warn(message);
             activityLogService.warn(LogCategory.SCHEDULE, message, "SchedulerService");
         }
-        fireOrSkipUntil(regular, now, activeSkipUntil(now));
+        fireOrSkipUntil(regular, activeSkipUntil(now));
     }
 
     /**
