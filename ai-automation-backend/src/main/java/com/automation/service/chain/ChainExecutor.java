@@ -222,7 +222,7 @@ public class ChainExecutor {
             }
             default -> {
                 progress.hasFailures = true;
-                stop = stopOnFailure(progress, entry, "Workflow '" + runEntry.getWorkflowName() + "' failed");
+                stop = progress.stopOnFailure(entry, "Workflow '" + runEntry.getWorkflowName() + "' failed");
             }
         }
         saveAndBroadcast(progress);
@@ -246,23 +246,13 @@ public class ChainExecutor {
         markCompleted(runEntry);
         progress.hasFailures = true;
         saveAndBroadcast(progress);
-        return stopOnFailure(progress, entry, error);
+        return progress.stopOnFailure(entry, error);
     }
 
     /** The entry ends now; its duration is completedAt − startedAt. */
     private void markCompleted(ChainRunEntry runEntry) {
         runEntry.setCompletedAt(clock.instant());
         runEntry.setDurationMs(Duration.between(runEntry.getStartedAt(), runEntry.getCompletedAt()).toMillis());
-    }
-
-    /** With stop-on-failure, fails the chain with {@code error} and returns true. */
-    private boolean stopOnFailure(ChainRunProgress progress, ChainEntry entry, String error) {
-        if (!shouldStop(progress.chain, entry)) {
-            return false;
-        }
-        progress.run.setStatus(RunStatus.FAILED);
-        progress.run.setError(error);
-        return true;
     }
 
     private void logOutcome(WorkflowChain chain, String runId, RunStatus status) {
@@ -275,10 +265,6 @@ public class ChainExecutor {
         } else if (status == RunStatus.CANCELLED) {
             activityLogService.warn(LogCategory.EXECUTION, "Chain execution cancelled: " + chain.getName(), "ChainExecutor", runId, null);
         }
-    }
-
-    private boolean shouldStop(WorkflowChain chain, ChainEntry entry) {
-        return entry.isStopOnFailure() && chain.isStopOnFailure();
     }
 
     private void saveAndBroadcast(ChainRunProgress progress) {

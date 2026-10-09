@@ -53,6 +53,19 @@ final class ChainRunProgress {
     }
 
     /**
+     * With stop-on-failure — set on the chain and on the entry — fails the chain with {@code error}
+     * and returns true.
+     */
+    boolean stopOnFailure(ChainEntry entry, String error) {
+        if (!(entry.isStopOnFailure() && chain.isStopOnFailure())) {
+            return false;
+        }
+        run.setStatus(RunStatus.FAILED);
+        run.setError(error);
+        return true;
+    }
+
+    /**
      * The status of a chain that went through all its entries: failed when entries failed and none
      * completed, completed with errors on any failure or warning, else completed.
      */
