@@ -27,10 +27,11 @@ import static org.mockito.Mockito.withSettings;
  * {@code PromptBlockSchemaGateTest}, TODO c4b81017 and cf8db6f8).
  *
  * <p><b>Read</b> means a string literal in the code (comments and text blocks skipped) of the
- * executor that supports the type, of the classes it hands its config to ({@link #DELEGATES}), of
- * {@code BlockAiSettings} when it resolves provider/model/effort, of {@code ExecutionMode} when it
- * checks {@code execution_mode}, and of {@code BlockDefinition} ({@code on_failure}, read by the
- * engine for every block).
+ * executor that supports the type, of the classes it hands its config to ({@link #DELEGATES}, and
+ * {@code InnerStep} for the wrappers that run their command through one), of {@code BlockAiSettings}
+ * when it resolves provider/model/effort, of {@code ExecutionMode} when it checks
+ * {@code execution_mode}, and of {@code BlockDefinition} ({@code on_failure}, read by the engine for
+ * every block).
  *
  * <p>Public for {@code BlockSpecsTest}, which asks which executors resolve the AI overrides.
  */
@@ -47,6 +48,9 @@ public final class ExecutorConfigReads {
 
     /** provider/model/effort, resolved through ExecutionContext#providerFor/modelFor/effortFor. */
     private static final Pattern RESOLVES_AI_SETTINGS = Pattern.compile("\\b(?:providerFor|modelFor|effortFor)\\(");
+    /** The inner step of the wrapper blocks: it resolves provider/model/effort of the block it is given. */
+    private static final Pattern RUNS_INNER_STEP = Pattern.compile("\\bnew InnerStep\\(");
+    static final String INNER_STEP = "com/automation/executor/blocks/InnerStep.java";
     static final String AI_SETTINGS = "com/automation/executor/BlockAiSettings.java";
     private static final Pattern CHECKS_EXECUTION_MODE = Pattern.compile("\\bExecutionMode\\.");
     static final String EXECUTION_MODE = "com/automation/executor/ExecutionMode.java";
@@ -68,11 +72,13 @@ public final class ExecutorConfigReads {
     }
 
     /**
-     * Whether the executor of {@code type} resolves provider/model/effort itself — calls
-     * {@code providerFor}, {@code modelFor} or {@code effortFor} outside comments.
+     * Whether the executor of {@code type} resolves provider/model/effort — calls {@code providerFor},
+     * {@code modelFor} or {@code effortFor} outside comments, itself or through the {@code InnerStep} it runs.
      */
     public static boolean resolvesAiSettings(String type) throws IOException {
-        return RESOLVES_AI_SETTINGS.matcher(withoutComments(Files.readString(executorSource(type)))).find();
+        String code = withoutComments(Files.readString(executorSource(type)));
+        return RESOLVES_AI_SETTINGS.matcher(code).find() || (RUNS_INNER_STEP.matcher(code).find()
+                && RESOLVES_AI_SETTINGS.matcher(withoutComments(Files.readString(MAIN.resolve(INNER_STEP)))).find());
     }
 
     /** Adds a problem for every key none of the sources of {@code type} reads. */
@@ -96,6 +102,9 @@ public final class ExecutorConfigReads {
     static List<Path> sourcesOf(String type) throws IOException {
         Path executor = executorSource(type);
         List<Path> sources = new ArrayList<>(List.of(executor, MAIN.resolve(ENGINE)));
+        if (RUNS_INNER_STEP.matcher(withoutComments(Files.readString(executor))).find()) {
+            sources.add(MAIN.resolve(INNER_STEP));
+        }
         if (resolvesAiSettings(type)) {
             sources.add(MAIN.resolve(AI_SETTINGS));
         }

@@ -25,6 +25,15 @@ final class ForEachItems {
         return Arrays.stream(raw.split("\n")).filter(line -> !line.isBlank()).toList();
     }
 
+    /** The static {@code items}: a list (each entry as text) or newline-separated text; blank ones never count. */
+    static List<String> staticItems(Object rawItems) {
+        if (rawItems instanceof List<?> list) {
+            return list.stream().map(Object::toString).filter(item -> !item.isBlank()).toList();
+        }
+        if (rawItems instanceof String s) return splitIntoItems(s);
+        return List.of();
+    }
+
     /**
      * The top-level fields of an item that is a JSON object ({@code {"id": "auth", "desc": "Login"}}),
      * as {@code <variable>.<field>} → text, so {@code {{ feature.id }}} works in a command or a

@@ -1,5 +1,8 @@
 package com.automation.executor.blocks;
 
+import com.automation.entity.StepResult;
+import com.automation.entity.StepStatus;
+import com.automation.executor.StepFailureSummary;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -90,6 +93,104 @@ class ForEachFailuresTest {
         assertThat(ForEachFailures.maxConsecutiveFailures(" 6 ")).isEqualTo(6);
         assertThat(ForEachFailures.maxConsecutiveFailures("0")).isZero();
         assertThat(ForEachFailures.maxConsecutiveFailures("-1")).isZero();
+    }
+
+    private static StepResult ok() {
+        return StepResult.builder().status(StepStatus.COMPLETED).output("fine").build();
+    }
+
+    private static StepResult failed(String output) {
+        return StepResult.builder().status(StepStatus.FAILED).output(output).build();
+    }
+
+    @Test
+    void tally_stopsAfterMaxFailuresInARow_onlyWhileItemsAreLeft() {
+        ForEachFailures failures = new ForEachFailures(5, 2, false);
+
+        failures.record(0, "a", failed("x"));
+        failures.record(1, "b", ok());
+        failures.record(2, "c", failed("y"));
+        assertThat(failures.aborted()).as("a success in between resets the count").isFalse();
+        failures.record(3, "d", failed("z"));
+
+        assertThat(failures.aborted()).isTrue();
+        assertThat(failures.abortReason()).isEqualTo(ForEachFailures.abortReason(2, 1));
+        assertThat(failures.failsTheBlock()).isTrue();
+
+        ForEachFailures lastItems = new ForEachFailures(2, 2, false);
+        lastItems.record(0, "a", failed("x"));
+        lastItems.record(1, "b", failed("y"));
+        assertThat(lastItems.aborted()).as("nothing left to skip: the loop simply ended").isFalse();
+        assertThat(lastItems.abortReason()).isNull();
+
+        ForEachFailures off = new ForEachFailures(4, 0, false);
+        for (int i = 0; i < 3; i++) off.record(i, "i" + i, failed("x"));
+        assertThat(off.aborted()).as("max_consecutive_failures 0 switches the stop off").isFalse();
+    }
+
+    @Test
+    void tally_continueOnError_toleratesFailedItems_butNotAnAbort() {
+        ForEachFailures tolerated = new ForEachFailures(3, 3, true);
+        tolerated.record(0, "a", failed("x"));
+        tolerated.record(1, "b", ok());
+        assertThat(tolerated.failsTheBlock()).isFalse();
+
+        ForEachFailures aborted = new ForEachFailures(5, 2, true);
+        aborted.record(0, "a", failed("x"));
+        aborted.record(1, "b", failed("y"));
+        assertThat(aborted.failsTheBlock()).isTrue();
+
+        ForEachFailures clean = new ForEachFailures(1, 3, false);
+        clean.record(0, "a", ok());
+        assertThat(clean.failsTheBlock()).isFalse();
+    }
+
+    @Test
+    void report_continueOnError_notesTheFailedItems_withoutARunError() {
+        ForEachFailures failures = new ForEachFailures(3, 3, true);
+        failures.record(0, "a", failed("boom"));
+        failures.record(1, "b", ok());
+        StepResult aggregate = new StepResult();
+        StringBuilder outputs = new StringBuilder("[a]: boom\n[b]: fine\n");
+
+        failures.report(aggregate, outputs);
+
+        assertThat(aggregate.getMetadata()).containsEntry("failedItemCount", 1)
+                .containsEntry("failedItems", List.of("a"))
+                .doesNotContainKeys("abortedAfterConsecutiveFailures", StepFailureSummary.KEY);
+        assertThat(outputs.toString()).endsWith("\n[continue_on_error] 1/3 items failed: a");
+    }
+
+    @Test
+    void report_abort_putsTheReasonBeforeTheSummary_ofTheFirstFailure() {
+        ForEachFailures failures = new ForEachFailures(4, 2, false);
+        failures.record(0, "a", failed(null));
+        failures.record(1, "b", failed("second"));
+        StepResult aggregate = new StepResult();
+        StringBuilder outputs = new StringBuilder();
+
+        failures.report(aggregate, outputs);
+
+        String reason = ForEachFailures.abortReason(2, 2);
+        assertThat(aggregate.getMetadata()).containsEntry("abortedAfterConsecutiveFailures", 2)
+                .containsEntry("skippedItemCount", 2)
+                .containsEntry("failedItemCount", 2)
+                .containsEntry(StepFailureSummary.KEY,
+                        reason + "\n" + ForEachFailures.failureSummary(List.of("a", "b"), "", 4));
+        assertThat(outputs.toString()).isEqualTo("\n[max_consecutive_failures] " + reason);
+    }
+
+    @Test
+    void report_noFailures_writesNothing() {
+        ForEachFailures failures = new ForEachFailures(1, 3, false);
+        failures.record(0, "a", ok());
+        StepResult aggregate = new StepResult();
+        StringBuilder outputs = new StringBuilder("[a]: fine");
+
+        failures.report(aggregate, outputs);
+
+        assertThat(aggregate.getMetadata()).isNullOrEmpty();
+        assertThat(outputs.toString()).isEqualTo("[a]: fine");
     }
 
     @Test

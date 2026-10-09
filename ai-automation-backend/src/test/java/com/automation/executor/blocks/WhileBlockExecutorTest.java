@@ -649,4 +649,49 @@ class WhileBlockExecutorTest {
         assertThat(iterations.get(0)).containsEntry("index", 0).containsEntry("status", "COMPLETED").containsEntry("durationMs", 5L);
         assertThat(iterations.get(1)).containsEntry("index", 1).containsEntry("status", "FAILED");
     }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void execute_moreIterationsThanRecorded_countsEveryExecutedIteration() {
+        int runs = ForEachBlockExecutor.MAX_RECORDED_ITEMS + 1;
+        Map<String, Object> config = new HashMap<>();
+        config.put("command", "echo loop");
+        config.put("max_iterations", runs);
+        config.put("execution_mode", "shell");
+        BlockDefinition block = BlockDefinition.builder().type("while").config(config).build();
+        when(commandExecutor.executeStepAsShell(eq("/tmp/project"), any(), anyInt(), anyInt()))
+                .thenReturn(StepResult.builder().status(StepStatus.COMPLETED).output("loop").build());
+
+        StepResult result = executor.execute(block, context);
+
+        assertThat(result.getStatus()).isEqualTo(StepStatus.COMPLETED);
+        assertThat(result.getMetadata()).containsEntry("iterationCount", runs);
+        assertThat((List<Map<String, Object>>) result.getMetadata().get("iterations"))
+                .hasSize(ForEachBlockExecutor.MAX_RECORDED_ITEMS);
+        verify(commandExecutor, times(runs)).executeStepAsShell(eq("/tmp/project"), any(), anyInt(), anyInt());
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void execute_failedIterationBeyondTheRecordingLimit_stillCountsAsExecuted() {
+        int runs = ForEachBlockExecutor.MAX_RECORDED_ITEMS + 100;
+        Map<String, Object> config = new HashMap<>();
+        config.put("command", "echo loop");
+        config.put("max_iterations", runs + 50);
+        config.put("execution_mode", "shell");
+        BlockDefinition block = BlockDefinition.builder().type("while").config(config).build();
+        StepResult ok = StepResult.builder().status(StepStatus.COMPLETED).output("loop").build();
+        StepResult failed = StepResult.builder().status(StepStatus.FAILED).output("boom").build();
+        int[] calls = {0};
+        when(commandExecutor.executeStepAsShell(eq("/tmp/project"), any(), anyInt(), anyInt()))
+                .thenAnswer(invocation -> ++calls[0] == runs ? failed : ok);
+
+        StepResult result = executor.execute(block, context);
+
+        assertThat(result.getStatus()).isEqualTo(StepStatus.FAILED);
+        assertThat(result.getMetadata()).containsEntry("iterationCount", runs);
+        assertThat((List<Map<String, Object>>) result.getMetadata().get("iterations"))
+                .hasSize(ForEachBlockExecutor.MAX_RECORDED_ITEMS);
+        assertThat(result.getOutput()).endsWith("[iteration " + runs + "]: boom");
+    }
 }

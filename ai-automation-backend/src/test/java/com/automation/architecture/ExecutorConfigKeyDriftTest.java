@@ -57,6 +57,9 @@ class ExecutorConfigKeyDriftTest {
     private static final Map<String, Delegate> DELEGATES = Map.of(
             "buildResolvedShellBlock(config,",
             new Delegate("com/automation/service/cli/CommandExecutorService.java", "buildResolvedShellBlock"),
+            // InnerStep (see OWN_INNER_STEP) builds its shell step from the config of the block it runs for
+            "buildResolvedShellBlock(block.getConfig(),",
+            new Delegate("com/automation/service/cli/CommandExecutorService.java", "buildResolvedShellBlock"),
             "AgenticBlockConfig.from(block.getConfig(),",
             new Delegate("com/automation/executor/blocks/AgenticBlockConfig.java", "from"),
             "ContainerToolSpec.from(config,",
@@ -64,6 +67,16 @@ class ExecutorConfigKeyDriftTest {
 
     /** {@code ExecutionMode} reads its key via a constant, not via a literal. */
     private static final String EXECUTION_MODE_CALL = "ExecutionMode.isShell(config";
+
+    /**
+     * foreach, while, conditional and retry hand their own block to {@code InnerStep}, so every key InnerStep
+     * reads — anywhere in its file, through its own delegates too — counts for them as if they read it
+     * themselves. switch hands it its case blocks ({@code new InnerStep(nestedBlock, …)}): those reads belong
+     * to the case block's type (shell/simple) and are deliberately not measured for switch, like its other
+     * {@code nestedConfig} reads.
+     */
+    private static final String OWN_INNER_STEP = "new InnerStep(block,";
+    private static final Path INNER_STEP = SOURCES.resolve("com/automation/executor/blocks/InnerStep.java");
 
     /** Keys that an executor reads but that deliberately do not belong in the schema — with a reason. */
     private static final Map<String, String> EXCEPTIONS = Map.of();
@@ -104,6 +117,7 @@ class ExecutorConfigKeyDriftTest {
         }
         assertThat(Files.readString(SOURCES.resolve("com/automation/executor/ExecutionMode.java")))
                 .contains("KEY = \"execution_mode\"");
+        assertThat(keysIn(innerStepSource())).as("keys read through InnerStep").isNotEmpty();
     }
 
     /** Block type → keys read, across all executors on the classpath. */
@@ -137,7 +151,13 @@ class ExecutorConfigKeyDriftTest {
             if (source.contains(delegate.getKey())) keys.addAll(literalKeys(body(delegate.getValue())));
         }
         if (source.contains(EXECUTION_MODE_CALL)) keys.add("execution_mode");
+        if (source.contains(OWN_INNER_STEP)) keys.addAll(keysIn(innerStepSource()));
         return keys;
+    }
+
+    /** InnerStep's source, without the trigger text itself so that scanning it cannot recurse. */
+    private static String innerStepSource() throws IOException {
+        return Files.readString(INNER_STEP).replace(OWN_INNER_STEP, "");
     }
 
     /** The body of a static method: from its declaration to the closing brace at method level. */

@@ -7,12 +7,13 @@ import com.automation.executor.ApprovalRejection;
 import com.automation.executor.ApprovalRequest;
 import com.automation.executor.BlockExecutor;
 import com.automation.executor.ExecutionContext;
+import com.automation.service.workflow.ExecutionBroadcaster;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Component;
 
 import java.time.Instant;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -25,7 +26,7 @@ import java.util.concurrent.TimeoutException;
 @Slf4j
 public class ApprovalBlockExecutor implements BlockExecutor {
 
-    private final SimpMessagingTemplate messagingTemplate;
+    private final ExecutionBroadcaster broadcaster;
 
     @Override
     public Set<String> supportedTypes() {
@@ -55,75 +56,32 @@ public class ApprovalBlockExecutor implements BlockExecutor {
                 ? ((Number) config.get("timeout_minutes")).intValue()
                 : 30;
 
-        String answer;
-
-        if ("auto".equals(mode) && autoAnswer != null) {
-            // Auto mode: use pre-configured answer
-            answer = autoAnswer;
-            log.info("Approval auto-answered '{}' for question: {}", answer, question);
-        } else {
-            // Ask mode: check memory first, then ask user
-            String remembered = context.getRememberedApproval(question);
-            if (remembered != null) {
-                answer = remembered;
-                log.info("Approval remembered '{}' for question: {}", answer, question);
-            } else {
-                // Create approval request and wait
-                String blockId = "approval-" + stepIndex;
-                ApprovalRequest request = ApprovalRequest.builder()
-                        .blockId(blockId)
-                        .question(question)
-                        .options(options)
-                        .rejectOptions(rejectOptions)
-                        .stepIndex(stepIndex)
-                        .timeoutMinutes(timeoutMinutes)
-                        .build();
-
-                CompletableFuture<String> future = context.requestApproval(request);
-
-                // Broadcast approval_required via WebSocket
-                try {
-                    messagingTemplate.convertAndSend(
-                            "/topic/executions/" + context.getWorkflowRunId() + "/logs",
-                            Map.of(
-                                    "type", "approval_required",
-                                    "blockId", blockId,
-                                    "question", question,
-                                    "options", options,
-                                    "rejectOptions", rejectOptions,
-                                    "stepIndex", stepIndex
-                            )
-                    );
-                } catch (Exception e) {
-                    log.warn("Failed to broadcast approval request: {}", e.getMessage());
-                }
-
-                try {
-                    answer = context.awaitApproval(future, timeoutMinutes, TimeUnit.MINUTES);
-                } catch (TimeoutException e) {
-                    log.warn("Approval timed out for question: {}", question);
-                    return buildResult(stepIndex, start, question, "Timed out waiting for approval",
-                            StepStatus.FAILED);
-                } catch (Exception e) {
-                    log.warn("Approval interrupted for question: {}", question);
-                    return buildResult(stepIndex, start, question, "Approval cancelled: " + e.getMessage(),
-                            StepStatus.FAILED);
-                }
-
-                // Broadcast approval_resolved
-                try {
-                    messagingTemplate.convertAndSend(
-                            "/topic/executions/" + context.getWorkflowRunId() + "/logs",
-                            Map.of(
-                                    "type", "approval_resolved",
-                                    "stepIndex", stepIndex,
-                                    "answer", answer
-                            )
-                    );
-                } catch (Exception e) {
-                    log.warn("Failed to broadcast approval resolution: {}", e.getMessage());
-                }
+        String answer = presetAnswer(mode, autoAnswer, question, context);
+        if (answer == null) {
+            ApprovalRequest request = ApprovalRequest.builder()
+                    .blockId("approval-" + stepIndex)
+                    .question(question)
+                    .options(options)
+                    .rejectOptions(rejectOptions)
+                    .stepIndex(stepIndex)
+                    .timeoutMinutes(timeoutMinutes)
+                    .build();
+            CompletableFuture<String> pending = ask(request, context);
+            try {
+                answer = context.awaitApproval(pending, timeoutMinutes, TimeUnit.MINUTES);
+            } catch (TimeoutException e) {
+                log.warn("Approval timed out for question: {}", question);
+                return buildResult(stepIndex, start, question, "Timed out waiting for approval",
+                        StepStatus.FAILED);
+            } catch (Exception e) {
+                log.warn("Approval interrupted for question: {}", question);
+                return buildResult(stepIndex, start, question, "Approval cancelled: " + e.getMessage(),
+                        StepStatus.FAILED);
             }
+            Map<String, Object> resolved = new HashMap<>();
+            resolved.put("stepIndex", stepIndex);
+            resolved.put("answer", answer);
+            broadcaster.broadcastLogMessage(context.getWorkflowRunId(), "approval_resolved", resolved);
         }
 
         // Handle "Yes always" — remember for future steps in this run
@@ -147,6 +105,35 @@ public class ApprovalBlockExecutor implements BlockExecutor {
         }
 
         return buildResult(stepIndex, start, question, "Approved: " + answer, StepStatus.COMPLETED);
+    }
+
+    /**
+     * The answer without asking anyone: {@code auto_answer} in auto mode, else an answer remembered from
+     * "Yes always" in this run; {@code null} when the question has to be asked.
+     */
+    private static String presetAnswer(String mode, String autoAnswer, String question, ExecutionContext context) {
+        if ("auto".equals(mode) && autoAnswer != null) {
+            log.info("Approval auto-answered '{}' for question: {}", autoAnswer, question);
+            return autoAnswer;
+        }
+        String remembered = context.getRememberedApproval(question);
+        if (remembered != null) {
+            log.info("Approval remembered '{}' for question: {}", remembered, question);
+        }
+        return remembered;
+    }
+
+    /** Opens the question in the run and announces it on the run's log topic; the future carries the answer. */
+    private CompletableFuture<String> ask(ApprovalRequest request, ExecutionContext context) {
+        CompletableFuture<String> pending = context.requestApproval(request);
+        Map<String, Object> payload = new HashMap<>();
+        payload.put("blockId", request.getBlockId());
+        payload.put("question", request.getQuestion());
+        payload.put("options", request.getOptions());
+        payload.put("rejectOptions", request.getRejectOptions());
+        payload.put("stepIndex", request.getStepIndex());
+        broadcaster.broadcastLogMessage(context.getWorkflowRunId(), "approval_required", payload);
+        return pending;
     }
 
     private StepResult buildResult(int stepIndex, Instant start, String input, String output, StepStatus status) {

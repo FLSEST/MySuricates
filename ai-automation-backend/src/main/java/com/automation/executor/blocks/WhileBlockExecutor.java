@@ -42,6 +42,7 @@ public class WhileBlockExecutor implements BlockExecutor {
         Integer claudeTimeout = config.containsKey("timeout_seconds")
                 ? ((Number) config.get("timeout_seconds")).intValue()
                 : null;
+        InnerStep body = new InnerStep(block, isShell, escapeVariables, shellTimeout, claudeTimeout);
 
         StepResult aggregateResult = new StepResult();
         aggregateResult.setStepIndex(context.nextStepIndex());
@@ -51,6 +52,8 @@ public class WhileBlockExecutor implements BlockExecutor {
         StringBuilder outputs = new StringBuilder();
         List<Map<String, Object>> recordedIterations = new ArrayList<>();
         int iteration = 0;
+        // Every body run, the failed one included; the recorded list stops at MAX_RECORDED_ITEMS
+        int executedIterations = 0;
 
         while (iteration < maxIterations && !context.shouldStop()) {
             // Check condition
@@ -87,35 +90,9 @@ public class WhileBlockExecutor implements BlockExecutor {
                 }
             }
 
-            String resolvedCommand = isShell
-                    ? context.resolveShellTemplate(command, escapeVariables)
-                    : context.resolvePromptTemplate(command);
-            StepResult stepResult;
-            if (isShell) {
-                stepResult = commandExecutor.executeStepAsShell(
-                        context.getProjectPath(),
-                        CommandExecutorService.buildResolvedShellBlock(config, resolvedCommand, context),
-                        context.nextStepIndex(),
-                        shellTimeout
-                );
-            } else {
-                stepResult = commandExecutor.executeStepOnHost(
-                        HostExecutionRequest.builder()
-                                .projectPath(context.getProjectPath())
-                                .block(BlockDefinition.builder()
-                                        .type("simple")
-                                        .config(Map.of("command", resolvedCommand))
-                                        .build())
-                                .stepIndex(context.nextStepIndex())
-                                .systemPrompt(context.getInstructionPrefix())
-                                .model(context.modelFor(block))
-                                .timeoutSeconds(claudeTimeout)
-                                .providerId(context.providerFor(block))
-                                .effort(context.effortFor(block))
-                                .build()
-                );
-            }
+            StepResult stepResult = body.run(commandExecutor, context, command);
 
+            executedIterations++;
             outputs.append("[iteration ").append(iteration + 1).append("]: ")
                     .append(stepResult.getOutput()).append("\n");
 
@@ -139,7 +116,7 @@ public class WhileBlockExecutor implements BlockExecutor {
         }
 
         aggregateResult.setOutput(outputs.toString().trim());
-        StepAiMetadata.put(aggregateResult, "iterationCount", recordedIterations.size());
+        StepAiMetadata.put(aggregateResult, "iterationCount", executedIterations);
         StepAiMetadata.put(aggregateResult, "iterations", List.copyOf(recordedIterations));
         if (aggregateResult.getStatus() == null || aggregateResult.getStatus() == StepStatus.PENDING) {
             aggregateResult.setStatus(StepStatus.COMPLETED);
