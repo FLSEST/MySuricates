@@ -231,6 +231,26 @@ class WishFulfillmentLoopTest {
     }
 
     @Test
+    void stoppedSecondLoop_leavesTheFirstLoopCancellable() throws Exception {
+        ArgumentCaptor<Runnable> tasks = ArgumentCaptor.forClass(Runnable.class);
+        when(virtualThreadExecutor.submit(tasks.capture())).thenReturn(null);
+        lenient().doAnswer(inv -> { wish.setStatus(WishStatus.COMPLETED); return null; })
+                .when(executionService).execute(any(), any());
+        wish.setStatus(WishStatus.DECOMPOSING);
+
+        loop.fulfillAsync("w-1"); // first loop, still decomposing
+        loop.fulfillAsync("w-1"); // second loop meets DECOMPOSING and stops
+        tasks.getAllValues().get(1).run();
+        loop.cancel("w-1");
+        // The first loop's phase overwrites the CANCELLED that cancel() wrote, as execute() does
+        wish.setStatus(WishStatus.EXECUTING);
+        tasks.getAllValues().get(0).run();
+
+        assertThat(wish.getStatus()).isEqualTo(WishStatus.CANCELLED);
+        verify(executionService, never()).execute(any(), any());
+    }
+
+    @Test
     void cancel_activeWish_setsCancelledStatus() {
         wish.setStatus(WishStatus.EXECUTING);
 

@@ -37,6 +37,8 @@ public class WishFulfillmentLoop {
     private final WishEvaluationService evaluationService;
 
     private final Map<String, AtomicBoolean> activeCancellations = new ConcurrentHashMap<>();
+    /** Loops running per wish; a second fulfillAsync (no run lock) can start one next to the first. */
+    private final Map<String, Integer> runningLoops = new ConcurrentHashMap<>();
 
     public WishFulfillmentLoop(
             WishConfig wishConfig,
@@ -59,9 +61,12 @@ public class WishFulfillmentLoop {
     // ── Async Orchestration ──────────────────────────────────────
 
     public void fulfillAsync(String wishId) {
-        AtomicBoolean cancelFlag = new AtomicBoolean(false);
-        activeCancellations.put(wishId, cancelFlag);
-        virtualThreadExecutor.submit(() -> fulfillWish(wishId, cancelFlag));
+        // Under the per-key lock of runningLoops, so a loop ending at the same time cannot drop the new flag
+        runningLoops.compute(wishId, (id, running) -> {
+            activeCancellations.put(id, new AtomicBoolean(false));
+            return running == null ? 1 : running + 1;
+        });
+        virtualThreadExecutor.submit(() -> fulfillWish(wishId));
     }
 
     public void cancel(String wishId) {
@@ -79,7 +84,7 @@ public class WishFulfillmentLoop {
 
     // ── Meta-Loop ────────────────────────────────────────────────
 
-    private void fulfillWish(String wishId, AtomicBoolean cancelFlag) {
+    private void fulfillWish(String wishId) {
         Instant deadline = Instant.now().plus(Duration.ofMinutes(wishConfig.getTotalTimeoutMinutes()));
 
         try {
@@ -154,8 +159,15 @@ public class WishFulfillmentLoop {
                 log.error("Failed to update wish status after error", ex);
             }
         } finally {
-            // Only this loop's own flag: a later fulfillAsync for the same wish has registered its own one
-            activeCancellations.remove(wishId, cancelFlag);
+            // The flag belongs to the wish, not to this loop: every loop still running reads it via
+            // isCancelled, so only the last one may drop it.
+            runningLoops.compute(wishId, (id, running) -> {
+                if (running == null || running <= 1) {
+                    activeCancellations.remove(id);
+                    return null;
+                }
+                return running - 1;
+            });
         }
     }
 
