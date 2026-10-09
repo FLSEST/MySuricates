@@ -15,6 +15,7 @@ import org.springframework.messaging.simp.SimpMessagingTemplate;
 import java.util.HashMap;
 import java.util.Optional;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -185,6 +186,68 @@ class WishFulfillmentLoopTest {
         assertThat(wish.getStatus()).isEqualTo(WishStatus.FAILED);
         assertThat(wish.getError()).isEqualTo("decompose exploded");
         verify(wishRepository, atLeastOnce()).save(wish);
+    }
+
+    @Test
+    void loop_statusNoPhaseHandles_stopsInsteadOfSpinning() throws Exception {
+        // DECOMPOSING at the top of the loop means a second loop for the same wish (fulfillAsync has no
+        // run lock): the first one is still decomposing. Count the reads so a spinning loop fails fast.
+        runInline();
+        wish.setStatus(WishStatus.DECOMPOSING);
+        AtomicInteger reads = new AtomicInteger();
+        when(wishRepository.findById("w-1")).thenAnswer(inv -> {
+            if (reads.incrementAndGet() > 50) throw new IllegalStateException("loop keeps spinning");
+            return Optional.of(wish);
+        });
+
+        loop.fulfillAsync("w-1");
+
+        assertThat(reads.get()).isLessThanOrEqualTo(5);
+        assertThat(wish.getStatus()).isEqualTo(WishStatus.DECOMPOSING);
+        verify(decomposeService, never()).decompose(any());
+        verify(executionService, never()).execute(any(), any());
+        verify(evaluationService, never()).evaluate(any());
+        verify(wishRepository, never()).save(any());
+    }
+
+    @Test
+    void finishingLoop_keepsTheCancelFlagOfALaterLoop() throws Exception {
+        ArgumentCaptor<Runnable> tasks = ArgumentCaptor.forClass(Runnable.class);
+        when(virtualThreadExecutor.submit(tasks.capture())).thenReturn(null);
+        // Ends the second loop if the cancel flag got lost instead of letting it execute forever
+        lenient().doAnswer(inv -> { wish.setStatus(WishStatus.COMPLETED); return null; })
+                .when(executionService).execute(any(), any());
+        wish.setStatus(WishStatus.COMPLETED);
+
+        loop.fulfillAsync("w-1");
+        loop.fulfillAsync("w-1");
+        tasks.getAllValues().get(0).run(); // the first loop ends at once (terminal)
+        loop.cancel("w-1");
+        wish.setStatus(WishStatus.EXECUTING);
+        tasks.getAllValues().get(1).run();
+
+        assertThat(wish.getStatus()).isEqualTo(WishStatus.CANCELLED);
+        verify(executionService, never()).execute(any(), any());
+    }
+
+    @Test
+    void stoppedSecondLoop_leavesTheFirstLoopCancellable() throws Exception {
+        ArgumentCaptor<Runnable> tasks = ArgumentCaptor.forClass(Runnable.class);
+        when(virtualThreadExecutor.submit(tasks.capture())).thenReturn(null);
+        lenient().doAnswer(inv -> { wish.setStatus(WishStatus.COMPLETED); return null; })
+                .when(executionService).execute(any(), any());
+        wish.setStatus(WishStatus.DECOMPOSING);
+
+        loop.fulfillAsync("w-1"); // first loop, still decomposing
+        loop.fulfillAsync("w-1"); // second loop meets DECOMPOSING and stops
+        tasks.getAllValues().get(1).run();
+        loop.cancel("w-1");
+        // The first loop's phase overwrites the CANCELLED that cancel() wrote, as execute() does
+        wish.setStatus(WishStatus.EXECUTING);
+        tasks.getAllValues().get(0).run();
+
+        assertThat(wish.getStatus()).isEqualTo(WishStatus.CANCELLED);
+        verify(executionService, never()).execute(any(), any());
     }
 
     @Test
