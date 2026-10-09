@@ -550,6 +550,81 @@ class ChainExecutorTest {
         });
     }
 
+    /** A cancelled entry run cancels the chain; the next entry is not started. */
+    @Test
+    void executeEntries_cancelledEntryRun_cancelsTheChain() {
+        setupSynchronousExecutor();
+        Workflow wf1 = Workflow.builder().id("wf-1").name("WF1").build();
+        when(workflowService.findByIdEager("wf-1")).thenReturn(wf1);
+        when(workflowExecutor.execute(eq(wf1), any(), eq(TriggerSource.CHAIN)))
+                .thenReturn(WorkflowRun.builder().id("wfr-1").status(RunStatus.RUNNING).build());
+        when(workflowRunRepository.findById("wfr-1"))
+                .thenReturn(Optional.of(WorkflowRun.builder().id("wfr-1").status(RunStatus.CANCELLED).build()));
+
+        chainExecutor.execute(testChain, null);
+
+        ChainRun saved = captureLastSavedRun();
+        assertThat(saved.getStatus()).isEqualTo(RunStatus.CANCELLED);
+        assertThat(saved.getEntryRuns()).extracting(ChainRunEntry::getStatus).containsExactly(RunStatus.CANCELLED);
+        verify(workflowService, never()).findByIdEager("wf-2");
+    }
+
+    /** With stop-on-failure, the chain's error names why the entry failed — per failure branch. */
+    @Test
+    void executeEntries_stopOnFailure_chainErrorNamesTheCause() {
+        setupSynchronousExecutor();
+        Workflow wf1 = Workflow.builder().id("wf-1").name("WF1").build();
+        when(workflowService.findByIdEager("wf-1")).thenReturn(wf1);
+        when(workflowExecutor.execute(eq(wf1), any(), eq(TriggerSource.CHAIN))).thenThrow(new IllegalStateException("refused"));
+
+        chainExecutor.execute(testChain, null);
+
+        assertThat(captureLastSavedRun().getError()).isEqualTo("refused");
+        clearInvocations(chainRunRepository);
+
+        doReturn(WorkflowRun.builder().id("wfr-1").status(RunStatus.RUNNING).build())
+                .when(workflowExecutor).execute(eq(wf1), any(), eq(TriggerSource.CHAIN));
+        when(workflowRunRepository.findById("wfr-1"))
+                .thenReturn(Optional.of(WorkflowRun.builder().id("wfr-1").status(RunStatus.INTERRUPTED).build()));
+
+        chainExecutor.execute(testChain, null);
+
+        assertThat(captureLastSavedRun().getError()).isEqualTo("Workflow 'WF1' failed");
+        clearInvocations(chainRunRepository);
+
+        when(workflowService.findByIdEager("wf-1")).thenThrow(new RuntimeException("gone"));
+
+        chainExecutor.execute(testChain, null);
+
+        assertThat(captureLastSavedRun().getError()).isEqualTo("Workflow not found: wf-1");
+    }
+
+    /**
+     * The WebSocket order per failure branch: a failed entry run stops the chain before its entry is
+     * broadcast; an entry whose workflow is missing is broadcast while the chain still runs.
+     */
+    @Test
+    void executeEntries_stopOnFailure_broadcastOrderPerBranch() {
+        setupSynchronousExecutor();
+        Workflow wf1 = Workflow.builder().id("wf-1").name("WF1").build();
+        when(workflowService.findByIdEager("wf-1")).thenReturn(wf1);
+        when(workflowExecutor.execute(eq(wf1), any(), eq(TriggerSource.CHAIN)))
+                .thenReturn(WorkflowRun.builder().id("wfr-1").status(RunStatus.RUNNING).build());
+        when(workflowRunRepository.findById("wfr-1"))
+                .thenReturn(Optional.of(WorkflowRun.builder().id("wfr-1").status(RunStatus.FAILED).build()));
+
+        chainExecutor.execute(testChain, null);
+
+        assertThat(broadcastStatuses()).containsExactly("RUNNING", "RUNNING", "FAILED", "FAILED");
+        clearInvocations(messagingTemplate);
+
+        when(workflowService.findByIdEager("wf-1")).thenThrow(new RuntimeException("gone"));
+
+        chainExecutor.execute(testChain, null);
+
+        assertThat(broadcastStatuses()).containsExactly("RUNNING", "FAILED");
+    }
+
     /** A clock that moves one second ahead on every read, so a second read shows in a duration. */
     private static final class TickingClock extends Clock {
         private Instant now = Instant.parse("2026-10-09T10:00:00Z");
@@ -595,9 +670,16 @@ class ChainExecutorTest {
             return null;
         }).when(virtualThreadExecutor).submit(any(Runnable.class));
 
-        lenient().when(chainRunRepository.findById("run-1")).thenReturn(Optional.of(
+        // A fresh run per execution, so a test may run the chain more than once
+        lenient().when(chainRunRepository.findById("run-1")).thenAnswer(inv -> Optional.of(
                 ChainRun.builder().id("run-1").status(RunStatus.RUNNING)
                         .chain(testChain).entryRuns(new ArrayList<>()).build()));
+    }
+
+    private List<String> broadcastStatuses() {
+        ArgumentCaptor<String> captor = ArgumentCaptor.forClass(String.class);
+        verify(messagingTemplate, atLeastOnce()).convertAndSend(eq("/topic/chains/run-1/status"), captor.capture());
+        return captor.getAllValues();
     }
 
     private ChainRun captureLastSavedRun() {
