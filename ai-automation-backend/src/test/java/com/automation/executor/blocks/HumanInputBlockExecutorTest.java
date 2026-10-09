@@ -4,6 +4,7 @@ import com.automation.entity.BlockDefinition;
 import com.automation.entity.StepStatus;
 import com.automation.executor.ApprovalRequest;
 import com.automation.executor.ExecutionContext;
+import com.automation.service.workflow.ExecutionBroadcaster;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -32,7 +33,7 @@ class HumanInputBlockExecutorTest {
 
     @BeforeEach
     void setUp() {
-        executor = new HumanInputBlockExecutor(messagingTemplate);
+        executor = new HumanInputBlockExecutor(new ExecutionBroadcaster(messagingTemplate));
     }
 
     @Test
@@ -167,6 +168,66 @@ class HumanInputBlockExecutorTest {
         // Second: human_input_resolved
         assertThat(payloads.get(1).get("type")).isEqualTo("human_input_resolved");
         assertThat(payloads.get(1).get("answer")).isEqualTo("Bob");
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void execute_broadcastsTheRequestAndTheAnswer_withEveryField() {
+        var config = new HashMap<String, Object>();
+        config.put("prompt", "Which file?");
+        config.put("input_type", "select");
+        config.put("variable_name", "file");
+        config.put("options", List.of("a.md", "b.md"));
+        config.put("default_value", "a.md");
+        config.put("required", false);
+
+        var block = BlockDefinition.builder().type("human-input").config(config).build();
+        var context = buildContextWithPrecompletedApproval("b.md");
+
+        var result = executor.execute(block, context);
+
+        ArgumentCaptor<Map<String, Object>> captor = ArgumentCaptor.forClass(Map.class);
+        verify(messagingTemplate, times(2)).convertAndSend(eq("/topic/executions/run-1/logs"), captor.capture());
+        int stepIndex = result.getStepIndex();
+        // Sent through ExecutionBroadcaster.broadcastLogMessage, like every other run log event
+        assertThat(captor.getAllValues()).allSatisfy(payload ->
+                assertThat(payload).containsEntry("runId", "run-1").containsKey("timestamp"));
+        assertThat(captor.getAllValues().get(0))
+                .containsEntry("type", "human_input_required")
+                .containsEntry("blockId", "human-input-" + stepIndex)
+                .containsEntry("prompt", "Which file?")
+                .containsEntry("inputType", "select")
+                .containsEntry("options", List.of("a.md", "b.md"))
+                .containsEntry("defaultValue", "a.md")
+                .containsEntry("required", false)
+                .containsEntry("validationPattern", null)
+                .containsEntry("variableName", "file")
+                .containsEntry("stepIndex", stepIndex)
+                .doesNotContainKey("fields");
+        assertThat(captor.getAllValues().get(1))
+                .containsEntry("type", "human_input_resolved")
+                .containsEntry("stepIndex", stepIndex)
+                .containsEntry("answer", "b.md");
+    }
+
+    @Test
+    void execute_timeoutWithDefault_broadcastsTheDefaultAsTheAnswer() {
+        var config = new HashMap<String, Object>();
+        config.put("prompt", "Name?");
+        config.put("default_value", "anon");
+        config.put("timeout_minutes", 0);
+
+        var block = BlockDefinition.builder().type("human-input").config(config).build();
+        var context = buildContextWithNeverCompletingApproval();
+
+        executor.execute(block, context);
+
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<Map<String, Object>> captor = ArgumentCaptor.forClass(Map.class);
+        verify(messagingTemplate, times(2)).convertAndSend(eq("/topic/executions/run-1/logs"), captor.capture());
+        assertThat(captor.getAllValues().get(1))
+                .containsEntry("type", "human_input_resolved")
+                .containsEntry("answer", "anon");
     }
 
     @Test
