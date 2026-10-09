@@ -24,6 +24,14 @@ class ForEachItemsTest {
     }
 
     @Test
+    void should_readStaticItems_fromAListOrText_andDropBlankOnes() {
+        assertThat(ForEachItems.staticItems(java.util.List.of("a", " ", 7, ""))).containsExactly("a", "7");
+        assertThat(ForEachItems.staticItems("a\n\nb")).containsExactly("a", "b");
+        assertThat(ForEachItems.staticItems(null)).isEmpty();
+        assertThat(ForEachItems.staticItems(java.util.Map.of("a", 1))).isEmpty();
+    }
+
+    @Test
     void should_exposeTopLevelFields_ofAJsonObjectItem() {
         var fields = ForEachItems.fields("feature", "  {\"id\": \"auth\", \"desc\": \"Login\", \"n\": 3, \"ok\": true}  ");
 
