@@ -51,6 +51,8 @@ public class WhileBlockExecutor implements BlockExecutor {
         StringBuilder outputs = new StringBuilder();
         List<Map<String, Object>> recordedIterations = new ArrayList<>();
         int iteration = 0;
+        // Every body run, the failed one included; the recorded list stops at MAX_RECORDED_ITEMS
+        int executedIterations = 0;
 
         while (iteration < maxIterations && !context.shouldStop()) {
             // Check condition
@@ -116,6 +118,7 @@ public class WhileBlockExecutor implements BlockExecutor {
                 );
             }
 
+            executedIterations++;
             outputs.append("[iteration ").append(iteration + 1).append("]: ")
                     .append(stepResult.getOutput()).append("\n");
 
@@ -139,7 +142,7 @@ public class WhileBlockExecutor implements BlockExecutor {
         }
 
         aggregateResult.setOutput(outputs.toString().trim());
-        StepAiMetadata.put(aggregateResult, "iterationCount", recordedIterations.size());
+        StepAiMetadata.put(aggregateResult, "iterationCount", executedIterations);
         StepAiMetadata.put(aggregateResult, "iterations", List.copyOf(recordedIterations));
         if (aggregateResult.getStatus() == null || aggregateResult.getStatus() == StepStatus.PENDING) {
             aggregateResult.setStatus(StepStatus.COMPLETED);
