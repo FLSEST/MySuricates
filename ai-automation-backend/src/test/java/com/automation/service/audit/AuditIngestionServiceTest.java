@@ -559,6 +559,102 @@ class AuditIngestionServiceTest {
         verify(todoRepository, never()).save(any());
     }
 
+    /**
+     * An invalid envelope without an error text of its own (the parser passes on {@code ex.getMessage()}, which may
+     * be null) is rejected with one text: the stored error and the activity log say the same, never "null".
+     */
+    @Test
+    void invalidEnvelopeWithoutErrorText_isRejectedWithOneFallbackText() {
+        AuditResultParser parser = mock(AuditResultParser.class);
+        when(parser.parse(anyString())).thenReturn(new AuditResultParser.ParseResult(false, null, "# Report", List.of()));
+        AuditSnapshotApplier applier = mock(AuditSnapshotApplier.class);
+        AuditIngestionService withSilentParser = new AuditIngestionService(runRepository, reportRepository, parser,
+                new AuditRuleKeyCatalog(new ObjectMapper()), activityLog, applier);
+        stubRun("run-1", ACCEPTED_AT, "Big.java: 320 LOC");
+
+        withSilentParser.ingest(event("run-1"));
+
+        ArgumentCaptor<AuditReport> report = ArgumentCaptor.forClass(AuditReport.class);
+        verify(reportRepository).save(report.capture());
+        assertThat(report.getValue().getIngestionStatus()).isEqualTo(AuditIngestionStatus.INVALID);
+        assertThat(report.getValue().getIngestionError()).isEqualTo("Invalid audit snapshot");
+        verify(activityLog).warn(ActivityLog.LogCategory.EXECUTION,
+                "Audit-Report verworfen (" + AUDIT_KEY + "): Invalid audit snapshot"
+                        + " — keine Findings uebernommen, keine aufgeloest",
+                "AuditIngestionService", "run-1", "wf-1");
+        verifyNoInteractions(applier);
+    }
+
+    /** A run with one step: status of run and step, the step's block name and output are free. */
+    private void stubSingleStepRun(RunStatus runStatus, String blockName, StepStatus stepStatus, String output) {
+        StepResult step = StepResult.builder().stepIndex(0).status(stepStatus).output(output)
+                .metadata(new HashMap<>(Map.of("blockName", blockName))).build();
+        when(runRepository.findByIdWithSteps("run-1")).thenReturn(Optional.of(WorkflowRun.builder().id("run-1")
+                .workflow(Workflow.builder().name("Health Audit").build()).status(runStatus)
+                .completedAt(ACCEPTED_AT).steps(new ArrayList<>(List.of(step))).build()));
+    }
+
+    /**
+     * Ingests run-1 of the given audit and returns the reason the stored report names, after checking that the
+     * report is INVALID, the activity log names the same reason and no finding was touched.
+     */
+    private String rejectionOf(String auditKey) {
+        service.ingest(event("run-1", auditKey));
+
+        ArgumentCaptor<AuditReport> report = ArgumentCaptor.forClass(AuditReport.class);
+        verify(reportRepository).save(report.capture());
+        assertThat(report.getValue().getIngestionStatus()).isEqualTo(AuditIngestionStatus.INVALID);
+        String reason = report.getValue().getIngestionError();
+        verify(activityLog).warn(ActivityLog.LogCategory.EXECUTION,
+                "Audit-Report verworfen (" + auditKey + "): " + reason
+                        + " — keine Findings uebernommen, keine aufgeloest",
+                "AuditIngestionService", "run-1", "wf-1");
+        verify(findingRepository, never()).saveAll(any());
+        return reason;
+    }
+
+    /** The stored error and the activity log name the first failing check — one derivation for both. */
+    @Nested
+    class RejectionReasons {
+
+        @Test
+        void aRunThatDidNotComplete_namesItsStatus() {
+            stubSingleStepRun(RunStatus.FAILED, "report", StepStatus.COMPLETED, "# Report");
+
+            assertThat(rejectionOf(AUDIT_KEY)).isEqualTo("Run ended with status FAILED");
+        }
+
+        @Test
+        void aMissingReportStep_namesTheConfiguredBlock() {
+            stubSingleStepRun(RunStatus.COMPLETED, "other", StepStatus.COMPLETED, "# Report");
+
+            assertThat(rejectionOf(AUDIT_KEY)).isEqualTo("Configured report block 'report' was not persisted");
+        }
+
+        @Test
+        void aReportStepThatDidNotComplete_saysSo() {
+            stubSingleStepRun(RunStatus.COMPLETED_WITH_ERRORS, "report", StepStatus.FAILED, "# Report");
+
+            assertThat(rejectionOf(AUDIT_KEY)).isEqualTo("Report block did not complete");
+        }
+
+        @Test
+        void anInvalidEnvelope_namesTheParsersReason() {
+            stubSingleStepRun(RunStatus.COMPLETED, "report", StepStatus.COMPLETED, "# Report ohne Envelope");
+
+            assertThat(rejectionOf(AUDIT_KEY)).isEqualTo("Audit result envelope v1 is missing");
+        }
+
+        @Test
+        void anUnknownRuleKey_namesTheKeyAndTheAllowedOnes() {
+            stubCoverageRun("run-1", "coverage.mystery");
+
+            assertThat(rejectionOf(COVERAGE_KEY))
+                    .startsWith("Unbekannte ruleKeys für Audit '" + COVERAGE_KEY + "': [coverage.mystery]")
+                    .contains("erlaubt sind");
+        }
+    }
+
     /** A key from the catalog passes through unchanged. */
     @Test
     void bekannterRuleKeyBleibtGueltig() {

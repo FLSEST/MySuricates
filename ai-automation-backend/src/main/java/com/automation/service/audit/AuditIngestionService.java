@@ -23,6 +23,9 @@ import java.util.*;
 @RequiredArgsConstructor
 @Slf4j
 public class AuditIngestionService {
+    /** Rejection reason of an invalid envelope that names none of its own. */
+    static final String INVALID_SNAPSHOT = "Invalid audit snapshot";
+
     private final WorkflowRunRepository runRepository;
     private final AuditReportRepository reportRepository;
     private final AuditResultParser parser;
@@ -46,14 +49,7 @@ public class AuditIngestionService {
         StepResult promptStep = step(run, config.promptBlock());
         String output = reportStep != null ? reportStep.getOutput() : "";
         ParseResult parsed = parser.parse(output);
-        boolean successful = run.getStatus() == RunStatus.COMPLETED || run.getStatus() == RunStatus.COMPLETED_WITH_ERRORS;
-        String ruleKeyError = parsed.valid() ? unknownRuleKeyError(config.key(), parsed.findings()) : null;
-        String error = !successful ? "Run ended with status " + run.getStatus()
-                : reportStep == null ? "Configured report block '" + config.reportBlock() + "' was not persisted"
-                : reportStep.getStatus() != StepStatus.COMPLETED ? "Report block did not complete"
-                : parsed.error() != null ? parsed.error() : ruleKeyError;
-        boolean valid = successful && reportStep != null && reportStep.getStatus() == StepStatus.COMPLETED
-                && parsed.valid() && ruleKeyError == null;
+        Optional<String> rejection = rejection(run, config, reportStep, parsed);
 
         AuditReport report = reportRepository.save(AuditReport.builder()
                 .projectId(event.getProjectId())
@@ -70,18 +66,18 @@ public class AuditIngestionService {
                 .model(firstNonBlank(metadataValue(promptStep, "model"), metadataValue(reportStep, "model"),
                         run.getWorkflow().getModel()))
                 .workflowVersion(run.getWorkflow().getVersion())
-                .ingestionStatus(valid ? AuditIngestionStatus.VALID : AuditIngestionStatus.INVALID)
-                .ingestionError(valid ? null : firstNonBlank(error, "Invalid audit snapshot"))
+                .ingestionStatus(rejection.isEmpty() ? AuditIngestionStatus.VALID : AuditIngestionStatus.INVALID)
+                .ingestionError(rejection.orElse(null))
                 .generatedAt(run.getCompletedAt() != null ? run.getCompletedAt() : Instant.now())
                 .build());
 
-        if (!valid) {
-            log.warn("Stored invalid audit report for run {}: {}", event.getRunId(), error);
+        if (rejection.isPresent()) {
+            log.warn("Stored invalid audit report for run {}: {}", event.getRunId(), rejection.get());
             // Make it visible, not just in the log: an invalid report skips the entire
             // snapshot — no finding is created, none set to RESOLVED. Whoever expected the
             // audit should see why nothing happened (TODO e39379a9).
             activityLog.warn(ActivityLog.LogCategory.EXECUTION,
-                    "Audit-Report verworfen (" + config.key() + "): " + firstNonBlank(error, "ungueltiger Snapshot")
+                    "Audit-Report verworfen (" + config.key() + "): " + rejection.get()
                             + " — keine Findings uebernommen, keine aufgeloest",
                     "AuditIngestionService", event.getRunId(), event.getWorkflowId());
             return;
@@ -100,6 +96,28 @@ public class AuditIngestionService {
                     "AuditIngestionService", event.getRunId(), event.getWorkflowId());
         }
         snapshotApplier.apply(event, report, parsed.findings(), factNames, config.todoThreshold());
+    }
+
+    /**
+     * Why the report is rejected, or empty when it is valid: the first failing check names the reason. The
+     * stored {@code ingestionError}, the server log and the activity log all use this text, so an invalid
+     * envelope without a reason of its own (the parser passes on {@code ex.getMessage()}, which may be null)
+     * gets {@link #INVALID_SNAPSHOT} here, in one place.
+     */
+    private Optional<String> rejection(WorkflowRun run, AuditConfig config, StepResult reportStep, ParseResult parsed) {
+        if (run.getStatus() != RunStatus.COMPLETED && run.getStatus() != RunStatus.COMPLETED_WITH_ERRORS) {
+            return Optional.of("Run ended with status " + run.getStatus());
+        }
+        if (reportStep == null) {
+            return Optional.of("Configured report block '" + config.reportBlock() + "' was not persisted");
+        }
+        if (reportStep.getStatus() != StepStatus.COMPLETED) {
+            return Optional.of("Report block did not complete");
+        }
+        if (!parsed.valid()) {
+            return Optional.of(firstNonBlank(parsed.error(), INVALID_SNAPSHOT));
+        }
+        return Optional.ofNullable(unknownRuleKeyError(config.key(), parsed.findings()));
     }
 
     /**
