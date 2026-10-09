@@ -152,6 +152,23 @@ class PendingTodoApprovalServiceTest {
         verify(eventPublisher, never()).publishEvent(any());
     }
 
+    /** An approved escalation turns the open follow-up into an incident, like its priority; only the prefix changes. */
+    @Test
+    void approvePendingTodos_escalatedToHigh_turnsTheFollowUpIntoAnIncident() {
+        WorkflowRun run = runWithPending(pending("HIGH", "lint-failure"));
+        Todo existing = Todo.builder().id("t-old").title("[Follow-up] Test Workflow — lint-failure (von Hand ergaenzt)")
+                .priority(Todo.Priority.MEDIUM).build();
+        when(workflowRunRepository.findById("run-app")).thenReturn(Optional.of(run));
+        when(todoRepository.findOpenGateByCompositeKey("proj-1", "workflow_run", "wf-1", "category:lint-failure"))
+                .thenReturn(Optional.of(existing));
+
+        approvalService.approvePendingTodos("run-app", true);
+
+        assertThat(existing.getPriority()).isEqualTo(Todo.Priority.HIGH);
+        assertThat(existing.getTitle()).isEqualTo("[Incident] Test Workflow — lint-failure (von Hand ergaenzt)");
+        verify(todoRepository).save(existing);
+    }
+
     @Test
     void approvePendingTodos_invalidPriority_throwsIllegalArgument() {
         when(workflowRunRepository.findById("run-app")).thenReturn(Optional.of(runWithPending(pending("URGENT", "general"))));

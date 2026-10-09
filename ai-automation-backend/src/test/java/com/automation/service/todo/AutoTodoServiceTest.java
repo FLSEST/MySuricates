@@ -344,6 +344,50 @@ class AutoTodoServiceTest {
         assertThat(updated.getDescription()).contains("5 errors now");
     }
 
+    /**
+     * A follow-up that escalates to RED becomes an incident: priority and title prefix move together. The open
+     * todo is found by its category tag, not its title, and only the known prefix is swapped — the rest may be
+     * a user's edit.
+     */
+    @Test
+    void escalationFromYellowToRed_turnsTheFollowUpIntoAnIncident() {
+        WorkflowRunCompletedEvent event = createEvent(RunStatus.COMPLETED,
+                Map.of("gate_status", "RED"), AUTO_TODO_ENABLED_META);
+        when(gateStatusResolver.resolve(event))
+                .thenReturn(new GateResult(GateStatus.RED, "lint-failure", "5 errors now"));
+        Todo existing = Todo.builder().id("todo-existing")
+                .title("[Follow-up] Test Workflow — lint-failure (von Hand ergaenzt)")
+                .status(Todo.Status.OPEN).priority(Todo.Priority.MEDIUM).build();
+        when(todoRepository.findOpenGateByCompositeKey("proj-1", "workflow_run", "wf-1", "category:lint-failure"))
+                .thenReturn(Optional.of(existing));
+        when(todoRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        autoTodoService.onWorkflowRunCompleted(event);
+
+        verify(todoRepository).save(existing);
+        assertThat(existing.getPriority()).isEqualTo(Todo.Priority.HIGH);
+        assertThat(existing.getTitle()).isEqualTo("[Incident] Test Workflow — lint-failure (von Hand ergaenzt)");
+    }
+
+    /** Track mode: an incident that eases to YELLOW is a follow-up again, like its priority. */
+    @Test
+    void trackMode_deescalationFromRedToYellow_turnsTheIncidentBackIntoAFollowUp() {
+        WorkflowRunCompletedEvent event = createEvent(RunStatus.COMPLETED,
+                Map.of("gate_status", "YELLOW"), AUTO_TODO_TRACK_META);
+        when(gateStatusResolver.resolve(event))
+                .thenReturn(new GateResult(GateStatus.YELLOW, "security", "1 finding left"));
+        Todo existing = Todo.builder().id("todo-existing").title("[Incident] Test Workflow — security")
+                .description("first report").status(Todo.Status.OPEN).priority(Todo.Priority.HIGH).build();
+        when(todoRepository.findOpenGateByCompositeKey("proj-1", "workflow_run", "wf-1", "category:security"))
+                .thenReturn(Optional.of(existing));
+        when(todoRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        autoTodoService.onWorkflowRunCompleted(event);
+
+        assertThat(existing.getPriority()).isEqualTo(Todo.Priority.MEDIUM);
+        assertThat(existing.getTitle()).isEqualTo("[Follow-up] Test Workflow — security");
+    }
+
     @Test
     void globalDefault_enablesAutoTodoWhenNoExplicitSetting() {
         // Workflow has no autoTodo in metadata — fallback to global default

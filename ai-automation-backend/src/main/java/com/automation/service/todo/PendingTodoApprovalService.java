@@ -1,6 +1,5 @@
 package com.automation.service.todo;
 
-import com.automation.entity.GateStatus;
 import com.automation.entity.Todo;
 import com.automation.entity.WorkflowRun;
 import com.automation.event.TodoCreatedEvent;
@@ -100,6 +99,7 @@ public class PendingTodoApprovalService {
             todo.setDescription(description);
             todo.setWorkflowRunId(run.getId());
             todo.setPriority(priority);
+            todo.setTitle(textBuilder.retitle(todo.getTitle(), priority));
             todo.setTags(tagsJson);
             todoRepository.save(todo);
             log.info("Auto-todo (approved) updated: {} ({})", todo.getTitle(), todo.getId());
@@ -124,13 +124,9 @@ public class PendingTodoApprovalService {
     }
 
     private Map<String, Object> buildPendingTodo(String projectId, WorkflowRunCompletedEvent event, GateResult gate) {
-        String prefix = gate.status() == GateStatus.RED ? "[Incident]" : "[Follow-up]";
-        String title = prefix + " " + event.getWorkflowName() + " — " + gate.category();
-        Todo.Priority priority = gate.status() == GateStatus.RED ? Todo.Priority.HIGH : Todo.Priority.MEDIUM;
-
         Map<String, Object> proposed = new HashMap<>();
-        proposed.put("title", title);
-        proposed.put("priority", priority.name());
+        proposed.put("title", textBuilder.buildTitle(event, gate));
+        proposed.put("priority", gate.status().todoPriority().name());
         proposed.put("description", textBuilder.buildDescription(event, gate));
         proposed.put("category", gate.category());
         proposed.put("gateStatus", gate.status().name());

@@ -32,6 +32,14 @@ class GateStatusTest {
         assertThat(GateStatus.valueOf("RED")).isEqualTo(GateStatus.RED);
     }
 
+    /** One mapping for every auto-todo mode: the worse the gate, the more urgent its todo. */
+    @Test
+    void todoPriority_growsWithTheSeverityOfTheGate() {
+        assertThat(GateStatus.GREEN.todoPriority()).isEqualTo(Todo.Priority.LOW);
+        assertThat(GateStatus.YELLOW.todoPriority()).isEqualTo(Todo.Priority.MEDIUM);
+        assertThat(GateStatus.RED.todoPriority()).isEqualTo(Todo.Priority.HIGH);
+    }
+
     @Test
     void should_throwException_when_valueOfReceivesInvalidName() {
         assertThatThrownBy(() -> GateStatus.valueOf("INVALID"))

@@ -108,23 +108,17 @@ public class AutoTodoService {
             }
             switch (gate.status()) {
                 case GREEN -> closeOpenTodos(projectId, event);
-                case YELLOW -> upsertTodo(projectId, event, gate, Todo.Priority.MEDIUM);
-                case RED -> upsertTodo(projectId, event, gate, Todo.Priority.HIGH);
+                case YELLOW, RED -> upsertTodo(projectId, event, gate);
             }
         }
     }
 
     private void handleTrackMode(WorkflowRunCompletedEvent event, GateResult gate, List<String> targetProjectIds) {
-        Todo.Priority priority = switch (gate.status()) {
-            case RED -> Todo.Priority.HIGH;
-            case YELLOW -> Todo.Priority.MEDIUM;
-            case GREEN -> Todo.Priority.LOW;
-        };
         for (String projectId : targetProjectIds) {
             if (granularTodoService.hasItems(event)) {
                 granularTodoService.syncItems(projectId, event, gate);
             }
-            upsertTodo(projectId, event, gate, priority);
+            upsertTodo(projectId, event, gate);
         }
     }
 
@@ -219,8 +213,13 @@ public class AutoTodoService {
         });
     }
 
-    private void upsertTodo(String projectId, WorkflowRunCompletedEvent event,
-                            GateResult gate, Todo.Priority priority) {
+    /**
+     * Creates the gate todo of this workflow and category, or updates the open one. Its priority comes from the
+     * gate ({@link GateStatus#todoPriority}); the title prefix of an open one follows it, so an escalated
+     * follow-up becomes an incident ({@link AutoTodoTextBuilder#retitle}).
+     */
+    private void upsertTodo(String projectId, WorkflowRunCompletedEvent event, GateResult gate) {
+        Todo.Priority priority = gate.status().todoPriority();
         TransactionTemplate tx = new TransactionTemplate(transactionManager);
         tx.execute(status -> {
             String categoryTag = "category:" + gate.category();
@@ -239,13 +238,13 @@ public class AutoTodoService {
                 }
                 todo.setWorkflowRunId(event.getRunId());
                 todo.setPriority(priority);
+                todo.setTitle(textBuilder.retitle(todo.getTitle(), priority));
                 todo.setTags(textBuilder.buildTagsJson(gate));
                 todoRepository.save(todo);
                 log.info("Auto-todo updated: {} ({})", todo.getTitle(), todo.getId());
             } else {
-                String prefix = priority == Todo.Priority.HIGH ? "[Incident]" : "[Follow-up]";
                 Todo todo = Todo.builder()
-                        .title(prefix + " " + event.getWorkflowName() + " — " + gate.category())
+                        .title(textBuilder.buildTitle(event, gate))
                         .description(textBuilder.buildDescription(event, gate))
                         .status(Todo.Status.OPEN)
                         .priority(priority)
