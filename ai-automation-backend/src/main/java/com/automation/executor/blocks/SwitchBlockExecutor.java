@@ -8,7 +8,6 @@ import com.automation.executor.ExecutionContext;
 import com.automation.executor.ExecutionMode;
 import com.automation.executor.StepAiMetadata;
 import com.automation.service.cli.CommandExecutorService;
-import com.automation.service.cli.HostExecutionRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -186,8 +185,8 @@ public class SwitchBlockExecutor implements BlockExecutor {
     }
 
     /**
-     * Executes a nested block using CommandExecutorService, matching the pattern
-     * from ConditionalBlockExecutor.
+     * Executes a nested block as an {@link InnerStep}, like the other wrappers run their command — but with
+     * the case block's own settings, shell also by its type, and named after it.
      */
     private StepResult executeNestedBlock(BlockDefinition nestedBlock, ExecutionContext context) {
         String type = nestedBlock.getType();
@@ -214,37 +213,8 @@ public class SwitchBlockExecutor implements BlockExecutor {
 
         // Shell blocks: taint escaping as in ShellBlockExecutor (untrusted always, everything with the option)
         boolean escapeVariables = Boolean.TRUE.equals(nestedConfig.get("shell_escape_variables"));
-        String command = isShell
-                ? context.resolveShellTemplate((String) nestedConfig.get("command"), escapeVariables)
-                : context.resolvePromptTemplate((String) nestedConfig.get("command"));
-
-        if (isShell) {
-            BlockDefinition shellBlock =
-                    CommandExecutorService.buildResolvedShellBlock(nestedConfig, command, context);
-            shellBlock.setName(nestedBlock.getName());
-            return commandExecutor.executeStepAsShell(
-                    context.getProjectPath(),
-                    shellBlock,
-                    context.nextStepIndex(),
-                    shellTimeout
-            );
-        } else {
-            return commandExecutor.executeStepOnHost(
-                    HostExecutionRequest.builder()
-                            .projectPath(context.getProjectPath())
-                            .block(BlockDefinition.builder()
-                                    .type("simple")
-                                    .name(nestedBlock.getName())
-                                    .config(Map.of("command", command))
-                                    .build())
-                            .stepIndex(context.nextStepIndex())
-                            .systemPrompt(context.getInstructionPrefix())
-                            .model(context.modelFor(nestedBlock))
-                            .timeoutSeconds(claudeTimeout)
-                            .providerId(context.providerFor(nestedBlock))
-                            .effort(context.effortFor(nestedBlock))
-                            .build()
-            );
-        }
+        // Named after the case block, so its output is recorded under that name (2718c20e)
+        return new InnerStep(nestedBlock, isShell, escapeVariables, shellTimeout, claudeTimeout, nestedBlock.getName())
+                .run(commandExecutor, context, (String) nestedConfig.get("command"));
     }
 }

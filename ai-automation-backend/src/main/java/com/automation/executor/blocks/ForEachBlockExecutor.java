@@ -9,7 +9,6 @@ import com.automation.executor.ExecutionMode;
 import com.automation.executor.StepAiMetadata;
 import com.automation.executor.StepFailureSummary;
 import com.automation.service.cli.CommandExecutorService;
-import com.automation.service.cli.HostExecutionRequest;
 import com.automation.service.workflow.ExecutionBroadcaster;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -54,6 +53,7 @@ public class ForEachBlockExecutor implements BlockExecutor {
         Integer claudeTimeout = config.containsKey("timeout_seconds")
                 ? ((Number) config.get("timeout_seconds")).intValue()
                 : null;
+        InnerStep itemStep = new InnerStep(block, isShell, escapeVariables, shellTimeout, claudeTimeout);
 
         // Get items from list or command output
         List<String> items;
@@ -137,7 +137,7 @@ public class ForEachBlockExecutor implements BlockExecutor {
 
             StepResult itemResult = workflowId != null
                     ? runWorkflow(workflowId, childMapping, context)
-                    : runCommand(block, command, isShell, escapeVariables, shellTimeout, claudeTimeout, context);
+                    : itemStep.run(commandExecutor, context, command);
             boolean failed = itemResult.getStatus() == StepStatus.FAILED;
             broadcaster.broadcastLogMessage(runId, "foreach_item_completed", Map.of(
                     "stepIndex", stepIndex,
@@ -209,29 +209,6 @@ public class ForEachBlockExecutor implements BlockExecutor {
         );
 
         return aggregateResult;
-    }
-
-    /** One item as a command: a shell call or an AI call, as before {@code workflow_id} existed. */
-    private StepResult runCommand(BlockDefinition block, String command, boolean isShell, boolean escapeVariables,
-                                  int shellTimeout, Integer claudeTimeout, ExecutionContext context) {
-        Map<String, Object> config = block.getConfig();
-        if (isShell) {
-            String resolvedCommand = context.resolveShellTemplate(command, escapeVariables);
-            return commandExecutor.executeStepAsShell(context.getProjectPath(),
-                    CommandExecutorService.buildResolvedShellBlock(config, resolvedCommand, context),
-                    context.nextStepIndex(), shellTimeout);
-        }
-        return commandExecutor.executeStepOnHost(HostExecutionRequest.builder()
-                .projectPath(context.getProjectPath())
-                .block(BlockDefinition.builder().type("simple")
-                        .config(Map.of("command", context.resolvePromptTemplate(command))).build())
-                .stepIndex(context.nextStepIndex())
-                .systemPrompt(context.getInstructionPrefix())
-                .model(context.modelFor(block))
-                .timeoutSeconds(claudeTimeout)
-                .providerId(context.providerFor(block))
-                .effort(context.effortFor(block))
-                .build());
     }
 
     /**

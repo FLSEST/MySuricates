@@ -42,6 +42,7 @@ public class WhileBlockExecutor implements BlockExecutor {
         Integer claudeTimeout = config.containsKey("timeout_seconds")
                 ? ((Number) config.get("timeout_seconds")).intValue()
                 : null;
+        InnerStep body = new InnerStep(block, isShell, escapeVariables, shellTimeout, claudeTimeout);
 
         StepResult aggregateResult = new StepResult();
         aggregateResult.setStepIndex(context.nextStepIndex());
@@ -89,34 +90,7 @@ public class WhileBlockExecutor implements BlockExecutor {
                 }
             }
 
-            String resolvedCommand = isShell
-                    ? context.resolveShellTemplate(command, escapeVariables)
-                    : context.resolvePromptTemplate(command);
-            StepResult stepResult;
-            if (isShell) {
-                stepResult = commandExecutor.executeStepAsShell(
-                        context.getProjectPath(),
-                        CommandExecutorService.buildResolvedShellBlock(config, resolvedCommand, context),
-                        context.nextStepIndex(),
-                        shellTimeout
-                );
-            } else {
-                stepResult = commandExecutor.executeStepOnHost(
-                        HostExecutionRequest.builder()
-                                .projectPath(context.getProjectPath())
-                                .block(BlockDefinition.builder()
-                                        .type("simple")
-                                        .config(Map.of("command", resolvedCommand))
-                                        .build())
-                                .stepIndex(context.nextStepIndex())
-                                .systemPrompt(context.getInstructionPrefix())
-                                .model(context.modelFor(block))
-                                .timeoutSeconds(claudeTimeout)
-                                .providerId(context.providerFor(block))
-                                .effort(context.effortFor(block))
-                                .build()
-                );
-            }
+            StepResult stepResult = body.run(commandExecutor, context, command);
 
             executedIterations++;
             outputs.append("[iteration ").append(iteration + 1).append("]: ")

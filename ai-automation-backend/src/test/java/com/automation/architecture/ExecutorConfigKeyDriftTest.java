@@ -57,6 +57,9 @@ class ExecutorConfigKeyDriftTest {
     private static final Map<String, Delegate> DELEGATES = Map.of(
             "buildResolvedShellBlock(config,",
             new Delegate("com/automation/service/cli/CommandExecutorService.java", "buildResolvedShellBlock"),
+            // A wrapper's own InnerStep builds its shell step from the wrapper's config
+            "new InnerStep(block,",
+            new Delegate("com/automation/service/cli/CommandExecutorService.java", "buildResolvedShellBlock"),
             "AgenticBlockConfig.from(block.getConfig(),",
             new Delegate("com/automation/executor/blocks/AgenticBlockConfig.java", "from"),
             "ContainerToolSpec.from(config,",

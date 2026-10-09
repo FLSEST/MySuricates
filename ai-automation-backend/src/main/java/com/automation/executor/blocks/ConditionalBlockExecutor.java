@@ -77,36 +77,8 @@ public class ConditionalBlockExecutor implements BlockExecutor {
         StepAiMetadata.put(result, "conditionMet", conditionMet);
 
         if (commandToExecute != null) {
-            String resolved = isShell
-                    ? context.resolveShellTemplate(commandToExecute, escapeVariables)
-                    : context.resolvePromptTemplate(commandToExecute);
-            StepResult stepResult;
-            if (isShell) {
-                // Like retry/foreach/while/switch: container_image, mount_docker_socket and mounts
-                // reach the branch command — before ee37f4c8 it silently ran on the host.
-                stepResult = commandExecutor.executeStepAsShell(
-                        context.getProjectPath(),
-                        CommandExecutorService.buildResolvedShellBlock(config, resolved, context),
-                        context.nextStepIndex(),
-                        shellTimeout
-                );
-            } else {
-                stepResult = commandExecutor.executeStepOnHost(
-                        HostExecutionRequest.builder()
-                                .projectPath(context.getProjectPath())
-                                .block(BlockDefinition.builder()
-                                        .type("simple")
-                                        .config(Map.of("command", resolved))
-                                        .build())
-                                .stepIndex(context.nextStepIndex())
-                                .systemPrompt(context.getInstructionPrefix())
-                                .model(context.modelFor(block))
-                                .timeoutSeconds(claudeTimeout)
-                                .providerId(context.providerFor(block))
-                                .effort(context.effortFor(block))
-                                .build()
-                );
-            }
+            StepResult stepResult = new InnerStep(block, isShell, escapeVariables, shellTimeout, claudeTimeout)
+                    .run(commandExecutor, context, commandToExecute);
             result.setOutput(stepResult.getOutput());
             result.setStatus(stepResult.getStatus());
             StepAiMetadata.carryAi(result, stepResult);

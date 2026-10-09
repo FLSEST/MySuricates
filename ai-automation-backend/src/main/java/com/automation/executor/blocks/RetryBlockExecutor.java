@@ -8,7 +8,6 @@ import com.automation.executor.ExecutionContext;
 import com.automation.executor.ExecutionMode;
 import com.automation.executor.StepAiMetadata;
 import com.automation.service.cli.CommandExecutorService;
-import com.automation.service.cli.HostExecutionRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -34,13 +33,13 @@ public class RetryBlockExecutor implements BlockExecutor {
         boolean isShell = ExecutionMode.isShell(config);
         boolean escapeVariables = Boolean.TRUE.equals(config.get("shell_escape_variables"));
         String rawCommand = (String) config.get("command");
-        String command = isShell
-                ? context.resolveShellTemplate(rawCommand, escapeVariables)
-                : context.resolvePromptTemplate(rawCommand);
         int shellTimeout = ((Number) config.getOrDefault("timeout_seconds", SHELL_TIMEOUT_SECONDS)).intValue();
         Integer claudeTimeout = config.containsKey("timeout_seconds")
                 ? ((Number) config.get("timeout_seconds")).intValue()
                 : null;
+        InnerStep attemptStep = new InnerStep(block, isShell, escapeVariables, shellTimeout, claudeTimeout);
+        // Resolved once: every attempt runs the same command
+        String command = attemptStep.resolve(context, rawCommand);
 
         StepResult lastResult = StepResult.builder()
                 .stepIndex(context.nextStepIndex())
@@ -66,30 +65,7 @@ public class RetryBlockExecutor implements BlockExecutor {
             }
 
             attempts++;
-            if (isShell) {
-                lastResult = commandExecutor.executeStepAsShell(
-                        context.getProjectPath(),
-                        CommandExecutorService.buildResolvedShellBlock(config, command, context),
-                        context.nextStepIndex(),
-                        shellTimeout
-                );
-            } else {
-                lastResult = commandExecutor.executeStepOnHost(
-                        HostExecutionRequest.builder()
-                                .projectPath(context.getProjectPath())
-                                .block(BlockDefinition.builder()
-                                        .type("simple")
-                                        .config(Map.of("command", command))
-                                        .build())
-                                .stepIndex(context.nextStepIndex())
-                                .systemPrompt(context.getInstructionPrefix())
-                                .model(context.modelFor(block))
-                                .timeoutSeconds(claudeTimeout)
-                                .providerId(context.providerFor(block))
-                                .effort(context.effortFor(block))
-                                .build()
-                );
-            }
+            lastResult = attemptStep.runResolved(commandExecutor, context, command);
 
             if (lastResult.getStatus() == StepStatus.COMPLETED) {
                 break;
