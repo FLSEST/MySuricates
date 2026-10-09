@@ -626,6 +626,10 @@ When multiple blocks emit gates, the highest severity wins (RED > YELLOW > GREEN
 }
 ```
 
+If an ordered verdict does not arrive (YELLOW `gate-missing`, see above), `gate_summary` says so too:
+`highest` is YELLOW, `counts_by_status` `{"YELLOW": 1}`, and `items` carries one entry with
+`"synthetic": true` and no `step_index` – no step delivered it.
+
 This allows diffing two runs without re-parsing (e.g. for public readiness trends):
 
 ```bash

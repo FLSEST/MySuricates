@@ -4,6 +4,7 @@ import com.automation.entity.GateStatus;
 import com.automation.entity.RunStatus;
 import com.automation.entity.StepResult;
 import com.automation.entity.StepStatus;
+import com.automation.entity.Todo;
 import com.automation.event.WorkflowRunCompletedEvent;
 import com.automation.mapper.TodoMapper;
 import com.automation.repository.StepResultRepository;
@@ -198,5 +199,35 @@ class AutoTodoTextBuilderTest {
         assertThat(d).startsWith("...\n---\n### Update ");
         assertThat(d).endsWith("### Update 2026-10-07 09:05\n*Run: `run-2`*\n\nnewest");
         assertThat(d.length()).isLessThanOrEqualTo(AutoTodoTextBuilder.MAX_TRACK_DESCRIPTION_LENGTH + "...\n".length());
+    }
+
+    @Test
+    void buildTitle_redIsAnIncident_yellowAndGreenAreFollowUps() {
+        WorkflowRunCompletedEvent event = event("wf-1", "run-1");
+
+        assertThat(builder.buildTitle(event, new GateResult(GateStatus.RED, "lint", null)))
+                .isEqualTo("[Incident] Test Workflow — lint");
+        assertThat(builder.buildTitle(event, new GateResult(GateStatus.YELLOW, "lint", null)))
+                .isEqualTo("[Follow-up] Test Workflow — lint");
+        assertThat(builder.buildTitle(event, new GateResult(GateStatus.GREEN, "coverage", null)))
+                .isEqualTo("[Follow-up] Test Workflow — coverage");
+    }
+
+    /** The prefix follows the priority; whatever a user wrote behind it stays. */
+    @Test
+    void retitle_swapsAKnownPrefixAtTheStart_andKeepsTheRest() {
+        assertThat(builder.retitle("[Follow-up] Lint bricht (von Hand ergaenzt)", Todo.Priority.HIGH))
+                .isEqualTo("[Incident] Lint bricht (von Hand ergaenzt)");
+        assertThat(builder.retitle("[Incident] Test Workflow — lint", Todo.Priority.MEDIUM))
+                .isEqualTo("[Follow-up] Test Workflow — lint");
+        assertThat(builder.retitle("[Incident] Test Workflow — lint", Todo.Priority.HIGH))
+                .isEqualTo("[Incident] Test Workflow — lint");
+    }
+
+    @Test
+    void retitle_leavesATitleWithoutAKnownPrefixAlone() {
+        assertThat(builder.retitle("Lint bricht [Follow-up]", Todo.Priority.HIGH)).isEqualTo("Lint bricht [Follow-up]");
+        assertThat(builder.retitle("[Follow-up-Notiz] Lint", Todo.Priority.HIGH)).isEqualTo("[Follow-up-Notiz] Lint");
+        assertThat(builder.retitle(null, Todo.Priority.HIGH)).isNull();
     }
 }

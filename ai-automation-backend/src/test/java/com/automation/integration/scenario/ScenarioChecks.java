@@ -186,9 +186,13 @@ final class ScenarioChecks {
         }
         Map<String, Object> metadata = run.getMetadata() == null ? Map.of() : run.getMetadata();
         if (want.has("gates")) {
-            int gates = metadata.get("gate_summary") instanceof Map<?, ?> summary
-                    && summary.get("items") instanceof List<?> items ? items.size() : 0;
-            assertThat(gates).as("gate markers counted (gate_summary.items)").isEqualTo(want.path("gates").asInt());
+            // The fallback item of an ordered but missing verdict is synthetic: no marker stood behind it.
+            long gates = metadata.get("gate_summary") instanceof Map<?, ?> summary
+                    && summary.get("items") instanceof List<?> items
+                    ? items.stream().filter(item -> !(item instanceof Map<?, ?> fields
+                            && Boolean.TRUE.equals(fields.get("synthetic")))).count()
+                    : 0;
+            assertThat(gates).as("gate markers counted (gate_summary.items)").isEqualTo(want.path("gates").asLong());
         }
         if (want.has("todos")) {
             int todos = metadata.get("todo_items") instanceof List<?> items ? items.size() : 0;

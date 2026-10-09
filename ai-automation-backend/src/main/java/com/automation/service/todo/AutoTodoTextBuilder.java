@@ -2,6 +2,7 @@ package com.automation.service.todo;
 
 import com.automation.entity.StepResult;
 import com.automation.entity.StepStatus;
+import com.automation.entity.Todo;
 import com.automation.event.WorkflowRunCompletedEvent;
 import com.automation.mapper.TodoMapper;
 import com.automation.repository.StepResultRepository;
@@ -17,7 +18,7 @@ import java.util.List;
 import java.util.Locale;
 
 /**
- * Builds the text parts of auto-todos: description (gate description or the run's report step),
+ * Builds the text parts of auto-todos: title, description (gate description or the run's report step),
  * granular-item description, source footer, the track-mode update entry and the tags JSON.
  *
  * <p>Extracted from {@code AutoTodoService} (Audit-TODO 9b4845ab). Reads step outputs, writes
@@ -33,7 +34,37 @@ public class AutoTodoTextBuilder {
     static final int MAX_TRACK_DESCRIPTION_LENGTH = 8000;
     private static final DateTimeFormatter TRACK_UPDATE_TIMESTAMP = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
 
+    static final String INCIDENT_PREFIX = "[Incident]";
+    static final String FOLLOW_UP_PREFIX = "[Follow-up]";
+
     private final StepResultRepository stepResultRepository;
+
+    /** Title of a new gate todo: the prefix of its priority, the workflow and the gate category. */
+    String buildTitle(WorkflowRunCompletedEvent event, GateResult gate) {
+        return titlePrefix(gate.status().todoPriority()) + " " + event.getWorkflowName() + " — " + gate.category();
+    }
+
+    /**
+     * Title of an open gate todo whose priority a new run sets: a known prefix at its start follows the priority
+     * (a follow-up escalated to HIGH becomes an incident, and back), the rest stays — a user may have edited it.
+     * A title without a known prefix stays as it is.
+     */
+    String retitle(String title, Todo.Priority priority) {
+        if (title == null) {
+            return null;
+        }
+        for (String known : List.of(INCIDENT_PREFIX, FOLLOW_UP_PREFIX)) {
+            if (title.startsWith(known)) {
+                return titlePrefix(priority) + title.substring(known.length());
+            }
+        }
+        return title;
+    }
+
+    /** HIGH and above is an incident, everything below a follow-up. */
+    private static String titlePrefix(Todo.Priority priority) {
+        return priority.compareTo(Todo.Priority.HIGH) >= 0 ? INCIDENT_PREFIX : FOLLOW_UP_PREFIX;
+    }
 
     String buildGranularDescription(String itemDescription, WorkflowRunCompletedEvent event) {
         StringBuilder sb = new StringBuilder();

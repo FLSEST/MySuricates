@@ -31,6 +31,9 @@
     "gate": {
       "status": "YELLOW",
       "category": "gate-missing"
+    },
+    "markers": {
+      "gates": 0
     }
   }
 }

@@ -635,6 +635,10 @@ Wenn mehrere Blöcke Gates emittieren, gewinnt der höchste Schweregrad (RED > Y
 }
 ```
 
+Bleibt ein bestelltes Urteil aus (YELLOW `gate-missing`, siehe oben), steht auch das in `gate_summary`:
+`highest` ist YELLOW, `counts_by_status` `{"YELLOW": 1}`, und `items` trägt einen Eintrag mit
+`"synthetic": true` und ohne `step_index` – kein Schritt hat ihn geliefert.
+
 Damit lassen sich zwei Runs ohne Re-Parsing diffen (z. B. für Public-Readiness-Trends):
 
 ```bash
