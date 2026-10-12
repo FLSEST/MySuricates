@@ -876,10 +876,12 @@ without a change, preconditions, `--discard` and that nothing gets pushed.
 
 Where the archive and the public repo stand, which checks the way between them has and how the kinds
 of release run is shown by a page that `scripts/release-overview.py` generates deterministically from
-both repos and an event log. It lives next to the log in the state directory, not in the repo:
-`~/.local/state/mysuricates/release/lagebild.html`, in the probe
-`~/.local/state/mysuricates/release-probe/lagebild.html`. The last step of every release run prints
-the path; in the run view it is a link that opens the page. Four workflows of the maintainer's
+both repos and an event log. It lives in no repo and in no hidden folder (a browser installed as a
+snap reads only visible folders in the home directory): in the documents folder under
+`MySuricates/release-lagebild.html`, in the probe `release-lagebild-probe.html` (context value
+`page_dir` sets the folder). Log and probe repos stay in the state directory
+`~/.local/state/mysuricates/`. The last step of every release run prints the path; in the run view it
+is a link that opens the page. Four workflows of the maintainer's
 instance run the process and write an event after each step (`release-overview.py event`):
 
 | Workflow | Task |

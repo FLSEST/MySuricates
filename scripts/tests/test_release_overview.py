@@ -262,7 +262,7 @@ class ReleasePaths(unittest.TestCase):
                   'echo "$ARCHIVE|$PUBLIC|$PUBLIC_REF|$PUBLIC_CLONE|$EVENTS|$PAGE|$STATUS_FILE"')
         with tempfile.TemporaryDirectory() as home:
             r = subprocess.run(["bash", "-c", script], capture_output=True, text=True,
-                               env={**ENV, "HOME": home, **env})
+                               env={**ENV, "HOME": home, "XDG_CONFIG_HOME": f"{home}/.config", **env})
             return r.returncode, r.stdout.strip().replace(home, "~")
 
     def test_probe_points_at_the_bare_repos(self):
@@ -271,7 +271,7 @@ class ReleasePaths(unittest.TestCase):
         self.assertEqual(out.split("|"), [
             "~/.local/state/mysuricates/release-probe/work", "~/.local/state/mysuricates/release-probe/public.git",
             "main", "~/.local/state/mysuricates/release-probe/public",
-            "~/.local/state/mysuricates/release-probe/events.jsonl", "~/.local/state/mysuricates/release-probe/lagebild.html",
+            "~/.local/state/mysuricates/release-probe/events.jsonl", "~/Documents/MySuricates/release-lagebild-probe.html",
             "~/.local/state/mysuricates/release-probe/lagebild-status.txt"])
 
     def test_live_counts_only_what_is_pushed(self):
@@ -279,7 +279,9 @@ class ReleasePaths(unittest.TestCase):
         self.assertEqual(rc, 0)
         archive, public, ref, _, events, page, _ = out.split("|")
         self.assertEqual((archive, public, ref), ("/repo", "/pub", "origin/main"))
-        self.assertEqual(page, "~/.local/state/mysuricates/release/lagebild.html")  # never inside a repo
+        self.assertEqual(page, "~/Documents/MySuricates/release-lagebild.html")  # no repo, no hidden folder
+        self.assertEqual(self.paths(MODE="live", ARCHIVE_REPO="/repo", PUBLIC_CLONE="/pub", PAGE_DIR="/docs/x")[1]
+                         .split("|")[5], "/docs/x/release-lagebild.html")
         self.assertEqual(events, "~/.local/state/mysuricates/release/events.jsonl")
 
     def test_missing_context_or_unknown_mode_fails(self):
