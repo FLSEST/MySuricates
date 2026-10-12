@@ -175,12 +175,13 @@ steht in [Architektur](docs/architektur.md#module-system-startkonfiguration).
 | Sicherheit | API-Key-Auth, Rate Limiting, Zulassungspruefung vor jedem Run; optional HMAC-signierte Workflow-Siegel |
 | i18n | Deutsch / Englisch |
 | PWA | Vite PWA Plugin |
-| Integrationen | Plugin-System für externe Dienste, z. B. Google Calendar, Gmail, Jira, Confluence, Trello, GitHub, Gitea/Forgejo, GitLab, Taskwarrior; ein neuer Anbieter ist eine einzelne Klasse — Modul, im Preset `full` |
+| Integrationen | Plugin-System für externe Dienste, z. B. Google Calendar, Gmail, Jira, Confluence, Trello, GitHub, Gitea/Forgejo, GitLab, Taskwarrior; ein neuer Anbieter ist im Backend eine einzelne Klasse plus ein Setup-Guide im Frontend — Modul, im Preset `full` |
 
 Ausgefuehrt wird dort, wo die Instanz laeuft — im Container (empfohlen) oder direkt auf dem
 Rechner: Shell-Bloecke ueber die Shell des Benutzers, KI-Bloecke ueber die installierte CLI (im
-Container vom Rechner eingebunden). Einen eigenen Container je
-Shell-Block (`container_image`) gibt es nur, wenn der Docker-Socket ausdruecklich freigegeben ist.
+Container unter Linux vom Rechner eingebunden, unter macOS nur die Anmeldung). Einen eigenen Container
+je Shell-Block (`container_image`) gibt es bei der Instanz im Container nur, wenn der Docker-Socket
+ausdruecklich freigegeben ist; direkt auf dem Rechner genuegt ein laufendes Docker.
 Was von den KI-Anbietern in den Container kommt, bestimmt ein Schalter: standardmaessig nur die
 Programme und je Anbieter die Anmeldung (fuer Claude einmal ein Token aus `claude setup-token`), nicht
 die Einstellungen, Plugins, Memory oder Verlaeufe des Rechners. Wer weniger oder alles teilen will,
