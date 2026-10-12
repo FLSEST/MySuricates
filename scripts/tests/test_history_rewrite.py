@@ -200,6 +200,43 @@ class FullRunFindings(unittest.TestCase):
         self.assertTrue(hm.is_path("src/main/App.java"))
 
 
+class CatchUpRunFindings(unittest.TestCase):
+    """False alarms from the catch-up run of 2026-10-12 (runs 20261012-082605 and -083026)."""
+
+    def test_german_thousands_separator_survives(self):
+        self.assertTrue(hm.survives("1.024", "every 1,024 charAt calls"))
+        self.assertTrue(hm.survives("2.000", "up to 2000 lines"))
+        self.assertFalse(hm.survives("1.024", "every 1 call"))
+
+    def test_identifier_with_changed_case_or_spacing_survives(self):
+        self.assertTrue(hm.survives("SystemPrompt", "system prompt building"))
+        self.assertTrue(hm.survives("ForEach", "the agentic/foreach card"))
+        self.assertTrue(hm.survives("OpenPath", "browse/openPath into FileBrowserService"))
+        self.assertTrue(hm.survives("DefaultContext", "metadata, defaultContext,"))
+        self.assertFalse(hm.survives("WorkflowStarters", "the starters"))
+
+    def test_translated_word_list_with_slashes_survives(self):
+        self.assertTrue(hm.survives("abgelaufen/verbraucht/erraten", "invalid ticket (expired/consumed/guessed)"))
+        self.assertTrue(hm.survives("setzen/erneuern/entfernen", "set/renew/remove secret"))
+        self.assertFalse(hm.survives("abgelaufen/verbraucht/erraten", "expired, consumed or guessed"))
+        self.assertFalse(hm.survives("scripts/ci/gate", "the gate"))  # below a known root it stays a path
+
+    def test_backticks_paired_across_a_line_break_are_no_code_span(self):
+        line = "login <anbieter>` und `instance.sh login --name X <anbieter>`. Beide weisen ab"
+        self.assertNotIn("` und `", hm.preserved_tokens(line))
+        self.assertNotIn("` der alten `", hm.preserved_tokens("skills;` der alten `getAll()`-Methode"))
+        self.assertIn("`foreach`", hm.preserved_tokens("Hinweis für `foreach` ergänzt"))
+
+    def test_german_compound_in_front_of_a_file_name_survives(self):
+        self.assertTrue(hm.survives("Codex-AGENTS.md", "the Factory's Codex AGENTS.md"))
+        self.assertTrue(hm.survives("Root-VISION.md", "root VISION.md was at v0.6.4"))
+        self.assertFalse(hm.survives("release-handover.sh", "the handover.sh script"))
+
+    def test_relative_prefix_with_german_compound_is_no_path(self):
+        self.assertFalse(hm.is_path("../-Sequenzen"))
+        self.assertTrue(hm.is_path("../lib/hygiene-rules.sh"))
+
+
 class NeedsTranslation(unittest.TestCase):
     def test_english_message_with_german_todo_title_needs_none(self):
         msg = f"test(scripts): green again\n\nBody in English.\n\nTodo: {UUID_A} (Rote Shell-Suiten auf main beheben)\n"

@@ -206,9 +206,10 @@ def is_path(token):
     """A slash token is a path if a segment has a file extension, it starts at a root, or it has
     lower-case segments below a known top-level directory. German writes word pairs and compounds
     with slashes ("Aktionen/Einstellungen", "Maven-/Spring-Logzeilen") - those are no paths."""
-    if token.startswith(('/', './', '../', '~/')):
-        return True
     segments = token.split('/')
+    if token.startswith(('/', './', '../', '~/')):
+        # "../-Sequenzen" is German for "../ sequences", no path
+        return not any(seg.startswith('-') and GERMAN_COMPOUND_TAIL.search(seg) for seg in segments)
     # Enumerations, not paths: "Port/-Duser.home/DB", ".java/.ts/.tsx-Datei", "Maven-/Spring-Logzeilen".
     if any(seg.endswith('-') or seg.startswith('-') or not seg or GERMAN_COMPOUND_TAIL.search(seg)
            for seg in segments):
@@ -220,6 +221,13 @@ def is_path(token):
     return segments[0] in PATH_ROOTS or len(segments) >= 3
 
 
+def is_prose_span(span):
+    """A backtick pair around plain German words is no code span: a span closed on the next line
+    pairs its closing backtick with the next opening one ("<anbieter>` und `instance.sh ...")."""
+    inner = span[1:-1]
+    return bool(re.fullmatch(r'[\sA-Za-zÄÖÜäöüß]+', inner)) and is_german_text(inner)
+
+
 def preserved_tokens(text):
     found = set()
     for pattern in TOKEN_PATTERNS:
@@ -229,6 +237,8 @@ def preserved_tokens(text):
                 continue  # a word like "deadbeef" without digits is no id
             if pattern is TOKEN_PATTERNS[3] and not is_path(token):
                 continue  # "Aktionen/Einstellungen" is a word pair, not a path
+            if pattern is TOKEN_PATTERNS[0] and is_prose_span(token):
+                continue  # "` und `": a closing and an opening backtick paired across a line break
             if len(token) > 1:
                 found.add(token)
     return found
@@ -404,11 +414,33 @@ def private_terms():
 
 def survives(token, text):
     """A preserved token is still there - allowing what a correct translation changes: the German
-    decimal comma becomes a point ("1,5" -> "1.5"), and German inflection on an identifier goes
-    ("MvcRequestMatchern" -> "MvcRequestMatchers")."""
+    decimal comma becomes a point ("1,5" -> "1.5"), German inflection on an identifier goes
+    ("MvcRequestMatchern" -> "MvcRequestMatchers"), and the cases commented below."""
     if token in text:
         return True
     if re.fullmatch(r'\d+(?:,\d+)+', token) and token.replace(',', '.') in text:
+        return True
+    # German thousands separator: "1.024" -> "1,024" or "1024"
+    if re.fullmatch(r'\d{1,3}(?:\.\d{3})+', token) \
+            and (token.replace('.', ',') in text or token.replace('.', '') in text):
+        return True
+    # An identifier whose case or spacing the translation changes: "SystemPrompt-Building" ->
+    # "system prompt building", "Browse/OpenPath" -> "browse/openPath"
+    if TOKEN_PATTERNS[5].fullmatch(token):
+        words = re.findall(r'[A-Z]?[a-z0-9]+|[A-Z]+(?![a-z])', token)
+        lowered = text.lower()
+        if any(form.lower() in lowered for form in (token, ' '.join(words), '-'.join(words))):
+            return True
+    # A German word list with slashes, translated as one: "abgelaufen/verbraucht/erraten" ->
+    # "expired/consumed/guessed"; below a known top-level directory it stays a path
+    segments = token.split('/')
+    if len(segments) >= 2 and segments[0] not in PATH_ROOTS \
+            and all(re.fullmatch(r'[a-zäöüß]+', seg) for seg in segments) \
+            and re.search(r'[\w-]+' + r'/[\w-]+' * (len(segments) - 1), text):
+        return True
+    # A German compound in front of a file name: "Root-VISION.md" -> "root VISION.md"
+    compound = re.fullmatch(r'[A-ZÄÖÜ]\w*-(\S+\.\w+)', token)
+    if compound and compound.group(1) in text:
         return True
     for ending in ('n', 'en', 's', 'e', 'es'):
         if token.endswith(ending) and len(token) - len(ending) >= 4 and re.search(r'[A-Z_]', token) \
