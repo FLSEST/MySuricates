@@ -258,8 +258,8 @@ describe('WorkflowExecution', () => {
     });
 
     it('shows COMPLETED status badge', () => {
-      // StatusBadge renders the status text inside a Badge component
-      cy.contains('COMPLETED').should('be.visible');
+      // StatusBadge renders the translated status label (runs.statuses), not the raw enum value
+      cy.contains('Completed').should('be.visible');
     });
 
     it('shows duration', () => {
@@ -280,7 +280,8 @@ describe('WorkflowExecution', () => {
     });
 
     it('does not show container interaction section', () => {
-      cy.contains('Command').should('not.exist');
+      // Step cards label their input "Command" too, so look for the container section's own input.
+      cy.get('input[placeholder*="Enter command"]').should('not.exist');
       cy.contains('Terminal').should('not.exist');
     });
 
@@ -312,7 +313,7 @@ describe('WorkflowExecution', () => {
     });
 
     it('shows FAILED status badge', () => {
-      cy.contains('FAILED').should('be.visible');
+      cy.contains('Failed').should('be.visible');
     });
 
     it('shows error card with error message', () => {
