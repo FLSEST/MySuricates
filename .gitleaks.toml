@@ -11,11 +11,15 @@ useDefault = true
 [[allowlists]]
 description = "Invented test tokens and API keys in tests (no real credentials)"
 condition = "AND"
-paths = ['''^ai-automation-backend/src/test/''', '''^scripts/tests/''']
+paths = ['''^ai-automation-backend/src/test/''', '''^scripts/tests/''', '''^ai-automation-frontend/cypress/''']
 regexTarget = "secret"
 regexes = [
   '''^test-api-key-12345$''',
   '''^xoxb-1111-2222-abcdefSECRET$''',
   '''^0123456789abcdef0123456789abcdef01234567$''',
   '''^sk-test-anthropic-4711$''',
+  # Dummy run token in the output-masking test (BlockStepRunnerTest, 7cf914127).
+  '''^tok-live-123$''',
+  # Name of the E2E key slot on globalThis, not a key (cypress/support/target.ts, 3a563a0d4).
+  '''^__mysuricatesE2eApiKey$''',
 ]
