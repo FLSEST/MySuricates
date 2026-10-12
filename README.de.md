@@ -10,9 +10,13 @@
 
 # MySuricates
 
-Ein Forschungsprojekt zur Frage, wie sich Softwareentwicklung und andere Arbeit mit KI-Agenten verändern
-und wie sich diese Arbeit aus wiederholbaren, möglichst nachvollziehbaren Bausteinen unterschiedlich
-zusammensetzen lässt — und ein lauffähiges System, an dem sich das beobachten lässt.
+Ein Forschungsprojekt zur Frage, wie sich mit KI Projekte umsetzen lassen. Ansätze dafür gibt es sehr
+viele, und es werden mehr: neue Formen der Zusammenarbeit, unterschiedliche Abstraktionsniveaus für
+unterschiedliche Beteiligte. Die Annahme dahinter: Diese Arbeit lässt sich in Bausteine herunterbrechen,
+die sich beliebig zusammensetzen lassen, hier wie anderswo. MySuricates probiert das aus, mit Abläufen aus
+festen, KI- und Mensch-Schritten, mit Gates, Sichtbarkeit und Nachvollziehbarkeit: deterministisch, wo es
+geht, Modell und Anbieter je Schritt austauschbar, und für jeden Beteiligten auf seiner Ebene lesbar, vom
+Code über das Diagramm bis zur Freigabe. Das Ganze ist als Showcase in eine lauffähige Plattform gegossen.
 
 ## Schnellstart
 
