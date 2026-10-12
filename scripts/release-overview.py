@@ -332,12 +332,20 @@ def station_states(archive, public, events, mode):
     return s
 
 
+def tally(checks):
+    """Counts for one event: ok out of all, then skipped and failed - a skipped check is no green one."""
+    n = len(checks)
+    ok = sum(1 for c in checks if c['result'] == 'ok')
+    skipped = sum(1 for c in checks if c['result'] == 'skipped')
+    failed = n - ok - skipped
+    return f"{ok}/{n} grün" + (f" · {skipped} übersprungen" if skipped else '') + (f" · {failed} Fehler" if failed else '')
+
+
 def event_state(e):
     checks = e.get('checks') or []
-    failed = [c for c in checks if c['result'] == 'failed']
     text = f"{e.get('tag') or '-'} · {status_word(e['status'])} · {short_time(e['time'])}"
     if checks:
-        text += f" · {len(checks) - len(failed)}/{len(checks)} Prüfungen grün"
+        text += ' · ' + tally(checks)
     return ('failed' if e['status'] == 'failed' else 'ok', text)
 
 
@@ -604,8 +612,8 @@ def checks_count(e):
     checks = e.get('checks') or []
     if not checks:
         return ''
-    failed = sum(1 for c in checks if c['result'] == 'failed')
-    return f'{len(checks) - failed}/{len(checks)}' + (f' · <b class="bad">{failed} Fehler</b>' if failed else '')
+    text = esc(tally(checks))
+    return text.replace(' Fehler', ' <b class="bad">Fehler</b>') if ' Fehler' in text else text
 
 
 PAGE = '''<!doctype html>

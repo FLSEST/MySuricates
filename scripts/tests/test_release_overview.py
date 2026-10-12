@@ -234,7 +234,7 @@ class Lines(unittest.TestCase):
                    "checks": ro.parse_checks(HANDOVER_OUT)}]
         self.assertEqual(ro.overall(archive, public, failed, pending)[0], "RED")
         page = ro.render(archive, public, failed, "live", "jetzt")
-        self.assertIn("1 Fehler", page)
+        self.assertIn('2/4 grün · 1 übersprungen · 1 <b class="bad">Fehler</b>', page)
         self.assertIn("Doku-Gates (pre-push-checks --tree)", page)
 
     def test_render_command_writes_page_and_status(self):
