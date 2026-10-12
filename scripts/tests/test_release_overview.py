@@ -271,14 +271,15 @@ class ReleasePaths(unittest.TestCase):
         self.assertEqual(out.split("|"), [
             "~/.local/state/mysuricates/release-probe/work", "~/.local/state/mysuricates/release-probe/public.git",
             "main", "~/.local/state/mysuricates/release-probe/public",
-            "~/.local/state/mysuricates/release-probe/events.jsonl", "/repo/reports/release-lagebild-probe.html",
+            "~/.local/state/mysuricates/release-probe/events.jsonl", "~/.local/state/mysuricates/release-probe/lagebild.html",
             "~/.local/state/mysuricates/release-probe/lagebild-status.txt"])
 
     def test_live_counts_only_what_is_pushed(self):
         rc, out = self.paths(MODE="live", ARCHIVE_REPO="/repo", PUBLIC_CLONE="/pub")
         self.assertEqual(rc, 0)
         archive, public, ref, _, events, page, _ = out.split("|")
-        self.assertEqual((archive, public, ref, page), ("/repo", "/pub", "origin/main", "/repo/reports/release-lagebild.html"))
+        self.assertEqual((archive, public, ref), ("/repo", "/pub", "origin/main"))
+        self.assertEqual(page, "~/.local/state/mysuricates/release/lagebild.html")  # never inside a repo
         self.assertEqual(events, "~/.local/state/mysuricates/release/events.jsonl")
 
     def test_missing_context_or_unknown_mode_fails(self):

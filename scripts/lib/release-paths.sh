@@ -2,9 +2,10 @@
 # (docs/entwicklung.md -> "Release-Lagebild"). Probe = the GitHub repos as local bare repos
 # (scripts/release-probe.sh), live = the real working repo and the clone of the public repo.
 #
-# In:  MODE (probe|live), ARCHIVE_REPO (working repo; live: the archive, probe: source of the probe
-#      and home of the page), PUBLIC_CLONE (live), PUBLIC_REMOTE (live, only for the first cut),
-#      PROBE_DIR and BACKUP_DIR (optional)
+# In:  MODE (probe|live), ARCHIVE_REPO (working repo; live: the archive, probe: source of the probe),
+#      PUBLIC_CLONE (live), PUBLIC_REMOTE (live, only for the first cut), PROBE_DIR and BACKUP_DIR
+#      (optional)
+# The page lives next to its event log in the state directory, never in a repo.
 # Out: ARCHIVE + ARCHIVE_UPSTREAM (line "archive"), PUBLIC + PUBLIC_REF (line "public": what counts as
 #      published), PUBLIC_CLONE (handover target), PUBLIC_REMOTE, EVENTS, PAGE, STATUS_FILE,
 #      BACKUP_DIR, REWRITE_WORK (work clone of the first cut)
@@ -22,7 +23,7 @@ release_paths() {
       EVENTS="$PROBE_DIR/events.jsonl"
       BACKUP_DIR="${BACKUP_DIR:-$PROBE_DIR/backup}"
       REWRITE_WORK="$PROBE_DIR/rewrite"
-      PAGE="$ARCHIVE_REPO/reports/release-lagebild-probe.html"
+      PAGE="$PROBE_DIR/lagebild.html"
       ;;
     live)
       [ -n "${PUBLIC_CLONE:-}" ] || { echo "public_clone fehlt im Kontext" >&2; return 2; }
@@ -33,7 +34,7 @@ release_paths() {
       EVENTS="$state/release/events.jsonl"
       BACKUP_DIR="${BACKUP_DIR:-$state/release/backup}"
       REWRITE_WORK="$state/release/rewrite"
-      PAGE="$ARCHIVE_REPO/reports/release-lagebild.html"
+      PAGE="$state/release/lagebild.html"
       ;;
     *) echo "mode muss probe oder live sein, nicht: ${MODE}" >&2; return 2 ;;
   esac

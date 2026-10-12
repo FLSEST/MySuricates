@@ -890,9 +890,11 @@ vollständiges Zurücksetzen bei einem Gate-Befund, Abbruch ohne Änderung, Vorb
 
 Wo Archiv und öffentliches Repo stehen, welche Prüfungen der Weg dazwischen hat und wie die
 Release-Arten laufen, zeigt eine Seite, die `scripts/release-overview.py` deterministisch aus beiden
-Repos und einem Ereignisprotokoll erzeugt (`reports/release-lagebild.html`, in der Probe
-`reports/release-lagebild-probe.html`, beide ignoriert). Vier Workflows der Maintainer-Instanz fahren
-den Ablauf und schreiben nach jedem Schritt ein Ereignis (`release-overview.py event`):
+Repos und einem Ereignisprotokoll erzeugt. Sie liegt neben dem Protokoll im Zustandsordner, nicht im
+Repo: `~/.local/state/mysuricates/release/lagebild.html`, in der Probe
+`~/.local/state/mysuricates/release-probe/lagebild.html`. Der letzte Schritt jedes Release-Laufs gibt
+den Pfad aus; in der Laufansicht ist er ein Link zum Öffnen. Vier Workflows der Maintainer-Instanz
+fahren den Ablauf und schreiben nach jedem Schritt ein Ereignis (`release-overview.py event`):
 
 | Workflow | Aufgabe |
 |---|---|
