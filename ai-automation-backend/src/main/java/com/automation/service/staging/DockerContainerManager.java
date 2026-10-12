@@ -3,6 +3,7 @@ package com.automation.service.staging;
 import com.automation.config.DataHome;
 import com.automation.exception.ErrorMessage;
 import com.automation.exception.LocalizedStateException;
+import com.automation.exception.StagingException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
@@ -177,15 +178,15 @@ public class DockerContainerManager {
 
             int exitCode = p.waitFor();
             if (exitCode != 0) {
-                throw new RuntimeException("Command failed (exit " + exitCode + "): " + String.join(" ", command));
+                throw new StagingException("Command failed (exit " + exitCode + "): " + String.join(" ", command));
             }
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
-            throw new RuntimeException("Command interrupted", e);
+            throw new StagingException("Command interrupted", e);
         } catch (RuntimeException e) {
             throw e;
         } catch (Exception e) {
-            throw new RuntimeException("Command execution failed: " + e.getMessage(), e);
+            throw new StagingException("Command execution failed: " + e.getMessage(), e);
         }
     }
 }

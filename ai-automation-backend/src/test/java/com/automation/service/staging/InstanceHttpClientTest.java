@@ -1,5 +1,6 @@
 package com.automation.service.staging;
 
+import com.automation.exception.StagingException;
 import com.automation.service.system.ApiKeyService;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -103,14 +104,14 @@ class InstanceHttpClientTest {
     @Test
     void httpPost_non2xx_throwsWithStatusAndBody() {
         assertThatThrownBy(() -> client.httpPost(base + "/boom", Map.of()))
-                .isInstanceOf(RuntimeException.class)
+                .isInstanceOf(StagingException.class)
                 .hasMessage("HTTP 500: server exploded");
     }
 
     @Test
     void httpPost_unreachable_wrapsCauseWithMethodAndUrl() {
         assertThatThrownBy(() -> client.httpPost("http://127.0.0.1:1/x", Map.of()))
-                .isInstanceOf(RuntimeException.class)
+                .isInstanceOf(StagingException.class)
                 .hasMessageStartingWith("POST http://127.0.0.1:1/x failed: ");
     }
 

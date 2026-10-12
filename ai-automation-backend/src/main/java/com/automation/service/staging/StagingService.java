@@ -8,6 +8,7 @@ import com.automation.dto.response.SyncPreview;
 import com.automation.dto.response.SyncResult;
 import com.automation.exception.ErrorMessage;
 import com.automation.exception.LocalizedStateException;
+import com.automation.exception.StagingException;
 import com.automation.service.system.ApiKeyService;
 import com.fasterxml.jackson.databind.JsonNode;
 import lombok.RequiredArgsConstructor;
@@ -136,11 +137,12 @@ public class StagingService {
 
     public void promote() {
         if (!promoteState.compareAndSet(PromoteState.idle(), PromoteState.of(PromotePhase.STOPPING, 1))) {
+            // A restart after ERROR claims the state with compareAndSet as well: get() and set() let two requests
+            // that both read ERROR start two pipelines side by side (compose, builds, deleteRecursive).
             PromoteState current = promoteState.get();
-            if (current.phase() == PromotePhase.ERROR) {
-                promoteState.set(PromoteState.of(PromotePhase.STOPPING, 1));
-            } else {
-                throw new IllegalStateException("Promote already in progress: " + current.phase());
+            if (current.phase() != PromotePhase.ERROR
+                    || !promoteState.compareAndSet(current, PromoteState.of(PromotePhase.STOPPING, 1))) {
+                throw new IllegalStateException("Promote already in progress: " + promoteState.get().phase());
             }
         }
         cancelRequested = false;
@@ -310,15 +312,15 @@ public class StagingService {
 
             int exitCode = p.waitFor();
             if (exitCode != 0) {
-                throw new RuntimeException("Command failed (exit " + exitCode + "): " + String.join(" ", command));
+                throw new StagingException("Command failed (exit " + exitCode + "): " + String.join(" ", command));
             }
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
-            throw new RuntimeException("Command interrupted", e);
+            throw new StagingException("Command interrupted", e);
         } catch (RuntimeException e) {
             throw e;
         } catch (Exception e) {
-            throw new RuntimeException("Command execution failed: " + e.getMessage(), e);
+            throw new StagingException("Command execution failed: " + e.getMessage(), e);
         }
     }
 
@@ -405,13 +407,13 @@ public class StagingService {
                         Files.copy(s, dest);
                     }
                 } catch (Exception e) {
-                    throw new RuntimeException("Failed to copy " + s + " -> " + dest, e);
+                    throw new StagingException("Failed to copy " + s + " -> " + dest, e);
                 }
             });
         } catch (RuntimeException e) {
             throw e;
         } catch (Exception e) {
-            throw new RuntimeException("Failed to copy directory", e);
+            throw new StagingException("Failed to copy directory", e);
         }
     }
 

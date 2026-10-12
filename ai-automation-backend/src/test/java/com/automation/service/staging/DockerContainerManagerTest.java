@@ -2,6 +2,7 @@ package com.automation.service.staging;
 
 import com.automation.exception.ErrorMessage;
 import com.automation.exception.LocalizedStateException;
+import com.automation.exception.StagingException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -66,7 +67,7 @@ class DockerContainerManagerTest {
     void runCommand_nonZeroExit_throwsRuntimeException() {
         assertThatThrownBy(() ->
                 manager.runCommand("test", Path.of("/tmp"), "false"))
-                .isInstanceOf(RuntimeException.class)
+                .isInstanceOf(StagingException.class)
                 .hasMessageContaining("exit");
     }
 
@@ -74,7 +75,7 @@ class DockerContainerManagerTest {
     void runCommand_invalidCommand_throwsException() {
         assertThatThrownBy(() ->
                 manager.runCommand("test", Path.of("/tmp"), "nonexistent-cmd-12345"))
-                .isInstanceOf(RuntimeException.class);
+                .isInstanceOf(StagingException.class);
     }
 
     @Test
@@ -120,7 +121,7 @@ class DockerContainerManagerTest {
     void runCommand_exitCode1_includesExitCodeInMessage() {
         assertThatThrownBy(() ->
                 manager.runCommand("test", Path.of("/tmp"), "bash", "-c", "exit 42"))
-                .isInstanceOf(RuntimeException.class)
+                .isInstanceOf(StagingException.class)
                 .hasMessageContaining("exit 42");
     }
 

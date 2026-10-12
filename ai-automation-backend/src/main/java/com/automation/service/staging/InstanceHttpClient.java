@@ -1,5 +1,6 @@
 package com.automation.service.staging;
 
+import com.automation.exception.StagingException;
 import com.automation.service.system.ApiKeyService;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -109,12 +110,12 @@ public class InstanceHttpClient {
                     errorBody = new String(conn.getErrorStream().readAllBytes(), StandardCharsets.UTF_8);
                 } catch (Exception ignored) {}
                 conn.disconnect();
-                throw new RuntimeException("HTTP " + code + ": " + errorBody);
+                throw new StagingException("HTTP " + code + ": " + errorBody);
             }
         } catch (RuntimeException e) {
             throw e;
         } catch (Exception e) {
-            throw new RuntimeException(method + " " + url + " failed: " + e.getMessage(), e);
+            throw new StagingException(method + " " + url + " failed: " + e.getMessage(), e);
         }
     }
 

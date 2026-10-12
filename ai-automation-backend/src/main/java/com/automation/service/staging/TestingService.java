@@ -8,6 +8,7 @@ import com.automation.dto.response.TestingStatusResponse;
 import com.automation.entity.Workflow;
 import com.automation.exception.ErrorMessage;
 import com.automation.exception.LocalizedStateException;
+import com.automation.exception.StagingException;
 import com.automation.repository.WorkflowRepository;
 import com.automation.service.system.ApiKeyService;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -294,7 +295,7 @@ public class TestingService {
                     Thread.sleep(intervalMs);
                 } catch (InterruptedException e) {
                     Thread.currentThread().interrupt();
-                    throw new RuntimeException("Polling interrupted", e);
+                    throw new StagingException("Polling interrupted", e);
                 }
                 waitedMs += intervalMs;
             }

@@ -226,6 +226,32 @@ class StagingServiceTest {
     }
 
     @Test
+    void promote_restartsFromErrorOnlyOnce() throws InterruptedException {
+        pointAtMissingProjectDirs();
+        service.promote();
+        assertThat(awaitPromoteSettled().promotePhase()).isEqualTo("ERROR");
+
+        // The restart claims the ERROR state; a second request while it runs is refused, not started alongside.
+        CountDownLatch holding = new CountDownLatch(1);
+        CountDownLatch release = new CountDownLatch(1);
+        when(compose.command(any(), any(), eq("stable"), eq("down"))).thenAnswer(inv -> {
+            holding.countDown();
+            release.await(30, TimeUnit.SECONDS);
+            return null;
+        });
+        service.promote();
+        try {
+            assertThat(holding.await(30, TimeUnit.SECONDS)).as("restart reached step 1").isTrue();
+            assertThatThrownBy(() -> service.promote())
+                    .isInstanceOf(IllegalStateException.class)
+                    .hasMessageContaining("already in progress: STOPPING");
+        } finally {
+            release.countDown();
+        }
+        assertThat(awaitPromoteSettled().promotePhase()).isEqualTo("ERROR");
+    }
+
+    @Test
     void promote_runsThePipelineOnTheInjectedExecutor_notTheCommonPool() throws InterruptedException {
         pointAtMissingProjectDirs();
         AtomicReference<Thread> pipelineThread = new AtomicReference<>();
