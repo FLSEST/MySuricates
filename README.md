@@ -172,12 +172,13 @@ complete list with all modules is in [Architecture](docs/en/architektur.md#modul
 | Security | API key auth, rate limiting, admission check before every run; optional HMAC-signed workflow seals |
 | i18n | German / English |
 | PWA | Vite PWA Plugin |
-| Integrations | Plugin system for external services, e.g. Google Calendar, Gmail, Jira, Confluence, Trello, GitHub, Gitea/Forgejo, GitLab, Taskwarrior; a new provider is a single class — module, in the `full` preset |
+| Integrations | Plugin system for external services, e.g. Google Calendar, Gmail, Jira, Confluence, Trello, GitHub, Gitea/Forgejo, GitLab, Taskwarrior; a new provider is a single class in the backend plus a setup guide in the frontend — module, in the `full` preset |
 
 Execution happens where the instance runs — in the container (recommended) or directly on the
 machine: shell blocks through the user's shell, AI blocks through the installed CLI (mounted into
-the container from the machine). A dedicated container per shell block (`container_image`) exists
-only if the Docker socket is explicitly made available. What gets into the container from the AI
+the container from the machine on Linux, only the login on macOS). For an instance in the container,
+a dedicated container per shell block (`container_image`) exists only if the Docker socket is
+explicitly made available; directly on the machine, a running Docker is enough. What gets into the container from the AI
 providers is controlled by a switch: by default, only the programs and, per provider, the login
 (for Claude, a one-time token from `claude setup-token`), not the machine's settings, plugins,
 memory, or histories. If you want to share less or everything, see the variants under [AI providers in the container](docs/en/deployment.md#ai-providers-in-the-container).
@@ -221,4 +222,4 @@ Please do **not** report security vulnerabilities as public issues; use the repo
 
 > 🌍 **README.de.md is the source, `README.md` the translation.** Content changes belong in the German file. The author generates the English version from it in their MySuricates instance using the "README DE↔EN Sync" workflow; the repository holds the result and the deterministic part of the sync (`scripts/readme-sync/readme_sync.py`), not the workflow definition itself. So if you contribute from outside, change the German source and adjust `README.md` by hand in the same commit — or change only the German one and note in the pull request that the translation still needs to follow.
 
-<!-- synced-from: 22e283cc22a2 sha256:5b7f84fed242f4574d16334dbec4c082bab55af3dad65b686be84bef508850d0 -->
+<!-- synced-from: 09a579d9bc83 sha256:85d6453a621c0cd21d46519d958123b6163437ce2468b0b45cca78ce2fac0df0 -->
