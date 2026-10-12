@@ -77,6 +77,20 @@ class ParseChecks(unittest.TestCase):
             ("README-Sync-Stand", "skipped"), ("Doku-Gates (pre-push-checks --tree)", "failed")])
         self.assertEqual(checks[1]["detail"], "2 Warnung(en)")
 
+    def test_skipped_checks_and_warning_details_are_kept(self):
+        checks = ro.parse_checks("  hinweis gitleaks nicht installiert - Geheimnis-Scan uebersprungen\n"
+                                 "  – Build-Pruefung uebersprungen (MYSURICATES_PREPUSH_SKIP=build)\n"
+                                 "  – Hygiene-Gate auf a..b: OK — 2 Warnung(en)\n")
+        self.assertEqual([c["result"] for c in checks], ["skipped", "skipped", "ok"])
+        self.assertEqual(checks[2]["detail"], "2 Warnung(en)")
+
+    def test_indented_log_tail_of_a_gate_adds_no_checks(self):
+        out = ("▶ Doku-Gates (pre-push-checks --tree)\n    Pre-Push-Gate (tree)\n    ▶ Bestands-Gates\n"
+               "      – Doku-Zahlen gegen den Code: OK\n      ✗ Doku-Verweise: 2 tote Links\n"
+               "## Gates\n- Doku-Gates (pre-push-checks --tree): FEHLER (exit 1)\n")
+        self.assertEqual([(c["name"], c["result"]) for c in ro.parse_checks(out)],
+                         [("Doku-Gates (pre-push-checks --tree)", "failed")])
+
     def test_pre_push_gate_lines(self):
         checks = ro.parse_checks(GATE_OUT)
         self.assertIn({"name": "Hygiene-Gate auf origin/main..main", "result": "ok"}, checks)
@@ -100,6 +114,15 @@ class Events(unittest.TestCase):
             self.assertEqual((event["kind"], event["tag"], event["status"], event["commit"]),
                              ("handover", "v0.1.1", "failed", "abc1234"))
             self.assertEqual(len(event["checks"]), 4)
+
+    def test_foreign_lines_and_broken_bytes_are_skipped(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            log = Path(tmp) / "events.jsonl"
+            log.write_bytes(b'123\n{"kind": "unknown"}\n{"kind": "cut"}\n\xff\xfe{"kind": "hand\n')
+            events = ro.read_events(log)
+            self.assertEqual([e["kind"] for e in events], ["cut"])
+            self.assertEqual((events[0]["time"], events[0]["status"], events[0]["checks"]), ("", "ok", []))
+            ro.render(None, None, events, "live", "jetzt")  # must not crash on missing fields
 
     def test_torn_line_does_not_hide_the_rest(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -129,6 +152,45 @@ class Lines(unittest.TestCase):
         self.assertEqual([(t["name"], t["pos"]) for t in line["tags"]], [("v0.1.0", 2), ("v0.1.1", 4)])
         self.assertEqual((line["unpushed"], line["since_tag"]), (2, 1))
 
+    def test_unreadable_archive_is_red_and_missing_public_is_yellow(self):
+        self.assertEqual(ro.overall(None, None, [], None), ("RED", "Arbeits-Repo nicht lesbar"))
+        git(self.arch, "push", "--quiet", "origin", "main")
+        git(self.arch, "fetch", "--quiet", "origin")
+        archive = ro.read_line(self.arch, "main", "origin/main")
+        status, summary = ro.overall(archive, None, [], ro.pending_stat(archive, None))
+        self.assertEqual(status, "YELLOW")
+        self.assertIn("Erstschnitt steht aus", summary)
+        self.assertEqual(ro.pending_stat(archive, None)["open_tags"], [])  # before the cut nothing is open
+
+    def test_tag_on_a_merged_side_branch_sits_at_its_merge(self):
+        git(self.arch, "checkout", "--quiet", "-b", "side", "HEAD~2")
+        (self.arch / "side.txt").write_text("s")
+        git(self.arch, "add", ".")
+        git(self.arch, "commit", "--quiet", "-m", "feat: side")
+        git(self.arch, "tag", "-a", "v0.2.0", "-m", "r")
+        git(self.arch, "checkout", "--quiet", "main")
+        git(self.arch, "merge", "--quiet", "--no-ff", "-m", "Merge side", "side")
+        line = ro.read_line(self.arch, "main")
+        side = next(t for t in line["tags"] if t["name"] == "v0.2.0")
+        self.assertEqual(side["pos"], line["span"] - 1)  # the merge commit, inside the drawn span
+        ro.render(line, None, [], "live", "jetzt")
+
+    def test_cut_is_the_newest_rewritten_tag_not_the_oldest(self):
+        git(self.arch, "tag", "-a", "v0.0.9", "-m", "old", "HEAD~5")  # an older release in the history
+        pub = make_repo(self.root / "pub", 4)
+        git(pub, "tag", "-a", "v0.0.9", "-m", "r", "HEAD~3")
+        git(pub, "tag", "-a", "v0.1.0", "-m", "r", "HEAD~1")
+        (pub / "r.txt").write_text("r")
+        git(pub, "add", ".")
+        git(pub, "commit", "--quiet", "-m", "Release v0.1.1")
+        git(pub, "tag", "-a", "v0.1.1", "-m", "r")
+        public = ro.read_line(pub, "main")
+        self.assertEqual(ro.cut_tag(public)["name"], "v0.1.0")
+        page = ro.render(ro.read_line(self.arch, "main", "origin/main"), public, [], "probe", "jetzt")
+        self.assertEqual(page.count('class="flow cut"'), 1)
+        self.assertEqual(page.count('class="flow handover"'), 1)
+        self.assertIn('class="tick public"', page)
+
     def test_missing_repo_is_none(self):
         self.assertIsNone(ro.read_line(self.root / "nope", "main"))
         empty = self.root / "empty.git"
@@ -156,7 +218,7 @@ class Lines(unittest.TestCase):
         self.assertEqual(status, "YELLOW")
         self.assertIn("offen: v0.1.1", summary)
         page = ro.render(archive, public, [], "probe", "jetzt")
-        self.assertIn("Rewrite", page)
+        self.assertEqual(page.count('class="flow cut"'), 1)
         self.assertIn('class="flow pending"', page)
 
     def test_everything_handed_over_is_green_and_failed_run_is_red(self):
@@ -256,6 +318,45 @@ class Probe(unittest.TestCase):
             r = self.run_probe("reset", "--dir", str(other), "--source", str(src), "--cut", "HEAD", check=False)
             self.assertNotEqual(r.returncode, 0)
             self.assertTrue((other / "keep.txt").exists())
+
+    def test_relative_dir_invalid_cut_and_untouched_source(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            src = make_repo(Path(tmp) / "src", 3)
+            before = git(src, "for-each-ref"), git(src, "remote", "-v"), git(src, "status", "--porcelain")
+            r = subprocess.run(["bash", str(PROBE), "reset", "--dir", "probe", "--source", str(src), "--cut", "HEAD~1",
+                                "--tag", "v0.1.0"], capture_output=True, text=True, env=ENV, cwd=tmp)
+            self.assertEqual(r.returncode, 0, r.stderr)
+            self.assertEqual(git(Path(tmp) / "probe" / "archive.git", "tag", "-l"), "v0.1.0")
+            r = self.run_probe("reset", "--dir", str(Path(tmp) / "probe"), "--source", str(src), "--cut", "nope", check=False)
+            self.assertNotEqual(r.returncode, 0)
+            self.assertTrue((Path(tmp) / "probe" / "archive.git").is_dir())  # a typo deletes nothing
+            self.assertEqual((git(src, "for-each-ref"), git(src, "remote", "-v"), git(src, "status", "--porcelain")), before)
+
+    def test_directory_with_only_workflow_files_is_accepted_but_home_is_not(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            src = make_repo(Path(tmp) / "src", 2)
+            probe = Path(tmp) / "probe"
+            probe.mkdir()
+            (probe / "events.jsonl").write_text("")
+            (probe / "lagebild-status.txt").write_text("GREEN\n")
+            self.run_probe("reset", "--dir", str(probe), "--source", str(src), "--cut", "HEAD")
+            self.assertTrue((probe / ".release-probe").exists())
+            home = Path(tmp) / "home"
+            home.mkdir()
+            (home / ".release-probe").write_text("")
+            r = subprocess.run(["bash", str(PROBE), "reset", "--dir", str(home), "--source", str(src), "--cut", "HEAD"],
+                               capture_output=True, text=True, env={**ENV, "HOME": str(home)})
+            self.assertNotEqual(r.returncode, 0)
+            self.assertTrue(home.is_dir())
+
+    def test_advance_only_goes_forward(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            src = make_repo(Path(tmp) / "src", 4)
+            probe = Path(tmp) / "probe"
+            self.run_probe("reset", "--dir", str(probe), "--source", str(src), "--cut", git(src, "rev-parse", "HEAD~1"))
+            r = self.run_probe("advance", "--dir", str(probe), "--to", git(src, "rev-parse", "HEAD~3"), "--tag", "v0.0.1", check=False)
+            self.assertNotEqual(r.returncode, 0)
+            self.assertEqual(git(probe / "work", "tag", "-l"), "")
 
     def test_advance_refuses_a_commit_outside_the_source_history(self):
         with tempfile.TemporaryDirectory() as tmp:

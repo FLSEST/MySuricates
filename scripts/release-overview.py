@@ -16,8 +16,8 @@ Deterministic, standard library only, no AI. Two commands:
           Write the page. --status-out gets GREEN/YELLOW/RED and a one-line summary for the
           dashboard (two lines). A public repo that does not exist yet is shown as "not created".
 
-The workflows "Release: Lagebild", "Release: Erstschnitt", "Release: Übergabe" and
-"Release: Probe zurücksetzen" call this script (docs/entwicklung.md -> "Release-Lagebild").
+The four release workflows of the maintainer's instance call this script; they are listed in
+docs/entwicklung.md, section on the release overview and the probe.
 """
 import argparse
 import datetime as dt
@@ -106,10 +106,14 @@ TAG_RE = re.compile(r'^v\d+\.\d+\.\d+$')
 # Events
 # ---------------------------------------------------------------------------------------------
 
-CHECK_REWRITE = re.compile(r'^\s+(ok|FEHLER)\s+(.*\S)\s*$')
+# Exactly two leading spaces: deeper indented lines are the log tail of a gate (release-handover.sh
+# indents it by four), whose own sub-results must not count as checks of their own.
+CHECK_REWRITE = re.compile(r'^  (ok|FEHLER|hinweis) +(.*\S)\s*$')
 CHECK_HANDOVER = re.compile(r'^- (.+?): (OK|FEHLER|übersprungen|nicht angefordert)\b\s*(.*)$')
-CHECK_GATE_OK = re.compile(r'^\s+[–-] (.+?): (OK|keine Funde)\b')
-CHECK_GATE_FAIL = re.compile(r'^\s+✗ (.*\S)')
+CHECK_GATE_OK = re.compile(r'^  – (.+?): (OK|keine Funde)\b\s*(.*)$')
+CHECK_GATE_SKIPPED = re.compile(r'^  – (.*(?:uebersprungen|übersprungen).*\S)')
+CHECK_GATE_FAIL = re.compile(r'^  ✗ (.*\S)')
+REWRITE_RESULT = {'ok': 'ok', 'FEHLER': 'failed', 'hinweis': 'skipped'}
 
 
 def parse_checks(text):
@@ -129,11 +133,18 @@ def parse_checks(text):
             continue
         m = CHECK_REWRITE.match(line)
         if m:
-            checks.append({'name': m.group(2), 'result': 'ok' if m.group(1) == 'ok' else 'failed'})
+            checks.append({'name': m.group(2), 'result': REWRITE_RESULT[m.group(1)]})
             continue
         m = CHECK_GATE_OK.match(line)
         if m:
-            checks.append({'name': m.group(1), 'result': 'ok'})
+            check = {'name': m.group(1), 'result': 'ok'}
+            if m.group(3).strip(' —-'):
+                check['detail'] = m.group(3).strip(' —-')  # "OK — 2 Warnung(en)"
+            checks.append(check)
+            continue
+        m = CHECK_GATE_SKIPPED.match(line)
+        if m:
+            checks.append({'name': m.group(1)[:160], 'result': 'skipped'})
             continue
         m = CHECK_GATE_FAIL.match(line)
         if m:
@@ -168,16 +179,19 @@ def cmd_event(args):
 
 
 def read_events(path):
+    """The event log; a torn or foreign line must not hide the rest."""
     events = []
     if path and Path(path).is_file():
-        for line in Path(path).read_text(encoding='utf-8').splitlines():
-            line = line.strip()
-            if not line:
-                continue
+        for line in Path(path).read_text(encoding='utf-8', errors='replace').splitlines():
             try:
-                events.append(json.loads(line))
+                event = json.loads(line) if line.strip() else None
             except json.JSONDecodeError:
-                continue  # a torn line must not hide the rest
+                continue
+            if isinstance(event, dict) and event.get('kind') in EVENT_KINDS:
+                event.setdefault('time', '')
+                event.setdefault('status', 'ok')
+                event['checks'] = [c for c in event.get('checks') or [] if isinstance(c, dict) and 'name' in c]
+                events.append(event)
     return events
 
 
@@ -206,11 +220,13 @@ def read_line(repo, ref, upstream=None):
         if not TAG_RE.match(name) or git(repo, 'merge-base', '--is-ancestor', sha, ref) is None:
             continue
         pos = index.get(sha)
-        if pos is None:
-            pos = int(git(repo, 'rev-list', '--count', sha)) - 1
+        if pos is None:  # tag on a merged side branch: place it at the merge into the line
+            merged = (git(repo, 'rev-list', '--first-parent', '--ancestry-path', '--reverse', f'{sha}..{ref}') or '').split()
+            pos = index.get(merged[0], len(order) - 1) if merged else len(order) - 1
+        subject = git(repo, 'log', '-1', '--format=%s', sha) or ''
         tags.append({'name': name, 'sha': sha, 'date': date, 'pos': pos,
-                     'commits': int(git(repo, 'rev-list', '--count', sha)),
-                     'subject': git(repo, 'log', '-1', '--format=%s', sha)})
+                     'commits': int(git(repo, 'rev-list', '--count', sha)), 'subject': subject,
+                     'handover': subject.startswith('Release v')})
     tags.sort(key=lambda t: t['pos'])
     unpushed = None
     if upstream and git(repo, 'rev-parse', '--verify', '--quiet', upstream) is not None:
@@ -230,18 +246,25 @@ def read_line(repo, ref, upstream=None):
     }
 
 
+def cut_tag(public):
+    """The tag the first cut brought: the newest public tag that is no "Release vX" handover commit
+    (the rewrite keeps the older v* tags of the history as well)."""
+    rewritten = [t for t in (public or {}).get('tags', []) if not t['handover']]
+    return rewritten[-1] if rewritten else None
+
+
 def pending_stat(archive, public):
-    """What the next handover would bring: commits and files since the last handed-over tag."""
+    """What the next handover would bring: commits and files since the last published tag, and the
+    archive tags after it that are not published yet. Before the first cut nothing is open."""
     if not archive:
         return None
-    public_tags = {t['name'] for t in (public or {}).get('tags', [])}
-    handed = [t for t in archive['tags'] if t['name'] in public_tags]
-    base = handed[-1] if handed else None
-    open_tags = [t['name'] for t in archive['tags'] if t['name'] not in public_tags
-                 and (not base or t['pos'] > base['pos'])]
-    if not base:
-        return {'base': None, 'open_tags': open_tags, 'commits': archive['count'], 'files': None}
-    commits = int(git(archive['repo'], 'rev-list', '--count', f"{base['sha']}..{archive['ref']}"))
+    public_names = {t['name'] for t in (public or {}).get('tags', [])}
+    published = [t for t in archive['tags'] if t['name'] in public_names]
+    if not published:
+        return {'base': None, 'open_tags': [], 'commits': archive['count'], 'files': None}
+    base = published[-1]
+    open_tags = [t['name'] for t in archive['tags'] if t['pos'] > base['pos'] and t['name'] not in public_names]
+    commits = int(git(archive['repo'], 'rev-list', '--count', f"{base['sha']}..{archive['ref']}") or 0)
     shortstat = git(archive['repo'], 'diff', '--shortstat', base['sha'], archive['ref']) or ''
     m = re.search(r'(\d+) files? changed', shortstat)
     return {'base': base['name'], 'open_tags': open_tags, 'commits': commits,
@@ -325,18 +348,31 @@ def failed_names(e):
 
 def overall(archive, public, events, pending):
     """GREEN / YELLOW / RED and a one-line summary for the dashboard."""
-    last = last_event(events, 'cut', 'handover', 'push', 'archive-gate')
-    parts = []
-    if archive:
-        parts.append(f"Archiv {archive['tags'][-1]['name'] if archive['tags'] else 'ohne Tag'}"
-                     + (f" +{archive['since_tag']}" if archive['since_tag'] else ''))
-    parts.append(f"öffentlich {public['tags'][-1]['name'] if public and public['tags'] else 'noch leer'}")
+    if not archive:
+        return 'RED', 'Arbeits-Repo nicht lesbar'
+    parts = [f"Archiv {archive['tags'][-1]['name'] if archive['tags'] else 'ohne Tag'}"
+             + (f" +{archive['since_tag']}" if archive['since_tag'] else '')]
+    if not public:
+        parts.append('öffentlich noch nicht angelegt')
+    else:
+        parts.append(f"öffentlich {public['tags'][-1]['name'] if public['tags'] else 'noch leer'}")
+    open_reasons = []
     if pending and pending['open_tags']:
-        parts.append('offen: ' + ', '.join(pending['open_tags']))
+        open_reasons.append('offen: ' + ', '.join(pending['open_tags']))
+    if archive['unpushed'] is None:
+        open_reasons.append('Archiv ohne Upstream')
+    elif archive['unpushed']:
+        open_reasons.append(f"{archive['unpushed']} Commit(s) nicht im Archiv")
+    if archive['behind']:
+        open_reasons.append(f"Archiv {archive['behind']} Commit(s) hinter {archive['upstream']}")
+    if not public or not public['tags']:
+        open_reasons.append('Erstschnitt steht aus')
+    last = last_event(events, 'cut', 'handover', 'push', 'archive-gate')
     if last and last['status'] == 'failed':
-        return 'RED', ' · '.join(parts + [f"letzter Lauf fehlgeschlagen ({last['kind']} {last.get('tag') or ''})".strip()])
-    if (pending and pending['open_tags']) or (archive and archive['unpushed']):
-        return 'YELLOW', ' · '.join(parts)
+        return 'RED', ' · '.join(parts + [f"letzter Lauf fehlgeschlagen ({KIND_WORDS.get(last['kind'], last['kind'])} "
+                                         f"{last.get('tag') or ''})".replace(' )', ')')])
+    if open_reasons:
+        return 'YELLOW', ' · '.join(parts + open_reasons)
     return 'GREEN', ' · '.join(parts)
 
 
@@ -366,40 +402,49 @@ KIND_WORDS = {'cut': 'Erstschnitt', 'handover': 'Übergabe', 'push': 'Push', 'di
 
 
 def lanes_svg(archive, public, pending):
-    """Two lanes. The history before the first release is compressed to a quarter of the width,
-    the time after it is linear in commits."""
+    """Two lanes. The history up to the cut (before it exists: up to the last tag) is compressed to a
+    quarter of the width, the time after it is linear in first-parent commits. Older v* tags of the
+    history are small ticks; the cut and every handover get a dot and an arrow between the lanes."""
     width, left, right = 1000, 110, 960
     y_arch, y_pub = 62, 182
     out = [f'<svg viewBox="0 0 {width} 250" role="img" aria-label="Archiv und öffentliches Repo">',
            '<defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" '
-           'orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="arrowhead"/></marker></defs>']
-    out.append(f'<text x="12" y="{y_arch + 5}" class="lane-label">Archiv</text>')
-    out.append(f'<text x="12" y="{y_pub + 5}" class="lane-label">Öffentlich</text>')
+           'orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="arrowhead"/></marker></defs>',
+           f'<text x="12" y="{y_arch + 5}" class="lane-label">Archiv</text>',
+           f'<text x="12" y="{y_pub + 5}" class="lane-label">Öffentlich</text>']
     if not archive:
         out.append(f'<text x="{left}" y="{y_arch + 5}" class="muted">Arbeits-Repo nicht lesbar</text></svg>')
         return '\n'.join(out)
-    first = archive['tags'][0]['pos'] if archive['tags'] else archive['span'] - 1
+    by_name = {t['name']: t for t in archive['tags']}
+    cut = cut_tag(public)
+    split_tag = by_name.get(cut['name']) if cut else None
+    split_tag = split_tag or (archive['tags'][-1] if archive['tags'] else None)
+    first = split_tag['pos'] if split_tag else archive['span'] - 1
     end = max(archive['span'] - 1, first + 1)
     split = left + (right - left) * 0.28
 
     def x(pos):
+        pos = min(max(pos, 0), end)
         if pos <= first:
             return left + (split - left) * (pos / max(first, 1))
         return split + (right - split) * ((pos - first) / max(end - first, 1))
 
-    # Archive lane: compressed history, then the commits after the first release.
+    # Archive lane
     out.append(f'<line x1="{left}" y1="{y_arch}" x2="{split:.1f}" y2="{y_arch}" class="lane archive compressed"/>')
     out.append(f'<line x1="{split:.1f}" y1="{y_arch}" x2="{x(end):.1f}" y2="{y_arch}" class="lane archive"/>')
+    upto = split_tag['commits'] if split_tag else archive['count']
     out.append(f'<text x="{(left + split) / 2:.1f}" y="{y_arch - 14}" class="note" text-anchor="middle">'
-               f'{archive["tags"][0]["commits"] if archive["tags"] else archive["count"]} Commits bis '
-               f'{esc(archive["tags"][0]["name"]) if archive["tags"] else "HEAD"}</text>')
+               f'{upto} Commits bis {esc(split_tag["name"]) if split_tag else "HEAD"}</text>')
     for t in archive['tags']:
-        out.append(f'<circle cx="{x(t["pos"]):.1f}" cy="{y_arch}" r="7" class="dot archive"><title>{esc(t["name"])} · '
-                   f'{esc(t["sha"][:9])} · {esc(t["subject"])}</title></circle>')
-        out.append(f'<text x="{x(t["pos"]):.1f}" y="{y_arch - 14}" class="tag" text-anchor="middle">{esc(t["name"])}</text>'
-                   if t is not archive['tags'][0] else '')
+        tip = f'<title>{esc(t["name"])} · {esc(t["sha"][:9])} · {esc(t["subject"])}</title>'
+        if t['pos'] < first:
+            out.append(f'<circle cx="{x(t["pos"]):.1f}" cy="{y_arch}" r="3" class="tick archive">{tip}</circle>')
+            continue
+        out.append(f'<circle cx="{x(t["pos"]):.1f}" cy="{y_arch}" r="7" class="dot archive">{tip}</circle>')
+        if t is not split_tag:
+            out.append(f'<text x="{x(t["pos"]):.1f}" y="{y_arch - 14}" class="tag" text-anchor="middle">{esc(t["name"])}</text>')
     head_x = x(end)
-    out.append(f'<circle cx="{head_x:.1f}" cy="{y_arch}" r="5" class="dot head"><title>HEAD {esc(archive["head"]["sha"][:9])} · '
+    out.append(f'<circle cx="{head_x:.1f}" cy="{y_arch}" r="5" class="dot head"><title>main {esc(archive["head"]["sha"][:9])} · '
                f'{esc(archive["head"]["subject"])}</title></circle>')
     if archive['since_tag'] or not archive['tags']:
         out.append(f'<text x="{head_x:.1f}" y="{y_arch - 14}" class="tag" text-anchor="end">main</text>')
@@ -409,45 +454,44 @@ def lanes_svg(archive, public, pending):
         out.append(f'<text x="{(x0 + head_x) / 2:.1f}" y="{y_arch + 38}" class="note" text-anchor="middle">'
                    f'{archive["since_tag"]} Commit(s) noch ohne Tag</text>')
 
-    # Public lane.
-    if not public:
+    # Public lane
+    if not public or not public['tags']:
         out.append(f'<line x1="{left}" y1="{y_pub}" x2="{right}" y2="{y_pub}" class="lane public missing"/>')
-        out.append(f'<text x="{left + 8}" y="{y_pub - 12}" class="muted">noch nicht angelegt</text>')
+        out.append(f'<text x="{left + 8}" y="{y_pub - 12}" class="muted">'
+                   f'{"noch nicht angelegt" if not public else "angelegt, noch ohne Release"} – der Erstschnitt steht aus</text>')
     else:
-        by_name = {t['name']: t for t in archive['tags']}
-        pub_tags = public['tags']
-        if pub_tags:
-            cut = pub_tags[0]
-            cut_x = x(by_name[cut['name']]['pos']) if cut['name'] in by_name else split
-            out.append(f'<line x1="{left}" y1="{y_pub}" x2="{cut_x:.1f}" y2="{y_pub}" class="lane public compressed"/>')
+        cut_x = x(by_name[cut['name']]['pos']) if cut and cut['name'] in by_name else split
+        out.append(f'<line x1="{left}" y1="{y_pub}" x2="{cut_x:.1f}" y2="{y_pub}" class="lane public compressed"/>')
+        if cut:
             out.append(f'<text x="{(left + cut_x) / 2:.1f}" y="{y_pub + 26}" class="note" text-anchor="middle">'
                        f'{cut["commits"]} Commits, bereinigt</text>')
-            last_x = cut_x
-            for t in pub_tags:
-                tx = x(by_name[t['name']]['pos']) if t['name'] in by_name else last_x + 30
-                if t is not cut:
-                    out.append(f'<line x1="{last_x:.1f}" y1="{y_pub}" x2="{tx:.1f}" y2="{y_pub}" class="lane public"/>')
-                out.append(f'<circle cx="{tx:.1f}" cy="{y_pub}" r="7" class="dot public"><title>{esc(t["name"])} · '
-                           f'{esc(t["sha"][:9])} · {esc(t["subject"])}</title></circle>')
-                out.append(f'<text x="{tx:.1f}" y="{y_pub + 26}" class="tag" text-anchor="{"start" if t is cut else "middle"}">'
-                           f'{esc(t["name"])}</text>')
-                if t['name'] in by_name:
-                    ax = x(by_name[t['name']]['pos'])
-                    label = 'Rewrite' if t is cut else 'Übergabe'
-                    out.append(f'<path d="M{ax:.1f},{y_arch + 9} C{ax:.1f},{(y_arch + y_pub) / 2:.1f} {tx:.1f},{(y_arch + y_pub) / 2:.1f} '
-                               f'{tx:.1f},{y_pub - 10}" class="flow {"cut" if t is cut else "handover"}" marker-end="url(#arrow)"/>')
-                    out.append(f'<text x="{(ax + tx) / 2 + 6:.1f}" y="{(y_arch + y_pub) / 2 + 4:.1f}" class="flow-label">{label}</text>')
-                last_x = tx
-        else:
-            out.append(f'<line x1="{left}" y1="{y_pub}" x2="{right}" y2="{y_pub}" class="lane public missing"/>')
-            out.append(f'<text x="{left + 8}" y="{y_pub - 12}" class="muted">angelegt, noch ohne Release</text>')
+        last_x = cut_x
+        for t in public['tags']:
+            in_archive = by_name.get(t['name'])
+            tip = f'<title>{esc(t["name"])} · {esc(t["sha"][:9])} · {esc(t["subject"])}</title>'
+            if not t['handover'] and t is not cut:  # older release tags that came with the rewrite
+                if in_archive:
+                    out.append(f'<circle cx="{x(in_archive["pos"]):.1f}" cy="{y_pub}" r="3" class="tick public">{tip}</circle>')
+                continue
+            tx = x(in_archive['pos']) if in_archive else last_x + 30
+            if t is not cut:
+                out.append(f'<line x1="{last_x:.1f}" y1="{y_pub}" x2="{tx:.1f}" y2="{y_pub}" class="lane public"/>')
+            out.append(f'<circle cx="{tx:.1f}" cy="{y_pub}" r="7" class="dot public">{tip}</circle>')
+            out.append(f'<text x="{tx:.1f}" y="{y_pub + 26}" class="tag" text-anchor="{"start" if t is cut else "middle"}">'
+                       f'{esc(t["name"])}</text>')
+            if in_archive:
+                ax, kind = x(in_archive['pos']), ('cut' if t is cut else 'handover')
+                out.append(f'<path d="M{ax:.1f},{y_arch + 9} C{ax:.1f},{(y_arch + y_pub) / 2:.1f} {tx:.1f},{(y_arch + y_pub) / 2:.1f} '
+                           f'{tx:.1f},{y_pub - 10}" class="flow {kind}" marker-end="url(#arrow)"/>')
+                out.append(f'<text x="{(ax + tx) / 2 + 6:.1f}" y="{(y_arch + y_pub) / 2 + 4:.1f}" class="flow-label">'
+                           f'{"Rewrite" if t is cut else "Übergabe"}</text>')
+            last_x = tx
     for name in (pending or {}).get('open_tags', []):
-        t = next(t for t in archive['tags'] if t['name'] == name)
-        ax = x(t['pos'])
+        ax = x(by_name[name]['pos'])
         out.append(f'<path d="M{ax:.1f},{y_arch + 9} L{ax:.1f},{y_pub - 10}" class="flow pending" marker-end="url(#arrow)"/>')
         out.append(f'<text x="{ax + 6:.1f}" y="{(y_arch + y_pub) / 2 + 4:.1f}" class="flow-label pending">offen</text>')
     out.append('</svg>')
-    return '\n'.join(part for part in out if part)
+    return '\n'.join(out)
 
 
 def line_card(title, line, role, extra):
@@ -544,8 +588,10 @@ def next_step(archive, public, pending):
     if archive['unpushed']:
         return f'{archive["unpushed"]} Commit(s) ins Archiv pushen (Sicherung).'
     if not public or not public['tags']:
-        first = archive['tags'][0]['name'] if archive['tags'] else 'v0.8.0'
-        return f'Workflow <b>„Release: Erstschnitt“</b> mit <code>tag={esc(first)}</code>.'
+        if archive['tags'] and not archive['since_tag']:
+            return f'Workflow <b>„Release: Erstschnitt“</b> mit <code>tag={esc(archive["tags"][-1]["name"])}</code>.'
+        return ('Release-Tag auf main setzen (<code>scripts/release.sh</code>), dann Workflow '
+                '<b>„Release: Erstschnitt“</b> mit diesem Tag.')
     if pending and pending['open_tags']:
         return f'Workflow <b>„Release: Übergabe“</b> mit <code>tag={esc(pending["open_tags"][0])}</code>.'
     if archive['since_tag']:
@@ -585,7 +631,7 @@ header {{ display:flex; gap:16px; align-items:center; flex-wrap:wrap; }}
 svg {{ width:100%; height:auto; display:block; }}
 .lane {{ stroke-width:6; stroke-linecap:round; }} .lane.archive {{ stroke:var(--archive); }} .lane.public {{ stroke:var(--public); }}
 .lane.compressed {{ stroke-dasharray:2 7; }} .lane.missing {{ stroke:var(--line); stroke-dasharray:6 6; stroke-width:3; }}
-.dot.archive {{ fill:var(--archive); }} .dot.public {{ fill:var(--public); }} .dot.head {{ fill:var(--card); stroke:var(--archive); stroke-width:3; }}
+.dot.archive, .tick.archive {{ fill:var(--archive); }} .tick.public {{ fill:var(--public); }} .dot.public {{ fill:var(--public); }} .dot.head {{ fill:var(--card); stroke:var(--archive); stroke-width:3; }}
 .lane-label {{ font-weight:700; font-size:14px; fill:var(--text); }} .tag {{ font-size:13px; font-weight:600; fill:var(--text); }}
 .note {{ font-size:12px; fill:var(--muted); }} .bracket {{ stroke:var(--open); stroke-width:2; stroke-dasharray:4 3; }}
 .flow {{ fill:none; stroke-width:2; }} .flow.cut {{ stroke:var(--muted); }} .flow.handover {{ stroke:var(--public); }}

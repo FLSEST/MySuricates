@@ -49,6 +49,12 @@ while [ $# -gt 0 ]; do
 done
 case "$CMD" in reset|advance) ;; *) usage >&2; exit 2 ;; esac
 [ -n "$REV" ] || { usage >&2; exit 2; }
+DIR="$(realpath -m "$DIR")"
+SOURCE="$(cd "$SOURCE" 2>/dev/null && pwd)" || die "Quell-Repo nicht gefunden"
+case "$DIR" in
+  /|"$HOME"|"$SOURCE"|"$SOURCE"/*) die "$DIR ist als Probe-Verzeichnis nicht erlaubt" ;;
+esac
+case "$SOURCE/" in "$DIR"/*) die "$DIR enthält das Quell-Repo" ;; esac
 if [ -n "$TAG" ] && ! [[ "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then die "Tag muss vX.Y.Z sein: $TAG"; fi
 
 WORK="$DIR/work"
@@ -63,20 +69,31 @@ tag_head() {  # $1 = tag
   log "Tag $1 auf $(git -C "$WORK" rev-parse --short HEAD)"
 }
 
+# A directory the release workflows created before the first reset holds only these files.
+only_workflow_files() {
+  local f
+  for f in "$DIR"/* "$DIR"/.[!.]*; do
+    [ -e "$f" ] || continue
+    case "$(basename "$f")" in events.jsonl|lagebild-status.txt) ;; *) return 1 ;; esac
+  done
+}
+
 if [ "$CMD" = reset ]; then
+  # Check everything before anything is deleted.
+  identity "$SOURCE"
+  CUT="$(git -C "$SOURCE" rev-parse --verify --quiet "$REV^{commit}")" || die "Commit $REV gibt es im Quell-Repo nicht"
   if [ -e "$DIR" ]; then
-    [ -f "$DIR/$MARKER" ] || die "$DIR ist kein Probe-Verzeichnis (Markierung $MARKER fehlt) — nichts gelöscht"
+    [ -f "$DIR/$MARKER" ] || only_workflow_files \
+      || die "$DIR ist kein Probe-Verzeichnis (Markierung $MARKER fehlt) — nichts gelöscht"
     rm -rf "$DIR"
   fi
-  identity "$SOURCE"
-  git -C "$SOURCE" rev-parse --verify --quiet "$REV^{commit}" >/dev/null || die "Commit $REV gibt es im Quell-Repo nicht"
   mkdir -p "$DIR" && touch "$DIR/$MARKER"
   git clone --quiet --no-local --single-branch --branch main "$SOURCE" "$WORK" || die "Klon von $SOURCE fehlgeschlagen"
   git -C "$WORK" config user.name "$NAME"
   git -C "$WORK" config user.email "$EMAIL"
   # Keep the later commits reachable for "advance", then let main start at the cut.
   git -C "$WORK" update-ref refs/probe/future "$(git -C "$WORK" rev-parse main)"
-  git -C "$WORK" reset --quiet --hard "$REV" || die "reset auf $REV fehlgeschlagen"
+  git -C "$WORK" reset --quiet --hard "$CUT" || die "reset auf $CUT fehlgeschlagen"
   git -C "$WORK" tag -l | xargs -r git -C "$WORK" tag -d >/dev/null
   git -C "$WORK" remote remove origin
   git init --quiet --bare --initial-branch=main "$DIR/archive.git"
@@ -94,6 +111,7 @@ fi
 identity "$WORK"
 TARGET="$(git -C "$WORK" rev-parse --verify --quiet "$REV^{commit}")" || die "Commit $REV gibt es in der Probe nicht"
 git -C "$WORK" merge-base --is-ancestor "$TARGET" refs/probe/future || die "$REV liegt nicht auf der Quell-History"
+git -C "$WORK" merge-base --is-ancestor main "$TARGET" || die "$REV liegt vor dem Stand von main — vorspulen geht nur nach vorn"
 git -C "$WORK" merge --quiet --ff-only "$TARGET" || die "main lässt sich nicht auf $REV vorspulen"
 log "main auf $(git -C "$WORK" rev-parse --short main) ($(git -C "$WORK" rev-list --count main) Commits)"
 [ -n "$TAG" ] && tag_head "$TAG"
