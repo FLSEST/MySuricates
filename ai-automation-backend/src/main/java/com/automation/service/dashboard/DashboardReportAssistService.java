@@ -161,7 +161,8 @@ public class DashboardReportAssistService {
         try {
             return Files.createTempDirectory("mysuricates-report-assist-");
         } catch (IOException e) {
-            throw new IllegalStateException("Arbeitsverzeichnis für den Vorschlag nicht anlegbar.");
+            log.warn("Could not create the neutral working directory for a report suggestion", e);
+            throw new IllegalStateException("Arbeitsverzeichnis für den Vorschlag nicht anlegbar.", e);
         }
     }
 

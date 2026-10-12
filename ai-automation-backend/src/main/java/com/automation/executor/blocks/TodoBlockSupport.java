@@ -13,6 +13,12 @@ final class TodoBlockSupport {
 
     private TodoBlockSupport() {}
 
+    /** The message of a failure, or its class when it has none (an NPE would otherwise read "null"). */
+    static String failureText(Exception e) {
+        String message = e.getMessage();
+        return message == null || message.isBlank() ? e.getClass().getSimpleName() : message;
+    }
+
     static StepResult startResult(ExecutionContext context) {
         StepResult result = new StepResult();
         result.setStepIndex(context.nextStepIndex());

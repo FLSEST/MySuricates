@@ -122,6 +122,19 @@ class TodoCreateBlockExecutorTest {
     }
 
     @Test
+    void execute_failureWithoutMessage_namesTheExceptionClass() {
+        when(todoService.create(any())).thenThrow(new NullPointerException());
+
+        Map<String, Object> config = new HashMap<>();
+        config.put("title", "T");
+
+        StepResult result = executor.execute(block(config), buildContext());
+
+        assertThat(result.getStatus()).isEqualTo(StepStatus.FAILED);
+        assertThat(result.getOutput()).isEqualTo("todo-create fehlgeschlagen: NullPointerException");
+    }
+
+    @Test
     void execute_serviceThrows_returnsFailed() {
         when(todoService.create(any())).thenThrow(new IllegalArgumentException("Projekt nicht gefunden"));
 

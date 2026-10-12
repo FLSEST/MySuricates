@@ -110,6 +110,18 @@ class GlobalExceptionHandlerTest {
     }
 
     @Test
+    void handleAiProviderError_returnsServiceUnavailable() {
+        var ex = new AiProviderException("Failed to generate project context: timeout", new java.io.IOException("timeout"));
+
+        ResponseEntity<ErrorResponse> response = handler.handleAiProviderError(ex);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.SERVICE_UNAVAILABLE);
+        assertThat(response.getBody()).isNotNull();
+        assertThat(response.getBody().getCode()).isEqualTo("SERVICE_UNAVAILABLE");
+        assertThat(response.getBody().getError()).isEqualTo("Failed to generate project context: timeout");
+    }
+
+    @Test
     void handleIllegalArgument_returnsBadRequest() {
         var ex = new IllegalArgumentException("Invalid name");
 

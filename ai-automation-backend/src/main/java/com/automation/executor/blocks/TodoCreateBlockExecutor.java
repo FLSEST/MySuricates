@@ -67,8 +67,8 @@ public class TodoCreateBlockExecutor implements BlockExecutor {
             result.setOutput("✓ TODO angelegt: " + created.getId() + " — " + created.getTitle());
             result.setStatus(StepStatus.COMPLETED);
         } catch (Exception e) {
-            log.warn("todo-create block failed: {}", e.getMessage());
-            result.setOutput("todo-create fehlgeschlagen: " + e.getMessage());
+            log.warn("todo-create block failed", e);
+            result.setOutput("todo-create fehlgeschlagen: " + TodoBlockSupport.failureText(e));
             result.setStatus(StepStatus.FAILED);
         }
         return TodoBlockSupport.finishResult(result);

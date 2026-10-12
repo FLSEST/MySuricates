@@ -86,8 +86,8 @@ public class TodoUpdateBlockExecutor implements BlockExecutor {
             result.setOutput("✓ TODO aktualisiert: " + updated.getId() + " — " + updated.getTitle());
             result.setStatus(StepStatus.COMPLETED);
         } catch (Exception e) {
-            log.warn("todo-update block failed: {}", e.getMessage());
-            result.setOutput("todo-update fehlgeschlagen: " + e.getMessage());
+            log.warn("todo-update block failed", e);
+            result.setOutput("todo-update fehlgeschlagen: " + TodoBlockSupport.failureText(e));
             result.setStatus(StepStatus.FAILED);
         }
         return TodoBlockSupport.finishResult(result);

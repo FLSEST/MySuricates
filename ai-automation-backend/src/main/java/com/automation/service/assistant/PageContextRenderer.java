@@ -12,6 +12,7 @@ import com.automation.repository.WorkflowRepository;
 import com.automation.repository.WorkflowRunRepository;
 import com.automation.util.TruncationUtil;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
@@ -31,6 +32,7 @@ import static com.automation.service.assistant.format.AssistantFormatUtils.trunc
  */
 @Component
 @RequiredArgsConstructor
+@Slf4j
 public class PageContextRenderer {
 
     private final WorkflowRunRepository workflowRunRepository;
@@ -69,7 +71,7 @@ public class PageContextRenderer {
                     sb.append("### Currently displayed run\n");
                     appendRunSummary(sb, run, resolveRunWorkflow(ctx, run));
                 });
-            } catch (Exception ignored) {}
+            } catch (Exception e) { log.debug("Page context: displayed run skipped", e); }
         }
 
         String workflowId = resolveWorkflowId(ctx);
@@ -95,7 +97,7 @@ public class PageContextRenderer {
                     sb.append("### Aktuell angezeigter Run\n");
                     appendRunSummary(sb, run, resolveRunWorkflow(ctx, run));
                 });
-            } catch (Exception ignored) {}
+            } catch (Exception e) { log.debug("Page context: displayed run skipped", e); }
         }
 
         String workflowId = resolveWorkflowId(ctx);
@@ -109,7 +111,7 @@ public class PageContextRenderer {
                                 .append(", iterations: ").append(w.getIterationCount())
                                 .append("/").append(w.getMaxIterations()).append("\n")
                 );
-            } catch (Exception ignored) {}
+            } catch (Exception e) { log.debug("Page context: wish skipped", e); }
         }
         if (ctx.projectId() != null) {
             try {
@@ -118,7 +120,7 @@ public class PageContextRenderer {
                             .append(" (ID: ").append(p.getId()).append(")\n");
                     projectFileListing.append(sb, p.getPath(), p.getId());
                 });
-            } catch (Exception ignored) {}
+            } catch (Exception e) { log.debug("Page context: project skipped", e); }
         } else if (workflowId != null) {
             try {
                 workflowRepository.findByIdWithSkills(workflowId)
@@ -129,7 +131,7 @@ public class PageContextRenderer {
                                     .append(" (ID: ").append(project.getId()).append(")\n");
                             projectFileListing.append(sb, project.getPath(), project.getId());
                         });
-            } catch (Exception ignored) {}
+            } catch (Exception e) { log.debug("Page context: project skipped", e); }
         }
         sb.append("\n");
     }
@@ -148,12 +150,13 @@ public class PageContextRenderer {
         if (wfId == null) {
             try {
                 wfId = run.getWorkflow() != null ? run.getWorkflow().getId() : null;
-            } catch (Exception ignored) {}
+            } catch (Exception e) { log.debug("Page context: workflow of the run skipped", e); }
         }
         if (wfId == null) return null;
         try {
             return workflowRepository.findById(wfId).orElse(null);
-        } catch (Exception ignored) {
+        } catch (Exception e) {
+            log.debug("Page context: workflow {} not loadable", wfId, e);
             return null;
         }
     }
@@ -288,6 +291,6 @@ public class PageContextRenderer {
                     }
                 }
             });
-        } catch (Exception ignored) {}
+        } catch (Exception e) { log.debug("Page context: workflow skipped", e); }
     }
 }

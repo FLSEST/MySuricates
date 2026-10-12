@@ -72,6 +72,12 @@ public class GlobalExceptionHandler {
         return respond(ErrorCode.SERVICE_UNAVAILABLE, ex.getMessage());
     }
 
+    @ExceptionHandler(AiProviderException.class)
+    public ResponseEntity<ErrorResponse> handleAiProviderError(AiProviderException ex) {
+        log.warn("AI provider call failed", ex);
+        return respond(ErrorCode.SERVICE_UNAVAILABLE, ex.getMessage());
+    }
+
     @ExceptionHandler(TaskExportException.class)
     public ResponseEntity<ErrorResponse> handleTaskExport(TaskExportException ex) {
         log.warn("Task export error [{}]: {}", ex.getCode(), ex.getMessage());

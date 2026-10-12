@@ -1,5 +1,6 @@
 package com.automation.service.project;
 
+import com.automation.exception.AiProviderException;
 import com.automation.service.ai.AiProvider;
 import com.automation.service.ai.AiProviderRegistry;
 import org.junit.jupiter.api.BeforeEach;
@@ -116,6 +117,18 @@ class ProjectContextServiceTest {
 
             assertThat(result).isEqualTo("Generated context");
             verify(aiProvider).reason(any());
+        }
+
+        @Test
+        void providerFailure_isAnAiProviderExceptionWithCause() throws IOException {
+            when(aiProviderRegistry.getDefault()).thenReturn(aiProvider);
+            IOException timeout = new IOException("claude timed out");
+            when(aiProvider.reason(any())).thenThrow(timeout);
+
+            assertThatThrownBy(() -> projectContextService.generateContext(tempDir.toString()))
+                    .isInstanceOf(AiProviderException.class)
+                    .hasMessageContaining("claude timed out")
+                    .hasCause(timeout);
         }
 
         @Test

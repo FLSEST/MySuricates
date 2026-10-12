@@ -1,5 +1,6 @@
 package com.automation.service.project;
 
+import com.automation.exception.AiProviderException;
 import com.automation.service.ai.AiProvider;
 import com.automation.service.ai.AiProviderRegistry;
 import lombok.RequiredArgsConstructor;
@@ -136,8 +137,8 @@ public class ProjectContextService {
                     new AiProvider.ReasoningRequest(prompt));
             return result.text();
         } catch (IOException e) {
-            log.error("Failed to generate project context: {}", e.getMessage());
-            throw new RuntimeException("Failed to generate project context: " + e.getMessage(), e);
+            // Logged once by the exception handler, with the cause.
+            throw new AiProviderException("Failed to generate project context: " + e.getMessage(), e);
         }
     }
 

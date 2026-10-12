@@ -44,8 +44,8 @@ public class TodoCloseBlockExecutor implements BlockExecutor {
             result.setOutput("✓ TODO geschlossen: " + closed.getId() + " — " + closed.getTitle());
             result.setStatus(StepStatus.COMPLETED);
         } catch (Exception e) {
-            log.warn("todo-close block failed: {}", e.getMessage());
-            result.setOutput("todo-close fehlgeschlagen: " + e.getMessage());
+            log.warn("todo-close block failed", e);
+            result.setOutput("todo-close fehlgeschlagen: " + TodoBlockSupport.failureText(e));
             result.setStatus(StepStatus.FAILED);
         }
         return TodoBlockSupport.finishResult(result);

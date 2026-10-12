@@ -203,7 +203,9 @@ public class AssistantContextBuilder {
                 return projectRepository.findById(ctx.projectId())
                         .map(p -> p.getPath() != null ? p.getPath() : System.getProperty("user.home"))
                         .orElse(System.getProperty("user.home"));
-            } catch (Exception ignored) {}
+            } catch (Exception e) {
+                log.debug("Working directory of project {} not resolvable, trying the workflow", ctx.projectId(), e);
+            }
         }
         if (ctx != null && ctx.workflowId() != null) {
             try {
@@ -211,7 +213,9 @@ public class AssistantContextBuilder {
                         .map(Workflow::getProject)
                         .map(project -> project != null && project.getPath() != null ? project.getPath() : System.getProperty("user.home"))
                         .orElse(System.getProperty("user.home"));
-            } catch (Exception ignored) {}
+            } catch (Exception e) {
+                log.debug("Working directory of workflow {} not resolvable, falling back to user.home", ctx.workflowId(), e);
+            }
         }
         return System.getProperty("user.home");
     }
