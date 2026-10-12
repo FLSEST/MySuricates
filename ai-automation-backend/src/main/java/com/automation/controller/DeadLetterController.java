@@ -1,6 +1,8 @@
 package com.automation.controller;
 
+import com.automation.dto.response.DeadLetterResponse;
 import com.automation.entity.DeadLetterEntry;
+import com.automation.mapper.DeadLetterMapper;
 import com.automation.service.dlq.DeadLetterRetryService;
 import com.automation.service.dlq.DeadLetterService;
 import lombok.RequiredArgsConstructor;
@@ -17,20 +19,21 @@ public class DeadLetterController {
 
     private final DeadLetterService dlqService;
     private final DeadLetterRetryService dlqRetryService;
+    private final DeadLetterMapper dlqMapper;
 
     /** Lists dead letter entries page by page, most recent failure first; optional {@code status} filter. */
     @GetMapping
-    public Page<DeadLetterEntry> list(
+    public Page<DeadLetterResponse> list(
             @RequestParam(required = false) DeadLetterEntry.Status status,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size) {
-        return dlqService.list(status, PageRequest.of(page, size));
+        return dlqService.list(status, PageRequest.of(page, size)).map(dlqMapper::toResponse);
     }
 
     /** Returns one dead letter entry. */
     @GetMapping("/{id}")
-    public DeadLetterEntry get(@PathVariable String id) {
-        return dlqService.findById(id);
+    public DeadLetterResponse get(@PathVariable String id) {
+        return dlqMapper.toResponse(dlqService.findById(id));
     }
 
     /**
@@ -38,8 +41,8 @@ public class DeadLetterController {
      * If the workflow or the failed run no longer exists, nothing starts, but the entry is still marked retried.
      */
     @PostMapping("/{id}/retry")
-    public ResponseEntity<DeadLetterEntry> retry(@PathVariable String id) {
-        return ResponseEntity.ok(dlqRetryService.retry(id));
+    public ResponseEntity<DeadLetterResponse> retry(@PathVariable String id) {
+        return ResponseEntity.ok(dlqMapper.toResponse(dlqRetryService.retry(id)));
     }
 
     /** Discards a dead letter entry: it is marked {@code DISCARDED}, not deleted; answers 204. */

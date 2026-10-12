@@ -33,6 +33,7 @@ public enum ErrorMessage {
     RESTRICTED_PATH(ErrorCode.INVALID_ARGUMENT, "Path points to a restricted system directory: {path}"),
     PROFILE_NEEDS_LANGUAGE(ErrorCode.INVALID_ARGUMENT, "Profile content needs at least one language"),
     MEMORY_NOT_IN_WORKFLOW(ErrorCode.INVALID_ARGUMENT, "Memory does not belong to workflow"),
+    PROJECT_NAME_REQUIRED(ErrorCode.INVALID_ARGUMENT, "A project needs a name"),
     OAUTH_STATE_INVALID(ErrorCode.INVALID_ARGUMENT, "Invalid or expired OAuth state"),
     INVALID_DATE(ErrorCode.INVALID_ARGUMENT, "Invalid date: {value}"),
     NO_FAILED_RUNS(ErrorCode.INVALID_ARGUMENT, "Workflow '{name}' has no failed runs"),

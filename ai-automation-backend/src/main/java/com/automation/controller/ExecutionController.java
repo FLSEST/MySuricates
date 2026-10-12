@@ -3,6 +3,7 @@ package com.automation.controller;
 import com.automation.dto.request.ApproveTodosRequest;
 import com.automation.dto.request.ApproveExecutionRequest;
 import com.automation.dto.request.ExecuteCommandRequest;
+import com.automation.dto.response.PendingApprovalResponse;
 import com.automation.service.todo.PendingTodoApprovalService;
 import com.automation.service.execution.ExecutionCommandService;
 import com.automation.service.execution.ExecutionQueryService;
@@ -146,32 +147,19 @@ public class ExecutionController {
      * Includes {@code options} and {@code rejectOptions}; human input adds its input fields.
      */
     @GetMapping("/{id}/approval")
-    public ResponseEntity<Map<String, Object>> getPendingApproval(@PathVariable String id) {
+    public ResponseEntity<PendingApprovalResponse> getPendingApproval(@PathVariable String id) {
         ApprovalRequest request = runControlService.getPendingApproval(id);
         if (request == null) {
-            return ResponseEntity.ok(Map.of("pending", false));
+            return ResponseEntity.ok(new PendingApprovalResponse.None());
         }
-        Map<String, Object> response = new java.util.HashMap<>();
-        response.put("pending", true);
-        response.put("blockId", request.getBlockId());
-        response.put("question", request.getQuestion());
-        response.put("options", request.getOptions());
-        response.put("rejectOptions", request.getRejectOptions());
-        response.put("stepIndex", request.getStepIndex());
-        response.put("type", request.getType());
-
         if ("human-input".equals(request.getType())) {
-            response.put("inputType", request.getInputType());
-            response.put("defaultValue", request.getDefaultValue());
-            response.put("variableName", request.getVariableName());
-            response.put("required", request.isRequired());
-            response.put("validationPattern", request.getValidationPattern());
-            // Formular mit mehreren Feldern – wie im WebSocket-Ereignis human_input_required (TODO ec913801)
-            if (request.getFields() != null && !request.getFields().isEmpty()) {
-                response.put("fields", request.getFields());
-            }
+            return ResponseEntity.ok(new PendingApprovalResponse.HumanInput(true, request.getBlockId(),
+                    request.getQuestion(), request.getOptions(), request.getRejectOptions(), request.getStepIndex(),
+                    request.getType(), request.getInputType(), request.getDefaultValue(), request.getVariableName(),
+                    request.isRequired(), request.getValidationPattern(), request.getFields()));
         }
-        return ResponseEntity.ok(response);
+        return ResponseEntity.ok(new PendingApprovalResponse.Approval(true, request.getBlockId(), request.getQuestion(),
+                request.getOptions(), request.getRejectOptions(), request.getStepIndex(), request.getType()));
     }
 
     /**

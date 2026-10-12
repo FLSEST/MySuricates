@@ -483,6 +483,38 @@ class ExecutionControllerTest {
         verify(executionQueryService, org.mockito.Mockito.never()).getExecutionResponse(anyString());
     }
 
+    /** The typed answer keeps the keys of the former map: null values stay, human-input keys stay out (contract). */
+    @Test
+    void getPendingApproval_approval_keepsNullKeys_andNoHumanInputKeys() throws Exception {
+        var approval = ApprovalRequest.builder()
+                .question("Approve?").options(List.of("Yes")).stepIndex(2).build();
+        when(runControlService.getPendingApproval("run-1")).thenReturn(approval);
+
+        mockMvc.perform(get("/api/v1/executions/run-1/approval"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$", org.hamcrest.Matchers.hasKey("blockId")))
+                .andExpect(jsonPath("$.blockId").value(org.hamcrest.Matchers.nullValue()))
+                .andExpect(jsonPath("$.type").value("approval"))
+                .andExpect(jsonPath("$.stepIndex").value(2))
+                .andExpect(jsonPath("$.inputType").doesNotExist())
+                .andExpect(jsonPath("$.fields").doesNotExist());
+    }
+
+    @Test
+    void getPendingApproval_humanInputWithoutFields_omitsFields_keepsNullDefault() throws Exception {
+        var approval = ApprovalRequest.builder()
+                .question("Name?").options(List.of()).stepIndex(0)
+                .type("human-input").inputType("text").variableName("name").build();
+        when(runControlService.getPendingApproval("run-1")).thenReturn(approval);
+
+        mockMvc.perform(get("/api/v1/executions/run-1/approval"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$", org.hamcrest.Matchers.hasKey("defaultValue")))
+                .andExpect(jsonPath("$", org.hamcrest.Matchers.hasKey("validationPattern")))
+                .andExpect(jsonPath("$.required").value(false))
+                .andExpect(jsonPath("$.fields").doesNotExist());
+    }
+
     @Test
     void getPendingApproval_humanInput_includesExtraFields() throws Exception {
         var approval = ApprovalRequest.builder()

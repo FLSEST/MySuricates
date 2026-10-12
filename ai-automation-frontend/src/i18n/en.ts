@@ -2314,6 +2314,7 @@ export const en = {
       RESTRICTED_PATH: 'Path points to a restricted system directory: {path}',
       PROFILE_NEEDS_LANGUAGE: 'Profile content needs at least one language',
       MEMORY_NOT_IN_WORKFLOW: 'Memory does not belong to workflow',
+      PROJECT_NAME_REQUIRED: 'A project needs a name',
       OAUTH_STATE_INVALID: 'Invalid or expired OAuth state',
       INVALID_DATE: 'Invalid date: {value}',
       NO_FAILED_RUNS: 'Workflow \'{name}\' has no failed runs',

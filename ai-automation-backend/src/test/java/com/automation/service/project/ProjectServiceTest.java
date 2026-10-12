@@ -7,6 +7,7 @@ import com.automation.entity.ContainerStatus;
 import com.automation.entity.Project;
 import com.automation.entity.ProjectStatus;
 import com.automation.entity.ProjectType;
+import com.automation.exception.LocalizedArgumentException;
 import com.automation.exception.ResourceNotFoundException;
 import com.automation.repository.ProjectRepository;
 import com.automation.service.activitylog.ActivityLogService;
@@ -100,6 +101,17 @@ class ProjectServiceTest {
         assertThatThrownBy(() -> projectService.findById("unknown"))
                 .isInstanceOf(ResourceNotFoundException.class)
                 .hasMessageContaining("Project");
+    }
+
+    @Test
+    void update_blankName_isRejected_andNothingIsSaved() {
+        when(projectRepository.findById("proj-1")).thenReturn(Optional.of(testProject));
+
+        assertThatThrownBy(() -> projectService.update("proj-1",
+                new UpdateProjectRequest("  ", null, null, null, null, null, null)))
+                .isInstanceOf(LocalizedArgumentException.class)
+                .hasMessage("A project needs a name");
+        verify(projectRepository, never()).save(any(Project.class));
     }
 
     @Test

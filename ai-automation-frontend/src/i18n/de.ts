@@ -2311,6 +2311,7 @@ export const de: TranslationKeys = {
       RESTRICTED_PATH: 'Der Pfad zeigt auf ein geschütztes Systemverzeichnis: {path}',
       PROFILE_NEEDS_LANGUAGE: 'Das Profil braucht Inhalt in mindestens einer Sprache',
       MEMORY_NOT_IN_WORKFLOW: 'Der Wissenseintrag gehört nicht zu diesem Workflow',
+      PROJECT_NAME_REQUIRED: 'Ein Projekt braucht einen Namen',
       OAUTH_STATE_INVALID: 'OAuth-Status ungültig oder abgelaufen',
       INVALID_DATE: 'Ungültiges Datum: {value}',
       NO_FAILED_RUNS: 'Workflow „{name}“ hat keine fehlgeschlagenen Ausführungen',

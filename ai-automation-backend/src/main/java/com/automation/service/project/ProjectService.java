@@ -7,6 +7,8 @@ import com.automation.entity.ContainerStatus;
 import com.automation.entity.Project;
 import com.automation.entity.ProjectStatus;
 import com.automation.entity.ProjectType;
+import com.automation.exception.ErrorMessage;
+import com.automation.exception.LocalizedArgumentException;
 import com.automation.exception.ResourceNotFoundException;
 import com.automation.repository.ProjectRepository;
 import com.automation.service.activitylog.ActivityLogService;
@@ -109,6 +111,10 @@ public class ProjectService {
         Project project = findById(id);
 
         if (request.name() != null) {
+            // Create requires @NotBlank; the partial update must not let an empty name through either.
+            if (request.name().isBlank()) {
+                throw new LocalizedArgumentException(ErrorMessage.PROJECT_NAME_REQUIRED);
+            }
             project.setName(request.name());
         }
         if (request.subtitle() != null) {

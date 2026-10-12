@@ -3,6 +3,7 @@ package com.automation.controller;
 import com.automation.entity.DeadLetterEntry;
 import com.automation.exception.ElementNotFoundException;
 import com.automation.exception.GlobalExceptionHandler;
+import com.automation.mapper.DeadLetterMapperImpl;
 import com.automation.security.RateLimitConfig;
 import com.automation.service.activitylog.ActivityLogService;
 import com.automation.service.dlq.DeadLetterRetryService;
@@ -30,7 +31,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 @WebMvcTest(DeadLetterController.class)
-@Import(GlobalExceptionHandler.class)
+@Import({GlobalExceptionHandler.class, DeadLetterMapperImpl.class})
 @AutoConfigureMockMvc(addFilters = false)
 class DeadLetterControllerTest {
 
@@ -102,7 +103,13 @@ class DeadLetterControllerTest {
         mockMvc.perform(get("/api/v1/dlq/dlq-1"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value("dlq-1"))
-                .andExpect(jsonPath("$.errorMessage").value("boom"));
+                .andExpect(jsonPath("$.errorMessage").value("boom"))
+                // same fields as the entity used to serialize (useDeadLetters.ts)
+                .andExpect(jsonPath("$.workflowRunId").value("run-1"))
+                .andExpect(jsonPath("$.failedStepIndex").value(2))
+                .andExpect(jsonPath("$.retryCount").value(0))
+                .andExpect(jsonPath("$.status").value("OPEN"))
+                .andExpect(jsonPath("$.lastFailureAt").exists());
     }
 
     /** 2b73ff48: an unknown entry is a 404 with a messageKey the UI translates, no longer a 400. */
