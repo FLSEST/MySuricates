@@ -312,8 +312,11 @@ public class ContainerShellService {
         cmd.add("--pids-limit");
         cmd.add("100");
 
-        cmd.add(containerImage);
+        // Command mode always runs through bash: force it as entrypoint so images that ship their own
+        // ENTRYPOINT (tool images such as ocrmypdf or pandoc) do not receive "bash -c" as tool arguments.
+        cmd.add("--entrypoint");
         cmd.add("/bin/bash");
+        cmd.add(containerImage);
         cmd.add("-c");
         cmd.add(command);
 

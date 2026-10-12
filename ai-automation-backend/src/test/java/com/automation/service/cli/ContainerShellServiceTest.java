@@ -104,6 +104,27 @@ class ContainerShellServiceTest {
     }
 
     @Test
+    void buildDockerCommand_forcesBashEntrypointBeforeImage() {
+        try {
+            var method = ContainerShellService.class.getDeclaredMethod(
+                    "buildDockerCommand", String.class, String.class, String.class, boolean.class, List.class);
+            method.setAccessible(true);
+            @SuppressWarnings("unchecked")
+            List<String> cmd = (List<String>) method.invoke(service, "echo hi", "/my/project", "tool-image:1.0", false, List.of());
+
+            int entrypoint = cmd.indexOf("--entrypoint");
+            int image = cmd.indexOf("tool-image:1.0");
+            assertThat(entrypoint).isGreaterThan(0);
+            assertThat(cmd.get(entrypoint + 1)).isEqualTo("/bin/bash");
+            assertThat(image).isGreaterThan(entrypoint);
+            // after the image only the bash arguments follow, never a second "/bin/bash" the tool entrypoint would swallow
+            assertThat(cmd.subList(image + 1, cmd.size())).containsExactly("-c", "echo hi");
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    @Test
     void buildDockerCommand_withDockerSocket_mountsSocket() {
         when(hostProcessUtils.getHostUid()).thenReturn("1000");
 
