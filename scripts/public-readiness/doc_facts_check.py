@@ -419,6 +419,10 @@ def check_version_row(rel, no, line, versions, findings):
     if not said:
         return
     said = said.group(0)
+    if expected == "@managed":
+        findings.append(f"DRIFT {rel}:{no} version({match.group(1).strip()}) sagt {said}, die Version"
+                        f" verwaltet der Spring-Boot-Parent – Zahl weglassen | {line.strip()[:120]}")
+        return
     parts = said.split(".")
     if expected.split(".")[:len(parts)] != parts:
         findings.append(f"DRIFT {rel}:{no} version({match.group(1).strip()}) sagt {said},"

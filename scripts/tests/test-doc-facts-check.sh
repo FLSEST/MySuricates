@@ -825,6 +825,25 @@ check "Gegenprobe: kein controller-names-Befund" '! grep -q "controller-names" <
 check "Gegenprobe: exit 0"                    '[ "$RC" -eq 0 ]'
 rm "$FAKE/docs/controller.md"
 
+echo "19) Version, die der Spring-Boot-Parent verwaltet (sqlite-jdbc seit Boot 4)"
+cp "$FAKE/ai-automation-backend/pom.xml" "$FAKE/pom.bak"
+sed -i '/sqlite-jdbc.version/d' "$FAKE/ai-automation-backend/pom.xml"
+OUT=$(bash "$SCRIPT" --root "$FAKE" 2>&1); RC=$?
+check "ohne Property und ohne Abhaengigkeit: Quelle fehlt" 'grep -q "version .SQLite.: keine Quelle" <<<"$OUT"'
+sed -i 's|</properties>|</properties>\n    <dependencies><dependency><artifactId>sqlite-jdbc</artifactId></dependency></dependencies>|' \
+  "$FAKE/ai-automation-backend/pom.xml"
+mkdir -p "$FAKE/docs/onboarding"
+printf '%s\n' '| Technologie | Version | Zweck |' '|---|---|---|' \
+  '| **SQLite** | sqlite-jdbc 3.53 | Datenbank |' '| **SQLite** | ueber Spring Boot | Datenbank |' \
+  > "$FAKE/docs/onboarding/managed.md"
+OUT=$(bash "$SCRIPT" --root "$FAKE" 2>&1); RC=$?
+check "verwaltete Abhaengigkeit bricht den Lauf nicht ab" '! grep -q "keine Quelle" <<<"$OUT"'
+check "genannte Zahl einer verwalteten Version gemeldet" \
+  'grep -qE "^DRIFT docs/onboarding/managed.md:3 version\(SQLite\) sagt 3.53, die Version verwaltet" <<<"$OUT"'
+check "Zeile ohne Zahl bleibt frei" '! grep -q "managed.md:4" <<<"$OUT"'
+rm "$FAKE/docs/onboarding/managed.md"
+mv "$FAKE/pom.bak" "$FAKE/ai-automation-backend/pom.xml"
+
 echo
 echo "passed=$PASS failed=$FAIL"
 [ "$FAIL" -eq 0 ]

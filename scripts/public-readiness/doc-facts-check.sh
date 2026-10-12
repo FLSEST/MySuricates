@@ -161,6 +161,17 @@ pom_parent_version() {
   grep -A4 'spring-boot-starter-parent' "$POM" 2>/dev/null \
     | sed -n 's|.*<version>\([^<]*\)</version>.*|\1|p' | head -1
 }
+# A dependency without its own version tag gets it from the Spring Boot parent BOM, which
+# is not readable offline. "@managed" makes every table row naming a version for it a
+# finding instead of letting it through unchecked (since Boot 4: sqlite-jdbc).
+pom_managed_or_property() {  # $1 = property name, $2 = artifactId
+  local value
+  value="$(pom_property "$1")"
+  if [ -z "$value" ] && grep -q "<artifactId>$2</artifactId>" "$POM" 2>/dev/null; then
+    value="@managed"
+  fi
+  printf '%s' "$value"
+}
 pkg_version() {  # $1 = package name
   sed -n "s|.*\"$1\"[[:space:]]*:[[:space:]]*\"[^0-9]*\([0-9][^\"]*\)\".*|\1|p" "$PKG" 2>/dev/null | head -1
 }
@@ -170,7 +181,7 @@ pkg_version() {  # $1 = package name
 
 VERSION_LABELS=("Spring Boot" "SQLite" "Docker Java Client" \
                 "React" "TypeScript" "Vite" "TailwindCSS" "Cypress" "Vite PWA")
-VERSION_VALUES=("$(pom_parent_version)" "$(pom_property sqlite-jdbc.version)" \
+VERSION_VALUES=("$(pom_parent_version)" "$(pom_managed_or_property sqlite-jdbc.version sqlite-jdbc)" \
                 "$(pom_property docker-java.version)" \
                 "$(pkg_version react)" "$(pkg_version typescript)" "$(pkg_version vite)" \
                 "$(pkg_version tailwindcss)" "$(pkg_version cypress)" "$(pkg_version vite-plugin-pwa)")
