@@ -22,7 +22,9 @@
 #   --work DIR      work clone (default <state>/work); "run" refuses an existing one
 #   --branch NAME   branch that goes public (default main); other branches are not cloned
 #   --tag NAME      release tag that must end up on the rewritten branch tip (e.g. v0.8.0); if it does
-#                   not exist in the source, --create-tag sets it on the tip of the work clone
+#                   not exist in the source, --create-tag sets it on the tip of the work clone. With a
+#                   tag, it is the only tag that stays - the first public state carries one version
+#                   (decided 2026-10-12); without one, all v* tags stay
 #   --create-tag    see --tag (for trial runs before the real tag exists)
 #   --strip-blobs-bigger-than SIZE   passed on to git filter-repo (e.g. 5M)
 #   --allow-missing-map              trial run: commits without a map entry keep their message
@@ -106,11 +108,16 @@ verify() {
   else
     finding "Baum der Spitze weicht von $BRANCH der Quelle ab"
   fi
-  # 5. Only the public branch and v* tags; the release tag sits on the tip.
+  # 5. Only the public branch; with --tag only that tag (on the tip), otherwise only v* tags.
   n="$(git -C "$w" for-each-ref --format='%(refname)' refs/heads | grep -vxF "refs/heads/$BRANCH" | wc -l | tr -d ' ')"
   [ "$n" = 0 ] && ok "nur Branch $BRANCH" || finding "$n weitere Branches"
-  n="$(git -C "$w" tag -l | grep -vE '^v[0-9]' | wc -l | tr -d ' ')"
-  [ "$n" = 0 ] && ok "nur v*-Tags" || finding "$n Tags ausserhalb von v*"
+  if [ -n "$TAG" ]; then
+    n="$(git -C "$w" tag -l | grep -vxF "$TAG" | wc -l | tr -d ' ')"
+    [ "$n" = 0 ] && ok "nur das Tag $TAG" || finding "$n weitere Tags neben $TAG"
+  else
+    n="$(git -C "$w" tag -l | grep -vE '^v[0-9]' | wc -l | tr -d ' ')"
+    [ "$n" = 0 ] && ok "nur v*-Tags" || finding "$n Tags ausserhalb von v*"
+  fi
   if [ -n "$TAG" ]; then
     [ "$(git -C "$w" rev-parse "$TAG^{commit}" 2>/dev/null)" = "$(git -C "$w" rev-parse "$BRANCH")" ] \
       && ok "Tag $TAG auf der Spitze" || finding "Tag $TAG fehlt oder liegt nicht auf der Spitze"
@@ -156,6 +163,10 @@ if [ -n "$TAG" ] && ! git -C "$WORK" rev-parse -q --verify "refs/tags/$TAG" >/de
   git -C "$WORK" tag -a "$TAG" -m "Release $TAG" "$BRANCH"
   log "Tag $TAG im Arbeitsklon gesetzt (Probelauf)"
 fi
+# The first public state carries one version: with --tag, every other tag goes.
+if [ -n "$TAG" ]; then
+  git -C "$WORK" tag -l | grep -vxF "$TAG" | while IFS= read -r t; do git -C "$WORK" tag -d "$t" >/dev/null; done
+fi
 
 MISSING="$(python3 -I "$HERE/messages.py" map-missing --repo "$WORK" --map "$MAP")"
 if [ "$MISSING" != 0 ]; then
@@ -174,5 +185,5 @@ verify "$WORK"; RC=$?
 echo
 echo "Naechste Schritte (nur Flo): Repo auf GitHub privat anlegen, dann in $WORK:"
 echo "  git remote add origin git@github.com:<owner>/<repo>.git"
-echo "  git push origin $BRANCH --tags"
+echo "  git push origin $BRANCH${TAG:+ refs/tags/$TAG}"
 exit $RC

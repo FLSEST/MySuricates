@@ -67,7 +67,7 @@ check "TODO bracket became a trailer" 'grep -x "Todo: deadbee1 (Erster Schritt)"
 check "private term replaced after the map" '! grep -F geheimname <<<"$MSGS" >/dev/null && grep -F "[name]" <<<"$MSGS" >/dev/null'
 check "no Claude-Session trailer" '! grep "^Claude-Session:" <<<"$MSGS" >/dev/null'
 check "only main, side branch not cloned" '[ "$(git -C "$W" for-each-ref --format="%(refname)" refs/heads)" = "refs/heads/main" ]'
-check "only v* tags, release tag on the tip" '[ "$(git -C "$W" tag -l | tr "\n" " ")" = "v0.1.0 v0.2.0 " ] && [ "$(git -C "$W" rev-parse "v0.2.0^{commit}")" = "$(git -C "$W" rev-parse main)" ]'
+check "only the release tag stays, on the tip (older v0.1.0 and stable-123 gone)" '[ "$(git -C "$W" tag -l | tr "\n" " ")" = "v0.2.0 " ] && [ "$(git -C "$W" rev-parse "v0.2.0^{commit}")" = "$(git -C "$W" rev-parse main)" ]'
 check "dates kept: author date of the first commit unchanged" '[ "$(git -C "$W" log --reverse --format=%at main | sed -n 1p)" = "$(g log --reverse --format=%at main | sed -n 1p)" ]'
 check "tip tree equals the source" '[ "$(git -C "$W" rev-parse "main^{tree}")" = "$(g rev-parse "main^{tree}")" ]'
 check "work clone has no remote" '[ -z "$(git -C "$W" remote)" ]'

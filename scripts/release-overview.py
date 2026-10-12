@@ -51,7 +51,7 @@ STATIONS = [
     ('rewrite', 'Rewrite', 'nur beim Erstschnitt', [
         'filter-repo: private Pfade raus, Mailmap auf noreply, Nachrichten englisch',
         'Gegenprobe: Pfade, Adressen, Nachrichten-Hygiene, Session-Trailer',
-        'Baum der Spitze gleich dem Tag, nur main, nur v*-Tags, gitleaks, README-Marke',
+        'Baum der Spitze gleich dem Tag, nur main, nur das Release-Tag, gitleaks, README-Marke',
     ]),
     ('handover', 'Übergabe', 'Tag → öffentlicher Klon', [
         'Treue: jede Datei wie im Tag, sonst nur release-notes/',
