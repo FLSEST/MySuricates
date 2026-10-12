@@ -872,6 +872,33 @@ repo and a local throwaway "public" repo (bare + clone): exclusion, replaced con
 for CRLF files, commit, annotated tag, notes file, stop and complete reset on a gate finding, stop
 without a change, preconditions, `--discard` and that nothing gets pushed.
 
+### Release overview and probe
+
+Where the archive and the public repo stand, which checks the way between them has and how the kinds
+of release run is shown by a page that `scripts/release-overview.py` generates deterministically from
+both repos and an event log (`reports/release-lagebild.html`, in the probe
+`reports/release-lagebild-probe.html`, both ignored). Four workflows of the maintainer's instance run
+the process and write an event after each step (`release-overview.py event`):
+
+| Workflow | Task |
+|---|---|
+| "Release: Lagebild" | regenerate the page; status and summary as a dashboard widget |
+| "Release: Probe zurücksetzen" | rebuild the probe (`scripts/release-probe.sh reset`) |
+| "Release: Erstschnitt" | pre-check, backup as a bundle, `rewrite.sh`, approval, push of the cleaned history with its tag into an empty target, create the public clone |
+| "Release: Übergabe" | `release-handover.sh`, approval, atomic push or `--discard`; in the probe `release-probe.sh advance` first |
+
+The context value `mode` decides: `probe` (default) replaces both GitHub repos with local bare repos
+under `~/.local/state/mysuricates/release-probe` — a clone of the working repo (`work/`, `main` starts
+at the cut commit) with `archive.git` as `origin`, and an empty `public.git`. That way the whole way can
+be played through beforehand. `live` takes the working repo (`archive_repo`) and the public clone
+(`public_clone`); there the first cut requires that `origin` already points to `MySuricates-archive`
+and that the target (`public_remote`) is empty. The paths per mode are in
+`scripts/lib/release-paths.sh`.
+
+**Test:** `python3 -m unittest discover -s scripts/tests -p 'test_release_overview.py'` (check lines of
+the three scripts, event log, page and status, paths per mode, `release-probe.sh` with throwaway
+repos).
+
 ### Behavior Changes
 
 Changes that can affect the runtime behavior of existing, self-operated workflows — not just new

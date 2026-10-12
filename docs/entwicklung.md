@@ -886,6 +886,33 @@ ersetzter Inhalt, Treue auch bei CRLF-Dateien, Commit, annotiertes Tag, Notizdat
 vollständiges Zurücksetzen bei einem Gate-Befund, Abbruch ohne Änderung, Vorbedingungen,
 `--discard` und dass nichts gepusht wird.
 
+### Release-Lagebild und Probe
+
+Wo Archiv und öffentliches Repo stehen, welche Prüfungen der Weg dazwischen hat und wie die
+Release-Arten laufen, zeigt eine Seite, die `scripts/release-overview.py` deterministisch aus beiden
+Repos und einem Ereignisprotokoll erzeugt (`reports/release-lagebild.html`, in der Probe
+`reports/release-lagebild-probe.html`, beide ignoriert). Vier Workflows der Maintainer-Instanz fahren
+den Ablauf und schreiben nach jedem Schritt ein Ereignis (`release-overview.py event`):
+
+| Workflow | Aufgabe |
+|---|---|
+| „Release: Lagebild“ | Seite neu erzeugen; Ampel und Kurzfassung als Dashboard-Widget |
+| „Release: Probe zurücksetzen“ | Probe neu aufbauen (`scripts/release-probe.sh reset`) |
+| „Release: Erstschnitt“ | Vorprüfung, Sicherung als Bundle, `rewrite.sh`, Freigabe, Push der bereinigten History samt Tag in ein leeres Ziel, öffentlichen Klon anlegen |
+| „Release: Übergabe“ | `release-handover.sh`, Freigabe, atomarer Push oder `--discard`; in der Probe vorher `release-probe.sh advance` |
+
+Der Kontext `mode` entscheidet: `probe` (Standard) ersetzt beide GitHub-Repos durch lokale Bare-Repos
+unter `~/.local/state/mysuricates/release-probe` — einen Klon des Arbeits-Repos (`work/`, `main`
+beginnt beim Schnitt-Commit) mit `archive.git` als `origin` und ein leeres `public.git`. So lässt sich
+der ganze Weg vorher durchspielen. `live` nimmt das Arbeits-Repo (`archive_repo`) und den öffentlichen
+Klon (`public_clone`); der Erstschnitt verlangt dort, dass `origin` schon auf `MySuricates-archive`
+zeigt und das Ziel (`public_remote`) leer ist. Die Pfade je Modus stehen in
+`scripts/lib/release-paths.sh`.
+
+**Test:** `python3 -m unittest discover -s scripts/tests -p 'test_release_overview.py'` (Prüfzeilen
+der drei Skripte, Ereignisprotokoll, Seite und Ampel, Pfade je Modus, `release-probe.sh` mit
+Wegwerf-Repos).
+
 ### Verhaltensänderungen
 
 Änderungen, die das Laufzeitverhalten bestehender, selbst betriebener Workflows beeinflussen
