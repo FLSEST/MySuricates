@@ -106,6 +106,15 @@ class AnalyzerFindingLanguagesTest {
                         "blocks", List.of(Map.of("type", "simple", "config", Map.of("command", "x"))))),
                 loose,
                 block("switch", "sw", Map.of("expression", "x", "default", List.of(strayNested)))), null));
+        // Instance: container-without-docker (top level and nested), only with InstanceFacts
+        Map<String, Object> boxed = new HashMap<>();
+        boxed.put("type", "shell");
+        boxed.put("config", Map.of("command", "set -euo pipefail\nls", "container_image", "alpine:3.20"));
+        out.addAll(analyzer.analyze(List.of(
+                block("shell", "box", Map.of("command", "set -euo pipefail\nls", "container_image", "alpine:3.20")),
+                block("switch", "pick", Map.of("expression", "x", "default", List.of(boxed)))), null, Map.of(),
+                new InstanceFacts(false, "Docker ist auf diesem Rechner nicht eingerichtet.",
+                        "Docker is not set up on this machine.")));
         return out;
     }
 

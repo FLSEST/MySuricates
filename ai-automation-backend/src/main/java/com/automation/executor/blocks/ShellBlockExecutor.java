@@ -135,6 +135,7 @@ public class ShellBlockExecutor implements BlockExecutor {
             case 127 -> "Command not found. Verify the tool is installed and available in PATH. Try: `which " + firstToken + "`.";
             case 126 -> "Permission denied. Check file permissions: `chmod +x <path>`.";
             case 130 -> "Interrupted. Retry the command.";
+            case 125 -> "The container did not start (Docker unreachable or the run was refused). See the message above.";
             case 1   -> "General failure (exit 1). See stderr above. Try running the command manually to reproduce.";
             default  -> "Exit " + exitCode + ": Command failed. See output above for details.";
         };

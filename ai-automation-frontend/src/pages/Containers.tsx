@@ -64,16 +64,52 @@ export function Containers() {
   );
 }
 
+/**
+ * Why no container can start here. An instance that itself runs in a container has no socket by default
+ * (secure default), so "Docker is not set up on this machine" would be wrong there; it names the switch.
+ */
+function DockerMissing({ overview }: { overview: ContainerImagesOverview }) {
+  const t = useT();
+  if (overview.docker === 'UNAVAILABLE') {
+    return (
+      <p className="rounded-lg border border-warning/30 bg-warning-subtle px-4 py-3 text-sm text-warning">
+        {t.containers.dockerUnavailable}
+      </p>
+    );
+  }
+  if (!overview.inContainer) {
+    return (
+      <p className="rounded-lg border border-warning/30 bg-warning-subtle px-4 py-3 text-sm text-warning">
+        {t.containers.dockerNotConfigured}
+      </p>
+    );
+  }
+  return (
+    <div className="rounded-lg border border-warning/30 bg-warning-subtle px-4 py-3 space-y-2">
+      <p className="text-sm text-warning">{t.containers.dockerInContainer}</p>
+      {overview.socketSwitch ? (
+        <>
+          {/* The path goes into the text: the snippet label is set in capitals, which would misspell it. */}
+          <p className="text-sm text-warning break-all">
+            {overview.switchSource
+              ? t.containers.socketSwitchIn.replace('{source}', overview.switchSource)
+              : t.containers.socketSwitch}
+          </p>
+          <ConfigSnippet label={t.containers.socketSwitchLabel} text={`${overview.socketSwitch}=1`} />
+        </>
+      ) : (
+        <p className="text-sm text-warning">{t.containers.socketRestart}</p>
+      )}
+    </div>
+  );
+}
+
 function StateNotes({ overview }: { overview: ContainerImagesOverview }) {
   const t = useT();
   const stale = overview.images.filter((image) => image.shipped && NEEDS_BUILD.includes(image.status));
   return (
     <div className="space-y-3">
-      {overview.docker !== 'CONNECTED' && (
-        <p className="rounded-lg border border-warning/30 bg-warning-subtle px-4 py-3 text-sm text-warning">
-          {overview.docker === 'NOT_CONFIGURED' ? t.containers.dockerNotConfigured : t.containers.dockerUnavailable}
-        </p>
-      )}
+      {overview.docker !== 'CONNECTED' && <DockerMissing overview={overview} />}
       {stale.length > 0 && (
         <div className="rounded-lg border border-warning/30 bg-warning-subtle px-4 py-3 space-y-2">
           <p className="text-sm text-warning">

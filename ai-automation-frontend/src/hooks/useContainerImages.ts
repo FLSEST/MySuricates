@@ -38,6 +38,12 @@ export interface ContainerImagesOverview {
   docker: 'CONNECTED' | 'UNAVAILABLE' | 'NOT_CONFIGURED';
   allowlistActive: boolean;
   images: ContainerImageView[];
+  /** The instance itself runs in a container; without the socket it cannot start containers. */
+  inContainer: boolean;
+  /** Switch that mounts the socket, e.g. TEST_DOCKER_SOCKET; null when the starter did not name one. */
+  socketSwitch: string | null;
+  /** Where that switch is set, e.g. the staging.env path; null when unknown. */
+  switchSource: string | null;
 }
 
 /** Container images workflows can run in, with build state and usage (TODO 244e5de5). */

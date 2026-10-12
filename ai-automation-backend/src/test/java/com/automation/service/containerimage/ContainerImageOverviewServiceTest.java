@@ -7,6 +7,7 @@ import com.automation.service.containerimage.ContainerImageInspector.ImageFacts;
 import com.automation.service.containerimage.ContainerImageOverviewService.ImageView;
 import com.automation.service.containerimage.ContainerImageOverviewService.Overview;
 import com.automation.service.containerimage.ContainerImageOverviewService.Status;
+import com.automation.service.project.DockerAccess;
 import com.automation.service.project.DockerExpectation;
 import com.automation.service.workflow.WorkflowService;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -33,15 +34,19 @@ class ContainerImageOverviewServiceTest {
 
     private final AgentImageCatalog catalog = new AgentImageCatalog(new ObjectMapper());
     private final ContainerImageInspector inspector = mock(ContainerImageInspector.class);
-    private final DockerExpectation docker = mock(DockerExpectation.class);
+    private final DockerAccess docker = mock(DockerAccess.class);
     private final ContainerImageAllowlist allowlist = mock(ContainerImageAllowlist.class);
     private final WorkflowService workflows = mock(WorkflowService.class);
     private final ContainerImageOverviewService service =
             new ContainerImageOverviewService(catalog, inspector, docker, allowlist, workflows);
 
+    private static DockerAccess.Status onHost(DockerExpectation.State state) {
+        return new DockerAccess.Status(state, false, null, null);
+    }
+
     @BeforeEach
     void setUp() {
-        when(docker.probe()).thenReturn(DockerExpectation.State.UP);
+        when(docker.status()).thenReturn(onHost(DockerExpectation.State.UP));
         when(allowlist.isAllowed(anyString())).thenReturn(true);
         when(allowlist.getEntries()).thenReturn(List.of());
         when(workflows.findAll()).thenReturn(List.of());
@@ -83,8 +88,7 @@ class ContainerImageOverviewServiceTest {
 
     @Test
     void withoutDockerNothingIsInspectedAndEverythingIsUnknown() {
-        when(docker.probe()).thenReturn(DockerExpectation.State.NOT_CONFIGURED);
-        when(docker.isConfigured()).thenReturn(false);
+        when(docker.status()).thenReturn(onHost(DockerExpectation.State.NOT_CONFIGURED));
 
         Overview overview = service.overview();
 
@@ -94,9 +98,21 @@ class ContainerImageOverviewServiceTest {
     }
 
     @Test
+    void anInstanceInAContainerNamesItsSocketSwitch() {
+        when(docker.status()).thenReturn(new DockerAccess.Status(DockerExpectation.State.NOT_CONFIGURED, true,
+                "TEST_DOCKER_SOCKET", "/home/user/.config/mysuricates/staging.env"));
+
+        Overview overview = service.overview();
+
+        assertThat(overview.docker()).isEqualTo("NOT_CONFIGURED");
+        assertThat(overview.inContainer()).isTrue();
+        assertThat(overview.socketSwitch()).isEqualTo("TEST_DOCKER_SOCKET");
+        assertThat(overview.switchSource()).isEqualTo("/home/user/.config/mysuricates/staging.env");
+    }
+
+    @Test
     void configuredButSilentDockerIsUnavailable() {
-        when(docker.probe()).thenReturn(DockerExpectation.State.DOWN);
-        when(docker.isConfigured()).thenReturn(true);
+        when(docker.status()).thenReturn(onHost(DockerExpectation.State.DOWN));
 
         assertThat(service.overview().docker()).isEqualTo("UNAVAILABLE");
     }

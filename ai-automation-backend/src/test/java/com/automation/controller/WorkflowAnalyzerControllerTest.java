@@ -5,12 +5,17 @@ import com.automation.exception.GlobalExceptionHandler;
 import com.automation.exception.ResourceNotFoundException;
 import com.automation.security.RateLimitConfig;
 import com.automation.service.activitylog.ActivityLogService;
+import com.automation.service.project.DockerAccess;
+import com.automation.service.project.DockerExpectation;
 import com.automation.service.system.ApiKeyService;
 import com.automation.service.workflow.WorkflowService;
 import com.automation.service.workflow.analyzer.AnalyzerFinding;
 import com.automation.service.workflow.analyzer.AnalyzerFinding.Severity;
+import com.automation.service.workflow.analyzer.InstanceFacts;
 import com.automation.service.workflow.analyzer.WorkflowAnalyzer;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
@@ -20,7 +25,11 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import java.util.List;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.contains;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -45,6 +54,13 @@ class WorkflowAnalyzerControllerTest {
     private ApiKeyService apiKeyService;
     @MockitoBean
     private RateLimitConfig rateLimitConfig;
+    @MockitoBean
+    private DockerAccess dockerAccess;
+
+    @BeforeEach
+    void dockerResponds() {
+        when(dockerAccess.status()).thenReturn(new DockerAccess.Status(DockerExpectation.State.UP, false, null, null));
+    }
 
     private static Workflow wf(String id, String name) {
         return Workflow.builder().id(id).name(name).build();
@@ -58,7 +74,7 @@ class WorkflowAnalyzerControllerTest {
     void analyzeLiefertBefundeMitZaehlungJeSchwere() throws Exception {
         Workflow w = wf("wf-1", "Bericht");
         when(workflowService.findByIdEager("wf-1")).thenReturn(w);
-        when(analyzer.analyze(w)).thenReturn(List.of(
+        when(analyzer.analyze(eq(w), any())).thenReturn(List.of(
                 finding("unknown-block-reference", Severity.HIGH),
                 finding("missing-strict-mode", Severity.LOW),
                 finding("dated-model-id", Severity.LOW)));
@@ -80,7 +96,7 @@ class WorkflowAnalyzerControllerTest {
     void analyzeLiefertDetailDeutschUndEnglisch() throws Exception {
         Workflow w = wf("wf-3", "Zweisprachig");
         when(workflowService.findByIdEager("wf-3")).thenReturn(w);
-        when(analyzer.analyze(w)).thenReturn(List.of(new AnalyzerFinding("missing-required-config-key", Severity.HIGH,
+        when(analyzer.analyze(eq(w), any())).thenReturn(List.of(new AnalyzerFinding("missing-required-config-key", Severity.HIGH,
                 0, "b", "Pflichtschlüssel command fehlt", "required key command is missing")));
 
         mockMvc.perform(get("/api/v1/workflows/wf-3/analyze"))
@@ -93,7 +109,7 @@ class WorkflowAnalyzerControllerTest {
     void analyzeOhneBefundeLiefertLeereZaehlung() throws Exception {
         Workflow w = wf("wf-2", "Sauber");
         when(workflowService.findByIdEager("wf-2")).thenReturn(w);
-        when(analyzer.analyze(w)).thenReturn(List.of());
+        when(analyzer.analyze(eq(w), any())).thenReturn(List.of());
 
         mockMvc.perform(get("/api/v1/workflows/wf-2/analyze"))
                 .andExpect(status().isOk())
@@ -116,9 +132,9 @@ class WorkflowAnalyzerControllerTest {
         Workflow wenig = wf("b", "Wenig");
         Workflow viel = wf("c", "Viel");
         when(workflowService.findAll()).thenReturn(List.of(sauber, wenig, viel));
-        when(analyzer.analyze(sauber)).thenReturn(List.of());
-        when(analyzer.analyze(wenig)).thenReturn(List.of(finding("unwired-output", Severity.MEDIUM)));
-        when(analyzer.analyze(viel)).thenReturn(List.of(
+        when(analyzer.analyze(eq(sauber), any())).thenReturn(List.of());
+        when(analyzer.analyze(eq(wenig), any())).thenReturn(List.of(finding("unwired-output", Severity.MEDIUM)));
+        when(analyzer.analyze(eq(viel), any())).thenReturn(List.of(
                 finding("unwired-output", Severity.MEDIUM),
                 finding("absolute-home-path", Severity.HIGH),
                 finding("missing-strict-mode", Severity.LOW)));
@@ -140,8 +156,8 @@ class WorkflowAnalyzerControllerTest {
         Workflow nurLeicht = wf("a", "Leicht");
         Workflow gemischt = wf("b", "Gemischt");
         when(workflowService.findAll()).thenReturn(List.of(nurLeicht, gemischt));
-        when(analyzer.analyze(nurLeicht)).thenReturn(List.of(finding("missing-strict-mode", Severity.LOW)));
-        when(analyzer.analyze(gemischt)).thenReturn(List.of(
+        when(analyzer.analyze(eq(nurLeicht), any())).thenReturn(List.of(finding("missing-strict-mode", Severity.LOW)));
+        when(analyzer.analyze(eq(gemischt), any())).thenReturn(List.of(
                 finding("absolute-home-path", Severity.HIGH),
                 finding("unwired-output", Severity.MEDIUM),
                 finding("dated-model-id", Severity.LOW)));
@@ -164,5 +180,23 @@ class WorkflowAnalyzerControllerTest {
         mockMvc.perform(get("/api/v1/workflows/analyze").param("minSeverity", "KRITISCH"))
                 .andExpect(status().isBadRequest());
         verifyNoInteractions(analyzer);
+    }
+
+    /** TODO 0ad8853b: the live analysis hands the analyzer what this instance can do, with the switch hint. */
+    @Test
+    void analyzeGibtDemAnalyzerDieDockerLageDerInstanzMit() throws Exception {
+        Workflow w = wf("wf-9", "Rechnungseingang");
+        when(workflowService.findByIdEager("wf-9")).thenReturn(w);
+        when(dockerAccess.status()).thenReturn(new DockerAccess.Status(DockerExpectation.State.NOT_CONFIGURED, true,
+                "TEST_DOCKER_SOCKET", "/home/user/.config/mysuricates/staging.env"));
+        when(analyzer.analyze(eq(w), any())).thenReturn(List.of());
+
+        mockMvc.perform(get("/api/v1/workflows/wf-9/analyze")).andExpect(status().isOk());
+
+        ArgumentCaptor<InstanceFacts> facts = ArgumentCaptor.forClass(InstanceFacts.class);
+        verify(analyzer).analyze(eq(w), facts.capture());
+        assertThat(facts.getValue().dockerReachable()).isFalse();
+        assertThat(facts.getValue().dockerHintEn())
+                .contains("TEST_DOCKER_SOCKET=1 in /home/user/.config/mysuricates/staging.env");
     }
 }

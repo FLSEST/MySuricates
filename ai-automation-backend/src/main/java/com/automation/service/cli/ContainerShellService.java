@@ -3,6 +3,7 @@ package com.automation.service.cli;
 import com.automation.entity.ActivityLog.LogCategory;
 import com.automation.service.activitylog.ActivityLogService;
 import com.automation.service.cli.ShellCommandService.ShellResult;
+import com.automation.service.project.DockerAccess;
 import com.automation.util.HostProcessUtils;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -22,6 +23,12 @@ import java.util.Set;
 @Slf4j
 public class ContainerShellService {
 
+    /**
+     * Exit code of a container block refused because Docker is not reachable — 125 like a {@code docker run}
+     * that cannot start its container, so callers treat it the same way.
+     */
+    public static final int NO_DOCKER_EXIT_CODE = 125;
+
     /** Mount paths always rejected regardless of allow-extra-mounts; a segment matches if it
      * equals one of these or starts with "<path>/" (so "/etc/passwd" matches "/etc"). */
     static final Set<String> FORBIDDEN_MOUNT_PATHS = Set.of(
@@ -36,6 +43,7 @@ public class ContainerShellService {
     private final HostProcessUtils hostProcessUtils;
     private final ActivityLogService activityLogService;
     private final ContainerImageAllowlist imageAllowlist;
+    private final DockerAccess dockerAccess;
 
     @Value("${automation.execution.allow-docker-socket-mount:false}")
     private boolean allowDockerSocketMount;
@@ -139,6 +147,14 @@ public class ContainerShellService {
             String msg = "Container image not allowed by automation.execution.allowed-container-images: " + containerImage;
             activityLogService.warn(LogCategory.SECURITY, msg, "ContainerShellService", null);
             return new Admission(new ShellResult(msg, 125, 0), false, List.of());
+        }
+        // Without a reachable daemon, docker run only prints its raw connection error; say why and which
+        // switch would change it instead (TODO 0ad8853b).
+        DockerAccess.Status docker = dockerAccess.status();
+        if (!docker.reachable()) {
+            String msg = "Docker is not reachable from this instance, so no container can start (image: "
+                    + containerImage + "). " + docker.hintEn();
+            return new Admission(new ShellResult(msg, NO_DOCKER_EXIT_CODE, 0), false, List.of());
         }
         boolean effectiveMount = mountDockerSocket && allowDockerSocketMount;
         if (mountDockerSocket && !allowDockerSocketMount) {

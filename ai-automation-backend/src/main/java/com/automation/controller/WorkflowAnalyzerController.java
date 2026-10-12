@@ -1,8 +1,10 @@
 package com.automation.controller;
 
 import com.automation.entity.Workflow;
+import com.automation.service.project.DockerAccess;
 import com.automation.service.workflow.WorkflowService;
 import com.automation.service.workflow.analyzer.AnalyzerFinding;
+import com.automation.service.workflow.analyzer.InstanceFacts;
 import com.automation.service.workflow.analyzer.WorkflowAnalyzer;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -19,7 +21,8 @@ import java.util.Map;
 
 /**
  * Deterministic check of workflow definitions for construction errors — on demand, never blocking
- * (TODO 182bd224). Saving is left untouched: the analyzer reports, it prevents nothing.
+ * (TODO 182bd224). Saving is left untouched: the analyzer reports, it prevents nothing. Both endpoints add
+ * the rules that depend on this instance, e.g. container blocks without a reachable Docker (TODO 0ad8853b).
  */
 @RestController
 @RequestMapping("/api/v1/workflows")
@@ -28,12 +31,13 @@ public class WorkflowAnalyzerController {
 
     private final WorkflowService workflowService;
     private final WorkflowAnalyzer analyzer;
+    private final DockerAccess dockerAccess;
 
     /** Returns the findings of one workflow definition. */
     @GetMapping("/{id}/analyze")
     public ResponseEntity<AnalysisResponse> analyze(@PathVariable String id) {
         Workflow workflow = workflowService.findByIdEager(id);
-        List<AnalyzerFinding> findings = analyzer.analyze(workflow);
+        List<AnalyzerFinding> findings = analyzer.analyze(workflow, instanceFacts());
         return ResponseEntity.ok(new AnalysisResponse(workflow.getId(), workflow.getName(),
                 findings.size(), countBySeverity(findings), findings));
     }
@@ -54,10 +58,11 @@ public class WorkflowAnalyzerController {
         Map<String, Integer> byRule = new LinkedHashMap<>();
         int checked = 0;
         int total = 0;
+        InstanceFacts instance = instanceFacts();
 
         for (Workflow workflow : workflowService.findAll()) {
             checked++;
-            List<AnalyzerFinding> findings = analyzer.analyze(workflow).stream()
+            List<AnalyzerFinding> findings = analyzer.analyze(workflow, instance).stream()
                     .filter(f -> minSeverity == null || f.severity().compareTo(minSeverity) <= 0)
                     .toList();
             if (findings.isEmpty()) continue;
@@ -68,6 +73,12 @@ public class WorkflowAnalyzerController {
         }
         affected.sort((a, b) -> Integer.compare(b.findings(), a.findings()));
         return ResponseEntity.ok(new InventoryResponse(checked, affected.size(), total, byRule, affected));
+    }
+
+    /** One Docker probe per request, not per workflow. */
+    private InstanceFacts instanceFacts() {
+        DockerAccess.Status docker = dockerAccess.status();
+        return new InstanceFacts(docker.reachable(), docker.hint(), docker.hintEn());
     }
 
     private static Map<String, Integer> countBySeverity(List<AnalyzerFinding> findings) {

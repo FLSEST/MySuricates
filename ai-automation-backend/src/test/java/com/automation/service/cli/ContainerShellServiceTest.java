@@ -1,6 +1,8 @@
 package com.automation.service.cli;
 
 import com.automation.service.activitylog.ActivityLogService;
+import com.automation.service.project.DockerAccess;
+import com.automation.service.project.DockerExpectation;
 import com.automation.util.HostProcessUtils;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -21,13 +23,16 @@ class ContainerShellServiceTest {
     @Mock private HostProcessUtils hostProcessUtils;
     @Mock private ActivityLogService activityLogService;
     @Mock private ContainerImageAllowlist imageAllowlist;
+    @Mock private DockerAccess dockerAccess;
 
     private ContainerShellService service;
 
     @BeforeEach
     void setUp() {
         lenient().when(imageAllowlist.isAllowed(anyString())).thenReturn(true);
-        service = new ContainerShellService(hostProcessUtils, activityLogService, imageAllowlist);
+        lenient().when(dockerAccess.status())
+                .thenReturn(new DockerAccess.Status(DockerExpectation.State.UP, false, null, null));
+        service = new ContainerShellService(hostProcessUtils, activityLogService, imageAllowlist, dockerAccess);
         ReflectionTestUtils.setField(service, "allowDockerSocketMount", false);
         ReflectionTestUtils.setField(service, "allowExtraMounts", false);
     }
@@ -42,6 +47,34 @@ class ContainerShellServiceTest {
         // docker run will likely fail in test env, but we verify no exception
         assertThat(result).isNotNull();
         assertThat(result.exitCode()).isNotNull();
+    }
+
+    @Test
+    void execute_withoutReachableDocker_namesTheSwitchAndStartsNoContainer() {
+        when(dockerAccess.status()).thenReturn(new DockerAccess.Status(DockerExpectation.State.NOT_CONFIGURED,
+                true, "TEST_DOCKER_SOCKET", "/home/user/.config/mysuricates/staging.env"));
+
+        ShellCommandService.ShellResult result = service.execute(
+                "echo hi", "/tmp", 10, "alpine:3.20", false);
+
+        assertThat(result.exitCode()).isEqualTo(ContainerShellService.NO_DOCKER_EXIT_CODE);
+        assertThat(result.output())
+                .contains("Docker is not reachable from this instance")
+                .contains("alpine:3.20")
+                .contains("TEST_DOCKER_SOCKET=1 in /home/user/.config/mysuricates/staging.env");
+        verify(hostProcessUtils, never()).getHostUid();
+    }
+
+    @Test
+    void executeTool_withoutReachableDocker_isRefusedAsWell() {
+        when(dockerAccess.status()).thenReturn(new DockerAccess.Status(DockerExpectation.State.DOWN, false, null, null));
+
+        ShellCommandService.ShellResult result = service.executeTool(
+                new ContainerToolRequest("tool:1", List.of("--version"), "/tmp", null, null, List.of(), false, 10), () -> false);
+
+        assertThat(result.exitCode()).isEqualTo(ContainerShellService.NO_DOCKER_EXIT_CODE);
+        assertThat(result.output()).contains("does not respond");
+        verify(hostProcessUtils, never()).getHostUid();
     }
 
     @Test

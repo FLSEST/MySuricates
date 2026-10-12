@@ -157,6 +157,31 @@ erreichbar, damit Health-Prüfung und Oberfläche sie weiter finden. Bei Stable 
 veröffentlichen selbst keinen. Für Fernzugriff besser ein VPN davorsetzen (Tailscale, siehe
 [Container-Weg](#container-weg)), statt den Port zu öffnen.
 
+**Wo Container-Blöcke laufen.** Ob ein Shell-Block mit `container_image` (auch im Werkzeug-Modus,
+in foreach, while, retry und conditional) starten kann, hängt allein daran, ob die Instanz einen
+Docker-Daemon erreicht:
+
+| Instanz | Docker erreichbar | Was es braucht |
+|---|---|---|
+| Direkt auf dem Rechner (Dev aus dem Quellcode, Installer mit „Eine Instanz — auf diesem Rechner“) | ja, sobald Docker läuft | Docker installiert; der Benutzer der Instanz darf es nutzen (Gruppe `docker`) |
+| `scripts/instance.sh`, Stable, Test, Dev-Container | nur mit Schalter | `…DOCKER_SOCKET=1` (Tabelle oben), dann neu starten |
+| Tryout | nie | — der Schnellstart bekommt bewusst keinen Socket |
+
+Die Projektordner sind in den Container-Instanzen unter demselben Pfad eingebunden wie auf dem
+Rechner; mit Socket funktionieren Container-Blöcke dort also wie auf dem Rechner.
+
+**Wie die Instanz es meldet.** Erreicht sie keinen Docker-Daemon, sagt sie das an drei Stellen und
+nennt in einer Container-Instanz den Schalter und die Datei, in der er steht (`MYSURICATES_SWITCH_PREFIX`
+und `MYSURICATES_SWITCH_SOURCE` aus `scripts/lib/host-mounts.sh`; ohne sie erkennt sie den Container an
+`/.dockerenv`):
+
+- **Lauf:** Ein Container-Block scheitert sofort mit Exit-Code 125 und dieser Erklärung, statt mit der
+  rohen Verbindungsmeldung von `docker run` (`ContainerShellService`, TODO 0ad8853b).
+- **Workflow-Seite:** Der Analyzer meldet `container-without-docker` (HIGH) an jedem Block mit
+  `container_image`. Die Regel hängt an der laufenden Instanz, nicht am Text der Definition; die Gates
+  über die ausgelieferten Definitionen prüfen ohne sie.
+- **Menü Container:** Der Hinweis oben nennt die Instanzart und den Schalter zum Kopieren.
+
 **Was ohne Socket fehlt.** Die Instanz meldet Docker dann als „nicht eingerichtet“; Workflows mit
 gewöhnlichen Shell- und KI-Blöcken laufen weiter. Es fehlen:
 

@@ -28,7 +28,8 @@ import java.util.Set;
  * {@link #UNATTENDED_REFUSAL_RULES} with {@code HIGH} — saving and manual starts continue to work.
  *
  * <p><b>What it checks today</b> — seventeen rules, each decidable from the text, one of them from the text plus
- * the definition's metadata, four against the block config schema that the editor also uses:
+ * the definition's metadata, four against the block config schema that the editor also uses — and one that
+ * also needs the running instance, which only the live analysis supplies:
  * <ul>
  *   <li>{@code unknown-block-reference} — reference to a block that does not exist</li>
  *   <li>{@code chain-only-placeholder} — chain variable in a workflow running on its own</li>
@@ -58,6 +59,8 @@ import java.util.Set;
  *       probes); in shell code HIGH, in the AI task MEDIUM for review ({@link SelfAccessRules})</li>
  *   <li>{@code direct-db-access} — block reads the platform database ({@code app_settings},
  *       {@code automation.db} with read access) — HIGH; {@code sqlite3} alone MEDIUM for review</li>
+ *   <li>{@code container-without-docker} — block runs in a container, but this instance reaches no Docker
+ *       daemon — HIGH; only in the live analysis, which passes {@link InstanceFacts} ({@link InstanceRules})</li>
  * </ul>
  *
  * <p><b>What it deliberately does not check.</b> Three rules of the ticket need more than the text and
@@ -106,10 +109,18 @@ public class WorkflowAnalyzer implements PlatformAccessCheck {
 
     /** Findings of a definition, most severe first and within equal severity in block order. */
     public List<AnalyzerFinding> analyze(Workflow workflow) {
+        return analyze(workflow, null);
+    }
+
+    /**
+     * Like {@link #analyze(Workflow)}, plus the rules that depend on the running instance
+     * ({@code container-without-docker}); {@code instance} null leaves them out.
+     */
+    public List<AnalyzerFinding> analyze(Workflow workflow, InstanceFacts instance) {
         if (workflow == null || workflow.getBlocks() == null || workflow.getBlocks().isEmpty()) {
             return List.of();
         }
-        return analyze(workflow.getBlocks(), workflow.getInstructions(), workflow.getMetadata());
+        return analyze(workflow.getBlocks(), workflow.getInstructions(), workflow.getMetadata(), instance);
     }
 
     /** Like {@link #analyze(Workflow)}, but on a loose block list without metadata — so not an audit workflow. */
@@ -123,6 +134,12 @@ public class WorkflowAnalyzer implements PlatformAccessCheck {
      */
     public List<AnalyzerFinding> analyze(List<BlockDefinition> blocks, String instructions,
                                          Map<String, Object> metadata) {
+        return analyze(blocks, instructions, metadata, null);
+    }
+
+    /** Like {@link #analyze(List, String, Map)}, plus the instance rules when {@code instance} is set. */
+    public List<AnalyzerFinding> analyze(List<BlockDefinition> blocks, String instructions,
+                                         Map<String, Object> metadata, InstanceFacts instance) {
         if (blocks == null || blocks.isEmpty()) {
             return List.of();
         }
@@ -135,6 +152,7 @@ public class WorkflowAnalyzer implements PlatformAccessCheck {
         BlockShapeRules.apply(blocks, findings);
         SelfAccessRules.apply(blocks, findings);
         RunTokenRules.apply(blocks, metadata != null ? metadata : Map.of(), findings);
+        InstanceRules.apply(blocks, instance, findings);
         findings.sort((a, b) -> a.severity() != b.severity()
                 ? a.severity().compareTo(b.severity())
                 : Integer.compare(a.blockIndex(), b.blockIndex()));

@@ -19,6 +19,9 @@ beforeEach(() => {
 const overview: ContainerImagesOverview = {
   docker: 'CONNECTED',
   allowlistActive: false,
+  inContainer: false,
+  socketSwitch: null,
+  switchSource: null,
   images: [
     {
       image: 'automation-agent-devops:latest',
@@ -117,6 +120,38 @@ describe('Containers', () => {
     expect(await screen.findByText(/Docker is not set up on this machine/)).toBeInTheDocument();
     expect(screen.getByText(/Only allowed images may run/)).toBeInTheDocument();
     expect(screen.queryByText(/do not match this version/)).not.toBeInTheDocument();
+  });
+
+  it('names the socket switch when the instance itself runs in a container', async () => {
+    server.use(http.get('/api/v1/container-images', () => HttpResponse.json({
+      ...overview,
+      docker: 'NOT_CONFIGURED',
+      inContainer: true,
+      socketSwitch: 'TEST_DOCKER_SOCKET',
+      switchSource: '/home/user/.config/mysuricates/staging.env',
+      images: overview.images.map((image) => ({ ...image, status: 'UNKNOWN', builtAt: null })),
+    })));
+
+    renderWithProviders(<Containers />);
+
+    expect(await screen.findByText(/This instance itself runs in a container, without the Docker socket/)).toBeInTheDocument();
+    expect(screen.getByText('Switch it on in /home/user/.config/mysuricates/staging.env, then restart the instance:'))
+      .toBeInTheDocument();
+    expect(screen.getByText('TEST_DOCKER_SOCKET=1')).toBeInTheDocument();
+    expect(screen.queryByText(/Docker is not set up on this machine/)).not.toBeInTheDocument();
+  });
+
+  it('asks for a restart with the socket when the starter named no switch', async () => {
+    server.use(http.get('/api/v1/container-images', () => HttpResponse.json({
+      ...overview,
+      docker: 'NOT_CONFIGURED',
+      inContainer: true,
+      images: overview.images.map((image) => ({ ...image, status: 'UNKNOWN', builtAt: null })),
+    })));
+
+    renderWithProviders(<Containers />);
+
+    expect(await screen.findByText('To use them, restart the instance with the socket mounted.')).toBeInTheDocument();
   });
 
   it('uses the German purpose and labels in German', async () => {

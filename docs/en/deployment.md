@@ -157,6 +157,31 @@ override file; `docker-compose.stable.yml` and `docker-compose.test.yml` publish
 remote access, put a VPN in front (Tailscale, see [Container path](#container-path)) rather than opening
 the port.
 
+**Where container blocks run.** Whether a shell block with `container_image` (also in tool mode, in
+foreach, while, retry and conditional) can start depends only on whether the instance reaches a Docker
+daemon:
+
+| Instance | Docker reachable | What it takes |
+|---|---|---|
+| Directly on the machine (dev from source, installer with "One instance — on this machine") | yes, once Docker runs | Docker installed; the instance's user may use it (group `docker`) |
+| `scripts/instance.sh`, Stable, Test, dev container | only with the switch | `…DOCKER_SOCKET=1` (table above), then restart |
+| Tryout | never | — the quick start deliberately gets no socket |
+
+In the container instances the project folders are mounted under the same path as on the machine; with
+the socket, container blocks therefore work there as they do on the machine.
+
+**How the instance reports it.** If it reaches no Docker daemon, it says so in three places and, in a
+container instance, names the switch and the file it is set in (`MYSURICATES_SWITCH_PREFIX` and
+`MYSURICATES_SWITCH_SOURCE` from `scripts/lib/host-mounts.sh`; without them it recognises the container by
+`/.dockerenv`):
+
+- **Run:** a container block fails right away with exit code 125 and this explanation, instead of the
+  raw connection message of `docker run` (`ContainerShellService`, TODO 0ad8853b).
+- **Workflow page:** the analyzer reports `container-without-docker` (HIGH) on every block with
+  `container_image`. The rule depends on the running instance, not on the text of the definition; the
+  gates over the shipped definitions check without it.
+- **Containers menu:** the note at the top names the kind of instance and the switch to copy.
+
 **What is missing without the socket.** The instance then reports Docker as "not set up"; workflows
 with ordinary shell and AI blocks keep running. Missing are:
 

@@ -6,6 +6,7 @@ import com.automation.service.containerimage.AgentImageCatalog.AgentImage;
 import com.automation.service.containerimage.ContainerImageInspector.ImageFacts;
 import com.automation.service.containerimage.ContainerImageUsage.WorkflowUse;
 import com.automation.service.project.DockerContainerGateway;
+import com.automation.service.project.DockerAccess;
 import com.automation.service.project.DockerExpectation;
 import com.automation.service.workflow.WorkflowService;
 import lombok.RequiredArgsConstructor;
@@ -50,21 +51,27 @@ public class ContainerImageOverviewService {
                             List<AgentImageCatalog.Tool> tools, Status status, String builtAt, boolean allowed,
                             String buildCommand, List<WorkflowUse> workflows, List<String> projectTypes) {}
 
-    /** {@code docker}: CONNECTED, UNAVAILABLE or NOT_CONFIGURED, as in the system health. */
-    public record Overview(String docker, boolean allowlistActive, List<ImageView> images) {}
+    /**
+     * {@code docker}: CONNECTED, UNAVAILABLE or NOT_CONFIGURED, as in the system health. {@code inContainer},
+     * {@code socketSwitch} and {@code switchSource} let the page say why Docker is missing in an instance that
+     * itself runs in a container and which switch mounts the socket (TODO 0ad8853b); both strings may be null.
+     */
+    public record Overview(String docker, boolean allowlistActive, List<ImageView> images, boolean inContainer,
+                           String socketSwitch, String switchSource) {}
 
     static final String BUILD_SCRIPT = "scripts/build-agent-images.sh";
 
     private final AgentImageCatalog catalog;
     private final ContainerImageInspector inspector;
-    private final DockerExpectation dockerExpectation;
+    private final DockerAccess dockerAccess;
     private final ContainerImageAllowlist allowlist;
     private final WorkflowService workflowService;
 
     public Overview overview() {
         Map<String, List<WorkflowUse>> uses = ContainerImageUsage.scan(workflowService.findAll());
-        boolean dockerUp = dockerExpectation.probe() == DockerExpectation.State.UP;
-        String docker = dockerState(dockerUp);
+        DockerAccess.Status access = dockerAccess.status();
+        boolean dockerUp = access.reachable();
+        String docker = dockerState(access.state());
 
         List<ImageView> images = new ArrayList<>();
         for (AgentImage image : catalog.images()) {
@@ -80,7 +87,8 @@ public class ContainerImageOverviewService {
             images.add(new ImageView(reference, false, Map.of(), null, List.of(), state.status(), state.builtAt(),
                     allowlist.isAllowed(reference), null, workflows, List.of()));
         });
-        return new Overview(docker, !allowlist.getEntries().isEmpty(), images);
+        return new Overview(docker, !allowlist.getEntries().isEmpty(), images, access.inContainer(),
+                access.socketSwitch(), access.switchSource());
     }
 
     private record State(Status status, String builtAt) {}
@@ -104,9 +112,12 @@ public class ContainerImageOverviewService {
         return label.equals(image.dockerfileSha256()) ? Status.CURRENT : Status.OUTDATED;
     }
 
-    private String dockerState(boolean up) {
-        if (up) return "CONNECTED";
-        return dockerExpectation.isConfigured() ? "UNAVAILABLE" : "NOT_CONFIGURED";
+    private static String dockerState(DockerExpectation.State state) {
+        return switch (state) {
+            case UP -> "CONNECTED";
+            case DOWN -> "UNAVAILABLE";
+            case NOT_CONFIGURED -> "NOT_CONFIGURED";
+        };
     }
 
     private static boolean isPlaceholder(String reference) {
