@@ -13,6 +13,12 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.net.InetAddress;
 import java.net.ServerSocket;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static com.automation.service.tray.TrayInstanceMonitor.InstanceKind.DEV;
 import static com.automation.service.tray.TrayInstanceMonitor.InstanceKind.STABLE;
@@ -76,6 +82,45 @@ class TrayInstanceMonitorTest {
             when(docker.containerExists(stagingConfig.getContainerName())).thenReturn(false);
 
             assertThat(monitor.collect()).containsExactly(new TrayInstanceMonitor.InstanceLight(DEV, GREEN));
+        }
+    }
+
+    @Test
+    void collect_doesNotWaitForAProbeOfAnotherCollect() throws Exception {
+        // Ticks run on virtual threads; a monitor held across the probes would pin the carrier for every waiting
+        // tick (Java 21). A second collect must therefore not wait for a probe that hangs in the first one.
+        try (ServerSocket frontend = new ServerSocket(0, 50, InetAddress.getLoopbackAddress())) {
+            trayConfig.setWebUiUrl("http://127.0.0.1:" + frontend.getLocalPort());
+            when(modules.isEnabled(ModuleCatalog.STAGING)).thenReturn(true);
+            CountDownLatch firstProbeEntered = new CountDownLatch(1);
+            CountDownLatch releaseFirstProbe = new CountDownLatch(1);
+            AtomicInteger probes = new AtomicInteger();
+            when(docker.isHealthy(stagingConfig.getTestHealthUrl())).thenAnswer(call -> {
+                if (probes.incrementAndGet() == 1) {
+                    firstProbeEntered.countDown();
+                    releaseFirstProbe.await(10, TimeUnit.SECONDS);
+                }
+                return true;
+            });
+            when(docker.isHealthy(stagingConfig.getHealthUrl())).thenReturn(true);
+
+            ExecutorService first = Executors.newSingleThreadExecutor();
+            try {
+                Future<?> hanging = first.submit(monitor::collect);
+                assertThat(firstProbeEntered.await(5, TimeUnit.SECONDS)).isTrue();
+
+                ExecutorService second = Executors.newSingleThreadExecutor();
+                try {
+                    assertThat(second.submit(monitor::collect).get(2, TimeUnit.SECONDS)).hasSize(3);
+                } finally {
+                    second.shutdownNow();
+                }
+                releaseFirstProbe.countDown();
+                hanging.get(5, TimeUnit.SECONDS);
+            } finally {
+                releaseFirstProbe.countDown();
+                first.shutdownNow();
+            }
         }
     }
 

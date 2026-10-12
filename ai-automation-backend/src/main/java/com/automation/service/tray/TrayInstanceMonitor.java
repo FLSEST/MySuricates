@@ -14,6 +14,7 @@ import java.net.URI;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /** Detects the MySuricates instances that deserve their own tray status light. */
 @Component
@@ -43,9 +44,11 @@ class TrayInstanceMonitor {
     private final ModuleRegistry modules;
     private final DockerContainerManager docker;
 
-    private int consecutiveDevFailures;
+    // Atomic instead of a monitor around collect(): the probes block for seconds, and ticks run on virtual threads,
+    // which a held monitor pins to their carrier on Java 21.
+    private final AtomicInteger consecutiveDevFailures = new AtomicInteger();
 
-    synchronized List<InstanceLight> collect() {
+    List<InstanceLight> collect() {
         List<InstanceLight> lights = new ArrayList<>();
         lights.add(devLight());
         if (modules.isEnabled(ModuleCatalog.STAGING)) {
@@ -59,12 +62,11 @@ class TrayInstanceMonitor {
 
     private InstanceLight devLight() {
         if (endpointPortOpen(trayConfig.getWebUiUrl())) {
-            consecutiveDevFailures = 0;
+            consecutiveDevFailures.set(0);
             return new InstanceLight(InstanceKind.DEV, LightColor.GREEN);
         }
-        consecutiveDevFailures++;
-        return new InstanceLight(InstanceKind.DEV,
-                consecutiveDevFailures < 3 ? LightColor.YELLOW : LightColor.RED);
+        int failures = consecutiveDevFailures.incrementAndGet();
+        return new InstanceLight(InstanceKind.DEV, failures < 3 ? LightColor.YELLOW : LightColor.RED);
     }
 
     private Optional<InstanceLight> optionalLight(InstanceKind kind, String healthUrl, String containerName) {
