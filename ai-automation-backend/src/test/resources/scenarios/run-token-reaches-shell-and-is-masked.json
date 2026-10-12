@@ -1,0 +1,48 @@
+{
+  "id": "run-token-reaches-shell-and-is-masked",
+  "title": "Lauf-Token: der Shell-Block bekommt Token und API-Basis, die Ausgabe zeigt ihn maskiert, ein Sub-Workflow ohne Anforderung bekommt keinen",
+  "derivedFrom": {
+    "spec": "docs/WORKFLOW-GUIDE.md — Lauf-Token: metadata.permissions [\"read\"], MYSURICATES_RUN_TOKEN / MYSURICATES_API, Maskierung, Sub-Workflows erben ihn nicht",
+    "incidents": [
+      "cfb5d56b (Rechtesystem: API-Keys mit Scopes und read-only-Token je Lauf statt eines Admin-Keys)"
+    ]
+  },
+  "workflows": {
+    "kind": {
+      "blocks": [
+        {
+          "type": "shell",
+          "name": "kind_pruefen",
+          "config": {
+            "command": "set -euo pipefail\necho \"kind:${MYSURICATES_RUN_TOKEN:-keiner}\""
+          }
+        }
+      ]
+    }
+  },
+  "workflow": {
+    "metadata": { "permissions": ["read"] },
+    "blocks": [
+      {
+        "type": "shell",
+        "name": "lesen",
+        "config": {
+          "command": "set -euo pipefail\necho \"token:${MYSURICATES_RUN_TOKEN:+gesetzt}\"\necho \"api:${MYSURICATES_API}\"\necho \"wert:${MYSURICATES_RUN_TOKEN}\"\necho \"no_proxy:${no_proxy}\""
+        }
+      },
+      {
+        "type": "sub-workflow",
+        "name": "kind_laufen",
+        "config": { "workflow_id": "@kind" }
+      }
+    ]
+  },
+  "expect": {
+    "runStatus": "COMPLETED",
+    "steps": [
+      { "index": 0, "status": "COMPLETED",
+        "outputContains": ["token:gesetzt", "/api/v1", "wert:***", "localhost,127.0.0.1"] },
+      { "index": 1, "status": "COMPLETED", "outputContains": ["kind:keiner"] }
+    ]
+  }
+}

@@ -16,7 +16,10 @@ Tabelle als „Hinweise“. Die Javadocs sind meist englisch. Request- und Respo
 ## Allgemein
 
 - **Basis-URL:** `http://localhost:9090/api/v1`, Content-Type `application/json`
-- **Authentifizierung:** Header `X-API-Key: <key>` (wenn `automation.security.enabled=true`)
+- **Authentifizierung:** Header `X-API-Key: <key>` (wenn `automation.security.enabled=true`) – der Key
+  darf alles. Eingeschränkt ist nur der Lauf-Token (`X-Run-Token`, gilt nur während eines Laufs, dessen
+  Workflow `metadata.permissions: ["read"]` setzt): nur `GET` auf eine feste Liste, siehe
+  [WORKFLOW-GUIDE → Plattformdaten lesen mit dem Lauf-Token](WORKFLOW-GUIDE.md#plattformdaten-lesen-mit-dem-lauf-token).
 - **Proxy:** Aufrufe mit API-Key per `curl` immer mit `--noproxy '*'` – bei gesetztem `http_proxy`
   schickt curl auch Anfragen an `localhost` über den Proxy, samt Key. Das Doku-Gate
   `doc-facts-check.sh` prüft das an jedem Beispiel in `docs/` und `AGENTS.md`.
@@ -92,6 +95,8 @@ Aus `ErrorCode` (`ai-automation-backend/src/main/java/com/automation/exception/E
 | `UNATTENDED_REQUIRES_SEAL` | 403 | Unattended runs require a sealed workflow |
 | `UNATTENDED_PLATFORM_ACCESS` | 403 | Unattended runs of workflows that access the platform directly are refused |
 | `WEBHOOK_SIGNATURE_INVALID` | 401 | Missing or invalid webhook signature |
+| `RUN_TOKEN_INVALID` | 401 | Unknown or expired run token |
+| `RUN_TOKEN_SCOPE` | 403 | Not readable with a run token |
 | `NO_TASK_TARGET` | 400 | No task export target configured |
 | `PROVIDER_NOT_CONNECTED` | 409 | Integration provider not connected |
 | `PROVIDER_NOT_TASK_CAPABLE` | 400 | Integration provider cannot receive tasks |

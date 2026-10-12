@@ -22,6 +22,8 @@ public enum ErrorCode {
     UNATTENDED_REQUIRES_SEAL(HttpStatus.FORBIDDEN, "Unattended runs require a sealed workflow"),
     UNATTENDED_PLATFORM_ACCESS(HttpStatus.FORBIDDEN, "Unattended runs of workflows that access the platform directly are refused"),
     WEBHOOK_SIGNATURE_INVALID(HttpStatus.UNAUTHORIZED, "Missing or invalid webhook signature"),
+    RUN_TOKEN_INVALID(HttpStatus.UNAUTHORIZED, "Unknown or expired run token"),
+    RUN_TOKEN_SCOPE(HttpStatus.FORBIDDEN, "Not readable with a run token"),
     NO_TASK_TARGET(HttpStatus.BAD_REQUEST, "No task export target configured"),
     PROVIDER_NOT_CONNECTED(HttpStatus.CONFLICT, "Integration provider not connected"),
     PROVIDER_NOT_TASK_CAPABLE(HttpStatus.BAD_REQUEST, "Integration provider cannot receive tasks"),

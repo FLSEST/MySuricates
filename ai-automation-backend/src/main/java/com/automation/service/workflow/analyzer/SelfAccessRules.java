@@ -98,10 +98,12 @@ final class SelfAccessRules {
     private static final List<String> ALWAYS_SHELL_KEYS = List.of("items_command", "run_if");
 
     private static final String ALTERNATIVE = " — Plattformdaten kommen als Kontextvariable (etwa {{ open_todos }},"
-            + " {{ previous_report }}), TODOs über die Blöcke todo-create/todo-update/todo-close,"
+            + " {{ previous_report }}) oder lesend über den Lauf-Token (metadata.permissions: [\"read\"],"
+            + " $MYSURICATES_API mit Header X-Run-Token), TODOs über die Blöcke todo-create/todo-update/todo-close,"
             + " externe Dienste über den Integrations-Block";
     private static final String ALTERNATIVE_EN = " — platform data comes as a context variable (such as {{ open_todos }},"
-            + " {{ previous_report }}), TODOs via the todo-create/todo-update/todo-close blocks,"
+            + " {{ previous_report }}) or read-only through the run token (metadata.permissions: [\"read\"],"
+            + " $MYSURICATES_API with header X-Run-Token), TODOs via the todo-create/todo-update/todo-close blocks,"
             + " external services via the integration block";
 
     static void apply(List<BlockDefinition> blocks, List<AnalyzerFinding> out) {

@@ -34,6 +34,9 @@ class RateLimitFilterTest {
     private ApiKeyService apiKeyService;
 
     @Mock
+    private RunTokenService runTokenService;
+
+    @Mock
     private HttpServletRequest request;
 
     @Mock
@@ -45,7 +48,7 @@ class RateLimitFilterTest {
     @BeforeEach
     void setUp() {
         rateLimitConfig = new RateLimitConfig();
-        filter = new RateLimitFilter(rateLimitConfig, clientIpResolver, apiKeyService);
+        filter = new RateLimitFilter(rateLimitConfig, clientIpResolver, apiKeyService, runTokenService);
     }
 
     @Test
@@ -119,6 +122,49 @@ class RateLimitFilterTest {
         writer.flush();
         // The same value in the body — header and JSON must not diverge.
         assertThat(stringWriter.toString()).contains("\"retryAfterSeconds\": " + seconds);
+    }
+
+    @Test
+    void runToken_hasItsOwnBucket_notTheSharedLocalhostOne() throws Exception {
+        // A run token comes from 127.0.0.1 like the UI and local agents; a busy run must not use up their bucket
+        rateLimitConfig.setEnabled(true);
+        rateLimitConfig.setRequestsPerMinute(1);
+        when(request.getHeader("X-Run-Token")).thenReturn("tok-a");
+        when(runTokenService.resolve("tok-a")).thenReturn(java.util.Optional.of("run-1"));
+        when(response.getWriter()).thenReturn(new PrintWriter(new StringWriter()));
+
+        filter.doFilterInternal(request, response, filterChain);
+        filter.doFilterInternal(request, response, filterChain);
+
+        HttpServletRequest local = mock(HttpServletRequest.class);
+        HttpServletResponse localResponse = mock(HttpServletResponse.class);
+        when(clientIpResolver.resolve(local)).thenReturn("127.0.0.1");
+        filter.doFilterInternal(local, localResponse, filterChain);
+
+        verify(response).setStatus(429);                 // the run's second request
+        verify(localResponse, never()).setStatus(429);   // the UI's first one still passes
+        verify(clientIpResolver, never()).resolve(request);
+        assertThat(RateLimitFilter.clientKey("tok-a")).isNotEqualTo(RateLimitFilter.clientKey("tok-b"))
+                .doesNotContain("tok-a");
+    }
+
+    @Test
+    void invalidRunTokens_doNotEscapeThePerIpLimit() throws Exception {
+        // A fresh random X-Run-Token per request must not buy a fresh bucket each time (review of cfb5d56b):
+        // otherwise API-key guessing with an invalid token alongside would never hit the limit
+        rateLimitConfig.setEnabled(true);
+        rateLimitConfig.setRequestsPerMinute(2);
+        when(clientIpResolver.resolve(request)).thenReturn("203.0.113.7");
+        when(response.getWriter()).thenReturn(new PrintWriter(new StringWriter()));
+        AtomicInteger n = new AtomicInteger();
+        when(request.getHeader("X-Run-Token")).thenAnswer(inv -> "random-" + n.incrementAndGet());
+        when(runTokenService.resolve(org.mockito.ArgumentMatchers.anyString())).thenReturn(java.util.Optional.empty());
+
+        filter.doFilterInternal(request, response, filterChain);
+        filter.doFilterInternal(request, response, filterChain);
+        filter.doFilterInternal(request, response, filterChain);
+
+        verify(response).setStatus(429);
     }
 
     @Test

@@ -2,6 +2,7 @@ package com.automation.service.workflow;
 
 import com.automation.entity.RunStatus;
 import com.automation.entity.StepResult;
+import com.automation.util.RunAccess;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
@@ -57,7 +58,7 @@ public class ExecutionBroadcaster {
 
     public void broadcastLogMessage(String runId, String type, Map<String, Object> data) {
         try {
-            Map<String, Object> msg = new HashMap<>(data);
+            Map<String, Object> msg = new HashMap<>(RunAccess.maskValues(data));   // foreach item outputs
             msg.put("type", type);
             msg.put("runId", runId);
             msg.put("timestamp", Instant.now().toString());

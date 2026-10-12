@@ -1,10 +1,13 @@
 package com.automation.security;
 
+import com.automation.entity.ActivityLog.LogCategory;
 import com.automation.service.activitylog.ActivityLogService;
 import com.automation.service.system.ApiKeyService;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.http.HttpServletResponse;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -12,10 +15,17 @@ import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.mock.web.MockHttpServletRequest;
+import org.springframework.mock.web.MockHttpServletResponse;
+import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.test.util.ReflectionTestUtils;
 
+import java.util.Optional;
+
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.contains;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -38,9 +48,12 @@ class ApiKeyAuthFilterTest {
     @Mock
     private FilterChain filterChain;
 
+    @Mock
+    private RunTokenService runTokenService;
+
     @BeforeEach
     void setUp() {
-        filter = new ApiKeyAuthFilter(apiKeyService, activityLogService);
+        filter = new ApiKeyAuthFilter(apiKeyService, activityLogService, runTokenService);
         request = new MockHttpServletRequest("GET", "/");
         SecurityContextHolder.clearContext();
     }
@@ -258,5 +271,94 @@ class ApiKeyAuthFilterTest {
         filter.doFilterInternal(request, response, filterChain);
 
         verify(activityLogService, never()).warn(any(), anyString(), anyString(), any());
+    }
+
+    @Nested
+    @DisplayName("run token (X-Run-Token)")
+    class RunToken {
+
+        private final MockHttpServletResponse servletResponse = new MockHttpServletResponse();
+
+        @BeforeEach
+        void keyIsSet() {
+            ReflectionTestUtils.setField(filter, "securityEnabled", true);
+            when(apiKeyService.getEffectiveApiKey()).thenReturn("my-secret-key");
+        }
+
+        private MockHttpServletRequest tokenRequest(String method, String path) {
+            MockHttpServletRequest r = new MockHttpServletRequest(method, path);
+            r.setServletPath(path);
+            r.addHeader("X-Run-Token", "tok-1");
+            return r;
+        }
+
+        @Test
+        @DisplayName("an allowlisted GET passes as the run, with the run-token role only")
+        void allowlistedGetPasses() throws Exception {
+            when(runTokenService.resolve("tok-1")).thenReturn(Optional.of("run-1"));
+            MockHttpServletRequest r = tokenRequest("GET", "/api/v1/todos");
+
+            filter.doFilterInternal(r, servletResponse, filterChain);
+
+            var auth = SecurityContextHolder.getContext().getAuthentication();
+            assertThat(auth.getPrincipal()).isEqualTo("run:run-1");
+            assertThat(auth.getAuthorities()).extracting(GrantedAuthority::getAuthority).containsExactly("ROLE_RUN_TOKEN");
+            verify(filterChain).doFilter(r, servletResponse);
+            verify(runTokenService).recordRead("tok-1", "/api/v1/todos");
+            verifyNoInteractions(activityLogService);
+        }
+
+        @Test
+        @DisplayName("a write is refused with 403 RUN_TOKEN_SCOPE and logged")
+        void writeIsRefused() throws Exception {
+            when(runTokenService.resolve("tok-1")).thenReturn(Optional.of("run-1"));
+
+            filter.doFilterInternal(tokenRequest("POST", "/api/v1/todos"), servletResponse, filterChain);
+
+            assertThat(servletResponse.getStatus()).isEqualTo(403);
+            assertThat(servletResponse.getContentAsString()).contains("RUN_TOKEN_SCOPE");
+            verify(filterChain, never()).doFilter(any(), any());
+            verify(activityLogService).warn(eq(LogCategory.SECURITY), contains("POST /api/v1/todos"),
+                    eq("ApiKeyAuthFilter"), eq("run-1"));
+            assertThat(SecurityContextHolder.getContext().getAuthentication()).isNull();
+        }
+
+        @Test
+        @DisplayName("a GET outside the allowlist is refused as well")
+        void otherGetIsRefused() throws Exception {
+            when(runTokenService.resolve("tok-1")).thenReturn(Optional.of("run-1"));
+
+            filter.doFilterInternal(tokenRequest("GET", "/api/v1/system/settings"), servletResponse, filterChain);
+
+            assertThat(servletResponse.getStatus()).isEqualTo(403);
+            verify(filterChain, never()).doFilter(any(), any());
+        }
+
+        @Test
+        @DisplayName("an unknown or revoked token gets 401 RUN_TOKEN_INVALID")
+        void unknownTokenIsRejected() throws Exception {
+            when(runTokenService.resolve("tok-1")).thenReturn(Optional.empty());
+
+            filter.doFilterInternal(tokenRequest("GET", "/api/v1/todos"), servletResponse, filterChain);
+
+            assertThat(servletResponse.getStatus()).isEqualTo(401);
+            assertThat(servletResponse.getContentAsString()).contains("RUN_TOKEN_INVALID");
+            verify(filterChain, never()).doFilter(any(), any());
+            verify(activityLogService).warn(eq(LogCategory.SECURITY), contains("run token"), eq("ApiKeyAuthFilter"), eq(null));
+        }
+
+        @Test
+        @DisplayName("a valid API key wins over a run token")
+        void apiKeyWins() throws Exception {
+            MockHttpServletRequest r = tokenRequest("POST", "/api/v1/todos");
+            r.addHeader("X-API-Key", "my-secret-key");
+            when(apiKeyService.matchesEffectiveApiKey("my-secret-key")).thenReturn(true);
+
+            filter.doFilterInternal(r, servletResponse, filterChain);
+
+            assertThat(SecurityContextHolder.getContext().getAuthentication().getPrincipal()).isEqualTo("api-key-user");
+            verify(filterChain).doFilter(r, servletResponse);
+            verifyNoInteractions(runTokenService);
+        }
     }
 }

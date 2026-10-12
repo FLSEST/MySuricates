@@ -58,12 +58,16 @@ public final class ChildProcessEnv {
     /**
      * For AI CLIs and shell blocks, after the working directory is set: strips the backend's secrets, then
      * turns the command into a container start when {@linkplain UnattendedContainer#active() that mode
-     * applies} — the working directory and {@code writable} mounted under their own paths — or else puts the
+     * applies} — the working directory and {@code writable} mounted under their own paths — or else adds the
+     * {@linkplain RunAccess run token} of the run on this thread and puts the
      * {@linkplain ProcessSandbox process sandbox} in front of it when that is active.
      */
     public static void isolate(ProcessBuilder pb, Path... writable) {
         scrub(pb.environment());
         if (!UnattendedContainer.apply(pb, List.of(writable))) {
+            // The run token reaches host processes only: in a container the backend on 127.0.0.1 is out of
+            // reach anyway, and the variables set here would only go to the docker client (TODO cfb5d56b).
+            RunAccess.addTo(pb.environment());
             ProcessSandbox.apply(pb);
         }
     }
@@ -84,5 +88,8 @@ public final class ChildProcessEnv {
 
     static void scrub(Map<String, String> environment) {
         BACKEND_SECRETS.forEach(environment::remove);
+        // A token inherited by the backend itself (started from inside a run) belongs to that other run
+        environment.remove(RunAccess.TOKEN_ENV);
+        environment.remove(RunAccess.API_ENV);
     }
 }

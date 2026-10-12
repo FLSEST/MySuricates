@@ -15,7 +15,7 @@ class ErrorCodeTest {
 
     @Test
     void should_containAllExpectedValues_when_enumValuesQueried() {
-        assertThat(ErrorCode.values()).hasSize(27)
+        assertThat(ErrorCode.values()).hasSize(29)
                 .containsExactly(
                         ErrorCode.RESOURCE_NOT_FOUND,
                         ErrorCode.MODULE_DISABLED,
@@ -33,6 +33,8 @@ class ErrorCodeTest {
                         ErrorCode.UNATTENDED_REQUIRES_SEAL,
                         ErrorCode.UNATTENDED_PLATFORM_ACCESS,
                         ErrorCode.WEBHOOK_SIGNATURE_INVALID,
+                        ErrorCode.RUN_TOKEN_INVALID,
+                        ErrorCode.RUN_TOKEN_SCOPE,
                         ErrorCode.NO_TASK_TARGET,
                         ErrorCode.PROVIDER_NOT_CONNECTED,
                         ErrorCode.PROVIDER_NOT_TASK_CAPABLE,
@@ -115,6 +117,8 @@ class ErrorCodeTest {
                 Arguments.of(ErrorCode.UNATTENDED_PLATFORM_ACCESS, HttpStatus.FORBIDDEN,
                         "Unattended runs of workflows that access the platform directly are refused"),
                 Arguments.of(ErrorCode.WEBHOOK_SIGNATURE_INVALID, HttpStatus.UNAUTHORIZED, "Missing or invalid webhook signature"),
+                Arguments.of(ErrorCode.RUN_TOKEN_INVALID, HttpStatus.UNAUTHORIZED, "Unknown or expired run token"),
+                Arguments.of(ErrorCode.RUN_TOKEN_SCOPE, HttpStatus.FORBIDDEN, "Not readable with a run token"),
                 Arguments.of(ErrorCode.NO_TASK_TARGET, HttpStatus.BAD_REQUEST, "No task export target configured"),
                 Arguments.of(ErrorCode.PROVIDER_NOT_CONNECTED, HttpStatus.CONFLICT, "Integration provider not connected"),
                 Arguments.of(ErrorCode.PROVIDER_NOT_TASK_CAPABLE, HttpStatus.BAD_REQUEST, "Integration provider cannot receive tasks"),

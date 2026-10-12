@@ -77,7 +77,7 @@ MySuricates supports 20 block types. Each block has a `type` and a `config` map.
 
 **Checked at save time.** Unknown block types are refused (HTTP 400; the message names the type and the allowed ones), checked against the executor registry (`BlockTypeRegistry`), recursively in `switch` `cases[].blocks` and `default` as well. A missing or empty `type` counts as unknown. This holds for every write path (UI, REST API, import, pool installation, seeder, factory) and for restoring an old version too: a definition that can no longer run does not come back.
 
-**Editor and analyzer.** The config field of the block editor suggests keys and values (Ctrl+Space, a second time shows the explanation) and marks unknown keys, wrong values and missing required fields in yellow; saving stays possible. The analyzer uses the same source, `blockConfigSchema.json`; the workflow page shows its findings below the header: `unknown-config-key`, `missing-required-config-key`, `invalid-config-value`, `legacy-config-key` (LOW, an old key name such as `workflowId`), `dead-nested-blocks` (HIGH: no type runs a `config.blocks` list) and `unknown-block-field` (HIGH when a config key sits next to `config` instead of inside it – such fields are stored, not dropped). Plus access to the platform itself: `self-api-call` (shell code calls the instance's REST API or reads its key file; the key-free probes excepted) and `direct-db-access`. A `HIGH` finding of these two blocks unattended starts (`403 UNATTENDED_PLATFORM_ACCESS`, a SECURITY entry, no run); started by hand the workflow still runs ([architektur.md](architektur.md) → Workflow hardening). Instead: context variables such as `{{ open_todos }}`, the `todo-*` blocks and, for other services, the `integration` block. Workflows an AI creates go through the same check right after creation. Whoever teaches an executor a new config key adds it to `blockConfigSchema.json` (`ExecutorConfigKeyDriftTest`).
+**Editor and analyzer.** The config field of the block editor suggests keys and values (Ctrl+Space, a second time shows the explanation) and marks unknown keys, wrong values and missing required fields in yellow; saving stays possible. The analyzer uses the same source, `blockConfigSchema.json`; the workflow page shows its findings below the header: `unknown-config-key`, `missing-required-config-key`, `invalid-config-value`, `legacy-config-key` (LOW, an old key name such as `workflowId`), `dead-nested-blocks` (HIGH: no type runs a `config.blocks` list) and `unknown-block-field` (HIGH when a config key sits next to `config` instead of inside it – such fields are stored, not dropped). Plus access to the platform itself: `self-api-call` (shell code calls the instance's REST API or reads its key file; the key-free probes and calls through `$MYSURICATES_API` with the [run token](#read-platform-data-with-the-run-token) excepted) and `direct-db-access`. A `HIGH` finding of these two blocks unattended starts (`403 UNATTENDED_PLATFORM_ACCESS`, a SECURITY entry, no run); started by hand the workflow still runs ([architektur.md](architektur.md) → Workflow hardening). Instead: context variables such as `{{ open_todos }}`, the `todo-*` blocks and, for other services, the `integration` block. Workflows an AI creates go through the same check right after creation. Whoever teaches an executor a new config key adds it to `blockConfigSchema.json` (`ExecutorConfigKeyDriftTest`).
 
 ### Fields on a block
 
@@ -1274,6 +1274,7 @@ If the provider is not connected or the API fails, the block is marked as `FAILE
 - **Don't use `container_image` for simple blocks** — simple blocks always use the host Claude CLI
 - **Don't forget to set `model` explicitly** — null uses the system default which may not be desired
 - **Don't use shell blocks for AI reasoning** — use simple blocks instead (shell blocks only execute commands)
+- **Never read the API key in a workflow** — for read access to platform data ask for the [run token](#read-platform-data-with-the-run-token) (`metadata.permissions: ["read"]`)
 - **Don't chain more than 5-7 blocks** without good reason — each block adds latency and cost
 - **Don't skip the verification step** after agentic blocks — trust but verify
 
@@ -1411,6 +1412,45 @@ In the UI: workflow detail page → "Resume automatically after a restart". The 
 **Global** — Settings → Execution: "Resume interrupted runs automatically" (`run-auto-resume-enabled`, default on) and "Wait before each resume" (`run-auto-resume-delay-seconds`, default 30 s, 0–3600). Runs are resumed one after another with this wait, also before the first. Startup values: `automation.execution.auto-resume.enabled` / `.delay-seconds`.
 
 **Together with a schedule** — If the workflow has a schedule with conflict behaviour `SKIP` (the default), the resume wins: while an automatic resume of the workflow is pending or running, a due occurrence is dropped — a catch-up run (`catchUpOnResume`) after a restart or standby as well. The activity log notes "Schedule skipped (interrupted run is being resumed automatically)" with `reason: auto-resume-pending`. With `OVERLAP` the occurrence starts next to it as usual (TODO 070ccc3d).
+
+## Read platform data with the run token
+
+Most platform data reaches a run as a context variable (`{{ open_todos }}`, `{{ previous_report }}` …, see [template variables](#3-template-variables)). When a step needs more – such as an overview of the workflows, the latest runs or learning figures –, the workflow asks for a **run token** (TODO cfb5d56b):
+
+```json
+{ "metadata": { "permissions": ["read"] } }
+```
+
+Then every shell block and every AI CLI of that run gets two environment variables:
+
+| Variable | Content |
+|---|---|
+| `MYSURICATES_RUN_TOKEN` | random token, valid only while this run is running |
+| `MYSURICATES_API` | base of the API, ending in `/api/v1` (such as `http://127.0.0.1:9090/api/v1`) – always the port the backend itself listens on, in a container too |
+
+```bash
+set -euo pipefail
+curl -s --noproxy '*' -H "X-Run-Token: $MYSURICATES_RUN_TOKEN" "$MYSURICATES_API/workflows"
+```
+
+**What it may do** – only `GET` on a fixed list (`security/RunTokenPaths`): workflows (list, single, their runs), runs (`/executions`, single), TODOs (list, single, `count`, `overview`), projects (list, single, their workflows), skills, goals (with work packages and milestones), audits (list, per key, reports, findings) and learning (dashboard, platform figures, per workflow figures, suggestions and execution insights, per run insights). Everything else gets `403 RUN_TOKEN_SCOPE`, an unknown or expired token `401 RUN_TOKEN_INVALID`; both are written as a `SECURITY` entry to the activity log. Writing never goes through the token: TODOs through the `todo-create`/`todo-update`/`todo-close` blocks, definitions only with the key – otherwise a step could bypass seal and hardening.
+
+**What it sees** – Whatever is on the list is readable, beyond its own run too: inputs and outputs of other runs, block configs of other workflows, project settings. None of these endpoints returns the API key, integration credentials or webhook secrets; what someone wrote into a definition or an input themselves, they do. Exports, versions, the live log and the open questions of other runs as well as the settings stay with the key. If a workflow feeds foreign input (a webhook payload, mails, web pages) to an AI step, a manipulated text can make that step read everything on the list and write it into its output – give such workflows the read permission only when they really need it.
+
+**Lifetime** – The token is created when the run starts (on a resume too, then a new one) and ends with the run, before its completion listeners run; after a backend restart no old token exists. It lives in memory only, never in the database. If its value shows up in a step output, the live log or a message, the platform replaces it with `***` before storing and sending. At the end the run writes how often it read (`SECURITY`, such as "Run token: 3 read(s) (todos 2, workflows 1), revoked at run end").
+
+**Not inherited** – Sub-workflows and `foreach` child runs do not get the parent run's token; they ask for their own with their own `permissions`. The token is no run variable, so it never ends up in the stored input of a child run either.
+
+**Limits**
+
+- **Container mode:** With `automation.hardening.unattended-in-container` unattended steps run in a container; the backend listens on the host's `127.0.0.1` and is out of reach from there, the token does not go into the container. With `unattended-sandbox` (Landlock) it works as usual.
+- **Codex** does not pass environment variables with `TOKEN` in their name on to its tools, and its sandbox mode blocks the network – the token does not work in Codex blocks; shell blocks, Claude and Pi get it.
+- **Proxy:** The run sets `no_proxy` for `localhost`, `127.0.0.1` and `::1`, so the token never goes through a proxy; `--noproxy '*'` does no harm anyway.
+- **Rate limit:** Requests with a token count per run, not in the shared `127.0.0.1` bucket of the UI and local agents.
+
+**Switching it off** – Module `run-tokens` (tier `standard`, on by default): `automation.modules.run-tokens: false` issues no more tokens. Only switchable in the startup configuration, not at runtime even with `ui-editable` – a leaked key must not be able to switch on additional access.
+
+**Analyzer** – `run-token-not-requested` (MEDIUM): a block uses `$MYSURICATES_RUN_TOKEN`, `$MYSURICATES_API` or `X-Run-Token`, but the workflow does not ask for the token; the run would get none and the call would fail with 401. A call through `$MYSURICATES_API/<path>` does not count as `self-api-call`; reading the key from the key file stays `self-api-call` (HIGH).
 
 ## Auto-Repair
 

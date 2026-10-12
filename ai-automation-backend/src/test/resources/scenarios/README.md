@@ -60,6 +60,7 @@ Die ersten zehn Zeilen sind die Startmenge aus fdf79a86, die übrigen stammen au
 | 21 | `todo_details` filtert (Ausschluss-Tag, Status-Liste) und liefert Beschreibungen; `todo-update` mit `updates` schreibt nur, wo `require_status` passt; `run_if` überspringt einen KI-Block ohne Aufruf (cc0eb3ba) | `todo-details-drive-bulk-update` |
 | 22 | foreach hört nach drei fehlgeschlagenen Items in Folge auf (`max_consecutive_failures`, Standard 3), auch mit `continue_on_error`; die Lauf-Fehlermeldung nennt den Grund zuerst (a6659a46) | `foreach-stops-after-consecutive-failures` |
 | 23 | foreach mit `workflow_id` startet je Eintrag einen Kind-Lauf: die ID kommt aus einer Kontextvariable, Item-Felder (`{{ current_feature.id }}`), Index und `context`-Zuordnung kommen im Kind an, dessen Marker zählen nur dort (a5c9fbbf) | `foreach-sub-workflow-per-item` |
+| 24 | Lauf-Token: ein Workflow mit `metadata.permissions: ["read"]` gibt seinen Shell-Schritten `MYSURICATES_RUN_TOKEN`, `MYSURICATES_API` (endet auf `/api/v1`) und `no_proxy` für die lokalen Hosts mit; der Token-Wert steht in der gespeicherten Ausgabe nur als `***`; ein Sub-Workflow ohne Anforderung bekommt keinen (cfb5d56b) | `run-token-reaches-shell-and-is-masked` |
 
 ### Aus der Historie, noch ohne Szenario
 

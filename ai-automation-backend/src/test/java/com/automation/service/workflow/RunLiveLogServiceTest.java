@@ -369,4 +369,18 @@ class RunLiveLogServiceTest {
         assertThat(firstSeqPerBatch).isSorted().doesNotHaveDuplicates();
         verify(template, never()).convertAndSend(eq("/topic/executions/other/logs"), any(Object.class));
     }
+
+    @Test
+    void appendMasksALiveRunToken_beforeTruncating() {
+        // TODO cfb5d56b; masking first, so a cut line never shows the start of a token
+        com.automation.util.RunAccess.register("tok-live-456");
+        try {
+            config.setMaxLineLength(12);
+            service.sinkFor(RUN, 1, null).emit(LiveLineKind.LINE, "tok-live-456 rest");
+
+            assertThat(service.snapshot(RUN, -1).lines()).extracting(LiveLine::text).containsExactly("*** rest");
+        } finally {
+            com.automation.util.RunAccess.unregister("tok-live-456");
+        }
+    }
 }

@@ -7,6 +7,10 @@
     "name": "Goals",
     "description": "Goals with projects, work packages and milestones, TODO planning (size, effort, question/decision), workflows on a goal and the goal guard. Off: goal pages and planning disappear, the data is kept."
   },
+  "run-tokens": {
+    "name": "Run tokens",
+    "description": "A workflow that asks for it (metadata.permissions: [\"read\"]) gets a read-only token for the duration of its run (MYSURICATES_RUN_TOKEN) and may read the allowlisted overview: workflows, runs, TODOs, projects, skills, goals, audits, learning. Only switchable in the startup configuration."
+  },
   "chains": {
     "name": "Chains",
     "description": "Chains several workflows into a pipeline that runs one after another."

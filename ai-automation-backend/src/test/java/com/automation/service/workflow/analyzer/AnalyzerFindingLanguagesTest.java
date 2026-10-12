@@ -88,6 +88,10 @@ class AnalyzerFindingLanguagesTest {
                 block("shell", "settings", Map.of("command", "set -euo pipefail\necho app_settings")),
                 block("shell", "db", Map.of("command", "set -euo pipefail\nsqlite3 data/automation.db 'SELECT 1'")),
                 block("shell", "lite", Map.of("command", "set -euo pipefail\nsqlite3 project.db .dump"))), null));
+        // Run token used but not requested: run-token-not-requested
+        out.addAll(analyzer.analyze(List.of(
+                block("shell", "reader", Map.of("command", "set -euo pipefail\ncurl -s -H \"X-Run-Token: $MYSURICATES_RUN_TOKEN\""
+                        + " \"$MYSURICATES_API/todos\""))), null));
         // Shape: dead-nested-blocks, unknown-block-field (config key, near spelling, otherwise; nested)
         BlockDefinition loose = block("shell", "loose", Map.of("command", "set -euo pipefail\nls"));
         loose.putUnknownField("on_failure", "continue");

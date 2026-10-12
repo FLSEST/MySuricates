@@ -2,6 +2,7 @@ package com.automation.config;
 
 import com.automation.security.ApiKeyAuthFilter;
 import com.automation.security.PublicPaths;
+import com.automation.security.RunTokenPaths;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -26,10 +27,13 @@ public class SecurityConfig {
                 .sessionManagement(session -> session
                         .sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 // Which paths are reachable without a key is defined solely in PublicPaths — the
-                // ApiKeyAuthFilter reads the same matchers to log missing keys.
+                // ApiKeyAuthFilter reads the same matchers to log missing keys. A run token (role
+                // RUN_TOKEN, TODO cfb5d56b) reaches only the GET allowlist of RunTokenPaths; everything
+                // else behind the key needs the API key's role, not merely some authentication.
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(PublicPaths.publicMatchers()).permitAll()
-                        .requestMatchers(PublicPaths.keyRequiredMatchers()).authenticated()
+                        .requestMatchers(RunTokenPaths.matchers()).hasAnyRole("API_USER", "RUN_TOKEN")
+                        .requestMatchers(PublicPaths.keyRequiredMatchers()).hasRole("API_USER")
                         // ausgeliefertes Frontend
                         .anyRequest().permitAll()
                 )

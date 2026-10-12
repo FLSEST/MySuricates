@@ -1,6 +1,8 @@
 package com.automation.config;
 
 import com.automation.security.PublicPaths;
+import com.automation.security.RunTokenService;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -15,10 +17,12 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.not;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
@@ -39,6 +43,59 @@ class SecurityConfigIntegrationTest {
 
     @Autowired
     private MockMvc mockMvc;
+
+    @Autowired
+    private RunTokenService runTokenService;
+
+    // --- Run token (TODO cfb5d56b): the whole chain, filter and authorization rule together ---
+
+    private String issueRunToken(String runId) {
+        return runTokenService.issue(runId, Map.of("permissions", List.of("read"))).orElseThrow();
+    }
+
+    @Test
+    @DisplayName("run token reads the allowlisted overview")
+    void runToken_readsAllowlistedOverview() throws Exception {
+        String token = issueRunToken("run-sec-1");
+        try {
+            mockMvc.perform(get("/api/v1/todos").header("X-Run-Token", token)).andExpect(status().isOk());
+            mockMvc.perform(get("/api/v1/workflows").header("X-Run-Token", token)).andExpect(status().isOk());
+        } finally {
+            runTokenService.revoke("run-sec-1", null);
+        }
+    }
+
+    @Test
+    @DisplayName("run token cannot write, cannot read beyond the list, and stops working when revoked")
+    void runToken_refusedOutsideTheAllowlistAndAfterRevoke() throws Exception {
+        String token = issueRunToken("run-sec-2");
+        mockMvc.perform(post("/api/v1/todos").header("X-Run-Token", token)
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"title\":\"x\"}"))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("RUN_TOKEN_SCOPE"));
+        mockMvc.perform(delete("/api/v1/workflows/0bf5eed4-cfd8-4c1c-861c-1d30b149c1dc").header("X-Run-Token", token))
+                .andExpect(status().isForbidden());
+        String id = "0bf5eed4-cfd8-4c1c-861c-1d30b149c1dc";
+        for (String path : List.of("/api/v1/executions/pending-input", "/api/v1/workflows/analyze",
+                "/api/v1/workflows/" + id + "/export/bpmn", "/api/v1/executions/" + id + "/live-log",
+                "/api/v1/workflows/" + id + "/versions", "/api/v1/projects/" + id + "/export",
+                "/api/v1/integrations", "/actuator/metrics", "/api/v1/workflows/")) {
+            mockMvc.perform(get(path).header("X-Run-Token", token)).andExpect(status().isForbidden());
+        }
+
+        runTokenService.revoke("run-sec-2", null);
+
+        mockMvc.perform(get("/api/v1/todos").header("X-Run-Token", token))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("RUN_TOKEN_INVALID"));
+    }
+
+    @Test
+    @DisplayName("the API key still reaches everything behind it")
+    void apiKey_stillReachesNonAllowlistedPaths() throws Exception {
+        mockMvc.perform(get("/api/v1/executions/pending-input").header(API_KEY_HEADER, VALID_API_KEY))
+                .andExpect(status().isOk());
+    }
 
     // --- Group 1: Public endpoints accessible without auth ---
 

@@ -36,6 +36,12 @@ public enum ModuleCatalog {
     GOALS("goals", STANDARD, STABLE, true, Set.of(), List.of(),
             "Goals: projects, work packages, milestones, TODO planning (size, effort, question/decision), "
                     + "goal workflows and the goal guard."),
+    RUN_TOKENS("run-tokens", STANDARD, EXPERIMENTAL, true, Set.of(), List.of(),
+            "Run tokens: a workflow that asks for it (metadata.permissions: [\"read\"]) gets a read-only token for "
+                    + "the duration of its run (MYSURICATES_RUN_TOKEN) and may read the allowlisted overview (workflows, "
+                    + "runs, TODOs, projects, skills, goals, audits, learning insights). Only switchable in the "
+                    + "startup configuration.",
+            StartupOnly.YES),
 
     // ── Research ─────────────────────────────────────────────────────────────
     CHAINS("chains", RESEARCH, STABLE, false, Set.of(), List.of(),

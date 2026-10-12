@@ -729,6 +729,13 @@ These endpoints do not extend that, they are more convenient routes to things a 
 anyway. A database backup does, however, contain every run, output and setting of the instance and
 is as confidential as the key itself.
 
+The key may do everything; there is exactly one restricted credential: the **run token**. A workflow
+with `metadata.permissions: ["read"]` gets a token for the duration of its run
+(`MYSURICATES_RUN_TOKEN`) that may only `GET` a fixed list — workflows, runs, TODOs, projects, skills,
+goals, audits, learning — and ends with the run. So no workflow needs the key to read platform data.
+Whatever is on the list is readable beyond its own run too (inputs and outputs of other runs).
+Details: [WORKFLOW-GUIDE → Read platform data with the run token](WORKFLOW-GUIDE.md#read-platform-data-with-the-run-token).
+
 ### Webhooks
 
 The trigger endpoint is guarded by a token in the path (32 random bytes from `SecureRandom`).

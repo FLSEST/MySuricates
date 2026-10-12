@@ -239,4 +239,20 @@ class ExecutionBroadcasterTest {
         assertThat(captor.getValue()).hasSize(5)
                 .containsOnlyKeys("stepIndex", "status", "input", "output", "durationMs");
     }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void broadcastLogMessage_masksALiveRunToken() {
+        // TODO cfb5d56b: foreach item outputs go out through here
+        com.automation.util.RunAccess.register("tok-live-789");
+        try {
+            broadcaster.broadcastLogMessage(RUN_ID, "foreach_item_completed", Map.of("output", "x tok-live-789", "itemIndex", 3));
+
+            ArgumentCaptor<Map<String, Object>> captor = ArgumentCaptor.forClass(Map.class);
+            verify(messagingTemplate).convertAndSend(eq(EXPECTED_TOPIC), captor.capture());
+            assertThat(captor.getValue()).containsEntry("output", "x ***").containsEntry("itemIndex", 3);
+        } finally {
+            com.automation.util.RunAccess.unregister("tok-live-789");
+        }
+    }
 }

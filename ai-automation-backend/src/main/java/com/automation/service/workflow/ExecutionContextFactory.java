@@ -10,8 +10,11 @@ import com.automation.service.cli.CommandExecutorService;
 import com.automation.service.memory.WorkflowMemoryService;
 import com.automation.service.project.ProjectContextService;
 import com.automation.service.system.SystemIdentityService;
+import com.automation.security.RunTokenService;
+import com.automation.util.RunAccess;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.core.env.Environment;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -43,6 +46,8 @@ public class ExecutionContextFactory {
     private final CommandExecutorService commandExecutorService;
     private final WorkflowMemoryService workflowMemoryService;
     private final ProjectContextService projectContextService;
+    private final RunTokenService runTokens;
+    private final Environment environment;
 
     /** Everything executeBlocks knows before the loop starts. */
     public record ContextSeed(String runId, String workflowId, String workflowName, Project project,
@@ -198,6 +203,11 @@ public class ExecutionContextFactory {
             context.setEffort(effort);
         }
 
+        // Read-only run token for workflows that ask for it (TODO cfb5d56b): bound to the run's thread, which
+        // calls this, so every AI CLI and shell process of the run gets it; RunFinalizer.finish revokes it
+        runTokens.issue(seed.runId(), seed.workflowMeta()).ifPresent(token -> RunAccess.bind(new RunAccess.Grant(token,
+                RunAccess.localApiBase(environment.getProperty("server.address"),
+                        environment.getProperty("local.server.port", environment.getProperty("server.port", "9090"))))));
         return context;
     }
 

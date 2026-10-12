@@ -23,8 +23,8 @@ class ModuleRegistryTest {
 
         assertThat(registry.preset()).isEqualTo(ModulePreset.CORE);
         assertThat(Arrays.stream(ModuleCatalog.values()).filter(registry::isEnabled))
-                .containsExactly(ModuleCatalog.DASHBOARD_REPORT, ModuleCatalog.GOALS, ModuleCatalog.PROVENANCE,
-                        ModuleCatalog.PRIVATE_NETWORK_GUARD);
+                .containsExactly(ModuleCatalog.DASHBOARD_REPORT, ModuleCatalog.GOALS, ModuleCatalog.RUN_TOKENS,
+                        ModuleCatalog.PROVENANCE, ModuleCatalog.PRIVATE_NETWORK_GUARD);
     }
 
     /** "Only" as in: of the tiers the preset adds — the STANDARD tier is on here as in every preset. */
@@ -179,7 +179,7 @@ class ModuleRegistryTest {
     void summaryListsPresetAndEnabledModules() {
         ModuleRegistry registry = ModuleRegistry.of(Map.of("chains", "true"), Map.of());
 
-        assertThat(registry.summary()).isEqualTo("preset=core, enabled=[dashboard-report, goals, chains, provenance, private-network-guard]");
+        assertThat(registry.summary()).isEqualTo("preset=core, enabled=[dashboard-report, goals, run-tokens, chains, provenance, private-network-guard]");
     }
 
     // --- automation.modules.ui-editable ---------------------------------------------
@@ -265,7 +265,7 @@ class ModuleRegistryTest {
         ModuleRegistry registry = editable(Map.of());
         registry.applyUiOverrides(Map.of(ModuleCatalog.CHAINS, true));
 
-        assertThat(registry.summary()).isEqualTo("preset=core, ui-editable=true, ui-overrides=[chains=true], enabled=[dashboard-report, goals, chains, provenance, private-network-guard]");
+        assertThat(registry.summary()).isEqualTo("preset=core, ui-editable=true, ui-overrides=[chains=true], enabled=[dashboard-report, goals, run-tokens, chains, provenance, private-network-guard]");
     }
 
     @Test
@@ -366,9 +366,11 @@ class ModuleRegistryTest {
     }
 
     @Test
-    void onlyMcpAndHardeningSwitchesAreStartupOnly() {
+    void onlyMcpRunTokensAndHardeningSwitchesAreStartupOnly() {
+        // Both open or widen access with the API key's reach, so a leaked key must not switch them (TODO cfb5d56b)
         for (ModuleCatalog module : ModuleCatalog.values()) {
-            boolean expected = module == ModuleCatalog.MCP || module.kind() == ModuleKind.HARDENING;
+            boolean expected = module == ModuleCatalog.MCP || module == ModuleCatalog.RUN_TOKENS
+                    || module.kind() == ModuleKind.HARDENING;
             assertThat(module.startupOnly()).as(module.key()).isEqualTo(expected);
         }
     }

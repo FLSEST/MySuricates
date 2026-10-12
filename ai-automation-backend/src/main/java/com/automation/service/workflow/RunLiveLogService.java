@@ -4,6 +4,7 @@ import com.automation.config.LiveLogConfig;
 import com.automation.event.WorkflowRunCompletedEvent;
 import com.automation.service.live.LiveLineKind;
 import com.automation.service.live.LiveOutputSink;
+import com.automation.util.RunAccess;
 import jakarta.annotation.PreDestroy;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -200,7 +201,8 @@ public class RunLiveLogService {
 
     private String sanitize(String text) {
         if (text == null) return "";
-        String clean = CONTROL.matcher(ANSI.matcher(text).replaceAll("")).replaceAll("");
+        // Mask a run token before truncating, so a cut line never shows the start of one (TODO cfb5d56b)
+        String clean = CONTROL.matcher(ANSI.matcher(RunAccess.mask(text)).replaceAll("")).replaceAll("");
         int max = Math.max(1, config.getMaxLineLength());
         return clean.length() > max ? clean.substring(0, max) + "…" : clean;
     }

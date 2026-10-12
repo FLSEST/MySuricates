@@ -570,4 +570,24 @@ class BlockStepRunnerTest {
         assertThat(context.getBlockOutput("freigabe")).isEqualTo("Übersprungen (run_if: exit 1)");
         assertThat(context.getVariable("approval_answer")).isNull();
     }
+
+    @Test
+    void runStep_masksALiveRunTokenInInputAndOutput_beforeSaveAndBroadcast() {
+        // TODO cfb5d56b: a step that prints its run token must not store or broadcast it
+        com.automation.util.RunAccess.register("tok-live-123");
+        try {
+            BlockDefinition block = block("b", null);
+            when(blockExecutor.execute(eq(block), any())).thenReturn(StepResult.builder().status(StepStatus.COMPLETED)
+                    .input("curl -H 'X-Run-Token: tok-live-123'").output("token=tok-live-123").build());
+            StepResult step = runner.startStep(run, 0, block, 0);
+
+            runner.runStep(step, block, blockExecutor, context, run, null);
+
+            assertThat(step.getInput()).isEqualTo("curl -H 'X-Run-Token: ***'");
+            assertThat(step.getOutput()).isEqualTo("token=***");
+            assertThat(context.resolveTemplate("{{ previous_output }}")).isEqualTo("token=***");
+        } finally {
+            com.automation.util.RunAccess.unregister("tok-live-123");
+        }
+    }
 }

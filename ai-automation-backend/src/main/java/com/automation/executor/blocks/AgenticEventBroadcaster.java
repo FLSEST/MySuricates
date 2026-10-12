@@ -1,6 +1,7 @@
 package com.automation.executor.blocks;
 
 import lombok.RequiredArgsConstructor;
+import com.automation.util.RunAccess;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Component;
@@ -27,7 +28,7 @@ public class AgenticEventBroadcaster {
             Map<String, Object> message = new LinkedHashMap<>();
             message.put("type", eventType);
             message.put("stepIndex", stepIndex);
-            message.putAll(data);
+            message.putAll(RunAccess.maskValues(data));
             messagingTemplate.convertAndSend(
                     "/topic/executions/" + runId + "/logs", message);
         } catch (Exception e) {

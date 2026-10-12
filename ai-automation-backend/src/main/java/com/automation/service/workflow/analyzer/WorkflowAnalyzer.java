@@ -134,6 +134,7 @@ public class WorkflowAnalyzer implements PlatformAccessCheck {
         ConfigKeyRules.apply(blocks, findings);
         BlockShapeRules.apply(blocks, findings);
         SelfAccessRules.apply(blocks, findings);
+        RunTokenRules.apply(blocks, metadata != null ? metadata : Map.of(), findings);
         findings.sort((a, b) -> a.severity() != b.severity()
                 ? a.severity().compareTo(b.severity())
                 : Integer.compare(a.blockIndex(), b.blockIndex()));

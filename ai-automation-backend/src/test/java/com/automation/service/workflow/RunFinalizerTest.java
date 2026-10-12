@@ -34,6 +34,7 @@ class RunFinalizerTest {
     @Mock private ExecutionBroadcaster broadcaster;
     @Mock private ApplicationEventPublisher eventPublisher;
 
+    @Mock private com.automation.security.RunTokenService runTokenService;
     @InjectMocks private RunFinalizer finalizer;
 
     private WorkflowRun run;

@@ -7,6 +7,7 @@ import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
@@ -24,6 +25,8 @@ public class RateLimitFilter extends OncePerRequestFilter {
     private final RateLimitConfig rateLimitConfig;
     private final ClientIpResolver clientIpResolver;
     private final ApiKeyService apiKeyService;
+    /** Absent in web slices without the workflow engine: then no run token counts as live. */
+    private final java.util.function.Supplier<RunTokenService> runTokenService;
 
     /** Bounded and swept on access — one entry per client, not per request (ba6a91a6). */
     private final ClientBucketStore<ClientBucket> buckets = new ClientBucketStore<>();
@@ -32,16 +35,22 @@ public class RateLimitFilter extends OncePerRequestFilter {
     public RateLimitFilter(
             RateLimitConfig rateLimitConfig,
             ApiKeyService apiKeyService,
+            ObjectProvider<RunTokenService> runTokenService,
             @Value("${automation.security.trusted-proxies:127.0.0.1,::1}") String trustedProxies) {
-        this(rateLimitConfig, new ClientIpResolver(trustedProxies), apiKeyService);
+        this.rateLimitConfig = rateLimitConfig;
+        this.clientIpResolver = new ClientIpResolver(trustedProxies);
+        this.apiKeyService = apiKeyService;
+        this.runTokenService = runTokenService::getIfAvailable;
     }
 
     RateLimitFilter(RateLimitConfig rateLimitConfig,
                     ClientIpResolver clientIpResolver,
-                    ApiKeyService apiKeyService) {
+                    ApiKeyService apiKeyService,
+                    RunTokenService runTokenService) {
         this.rateLimitConfig = rateLimitConfig;
         this.clientIpResolver = clientIpResolver;
         this.apiKeyService = apiKeyService;
+        this.runTokenService = () -> runTokenService;
     }
 
     @Override
@@ -73,7 +82,13 @@ public class RateLimitFilter extends OncePerRequestFilter {
         }
 
         int limit = rateLimitConfig.getRequestsPerMinute();
-        String clientId = clientIpResolver.resolve(request);
+        // A live run token (TODO cfb5d56b) is counted per run: its requests come from 127.0.0.1 like the UI
+        // and local agents, and a busy run must not use up their bucket. Only a live one, though — a fresh
+        // random header per request would otherwise get a fresh bucket each time and dodge the per-IP limit.
+        String runToken = request.getHeader("X-Run-Token");
+        RunTokenService tokens = runTokenService.get();
+        String clientId = runToken != null && tokens != null && tokens.resolve(runToken).isPresent()
+                ? clientKey(runToken) : clientIpResolver.resolve(request);
         ClientBucket bucket = buckets.get(clientId, ClientBucket::new, System.currentTimeMillis());
 
         if (bucket.tryConsume(limit)) {
@@ -93,6 +108,17 @@ public class RateLimitFilter extends OncePerRequestFilter {
                     + "\",\"timestamp\":\"" + Instant.now()
                     + "\",\"params\":{\"seconds\":\"" + retryAfterSeconds + "\"}"
                     + ",\"retryAfterSeconds\": " + retryAfterSeconds + "}\n");
+        }
+    }
+
+    /** Bucket key of a run token: a short hash, so the log line of a refused request never shows the token. */
+    static String clientKey(String runToken) {
+        try {
+            byte[] digest = java.security.MessageDigest.getInstance("SHA-256")
+                    .digest(runToken.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+            return "run-token:" + java.util.HexFormat.of().formatHex(digest, 0, 8);
+        } catch (java.security.NoSuchAlgorithmException e) {
+            throw new IllegalStateException("SHA-256 not available", e);
         }
     }
 

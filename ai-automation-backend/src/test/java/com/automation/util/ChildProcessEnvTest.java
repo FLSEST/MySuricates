@@ -65,4 +65,30 @@ class ChildProcessEnvTest {
 
         assertThat(env).containsExactlyEntriesOf(Map.of("PATH", "/usr/bin"));
     }
+
+    @Test
+    void scrub_dropsAnInheritedRunToken() {
+        // A backend or test suite started from inside a run must not hand that run's token to its own children
+        Map<String, String> env = new HashMap<>(Map.of(
+                RunAccess.TOKEN_ENV, "parent-run-token", RunAccess.API_ENV, "http://localhost:9090/api/v1", "PATH", "/usr/bin"));
+
+        ChildProcessEnv.scrub(env);
+
+        assertThat(env).containsOnlyKeys("PATH");
+    }
+
+    @Test
+    void forAgent_putsTheBoundRunTokenIntoTheEnvironment_onlyOnTheRunsThread() {
+        RunAccess.bind(new RunAccess.Grant("tok-run", "http://localhost:9090/api/v1"));
+        try {
+            ProcessBuilder pb = ChildProcessEnv.forAgent(List.of("claude", "-p"), "/tmp");
+
+            assertThat(pb.environment()).containsEntry(RunAccess.TOKEN_ENV, "tok-run")
+                    .containsEntry(RunAccess.API_ENV, "http://localhost:9090/api/v1");
+        } finally {
+            RunAccess.clear();
+        }
+        assertThat(ChildProcessEnv.forAgent(List.of("claude", "-p"), "/tmp").environment())
+                .doesNotContainKeys(RunAccess.TOKEN_ENV, RunAccess.API_ENV);
+    }
 }

@@ -2247,6 +2247,8 @@ export const en = {
       UNATTENDED_REQUIRES_SEAL: 'Workflow \'{name}\' was not started: unattended runs ({origin}) require a sealed workflow (automation.hardening.require-sealed-for-unattended)',
       UNATTENDED_PLATFORM_ACCESS: 'Workflow \'{name}\' was not started: unattended runs ({origin}) of workflows that access the platform directly are refused – {rule} in block {block}. A person can still start it; better use context variables or the todo blocks.',
       WEBHOOK_SIGNATURE_INVALID: 'Missing or invalid {header} header (expected sha256=<hex HMAC-SHA256 of the request body>)',
+      RUN_TOKEN_INVALID: 'Unknown or expired run token — it is only valid while its run is running',
+      RUN_TOKEN_SCOPE: 'Not readable with a run token — it only allows GET on the overview (workflows, runs, TODOs, projects, skills, goals, audits, learning)',
       NO_TASK_TARGET: 'No target configured for the task export ({setting})',
       PROVIDER_NOT_TASK_CAPABLE: 'Integration \'{provider}\' cannot receive tasks',
       PROVIDER_NOT_CONNECTED: 'Integration \'{provider}\' is not connected',

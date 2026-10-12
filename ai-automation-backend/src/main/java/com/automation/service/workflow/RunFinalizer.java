@@ -5,6 +5,8 @@ import com.automation.entity.WorkflowRun;
 import com.automation.event.WorkflowRunCompletedEvent;
 import com.automation.executor.ExecutionContext;
 import com.automation.repository.WorkflowRunRepository;
+import com.automation.security.RunTokenService;
+import com.automation.util.RunAccess;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationEventPublisher;
@@ -32,9 +34,17 @@ public class RunFinalizer {
     private final WorkflowRunRepository runRepository;
     private final ExecutionBroadcaster broadcaster;
     private final ApplicationEventPublisher eventPublisher;
+    private final RunTokenService runTokens;
 
     public void finish(WorkflowRun run, ExecutionContext context, String workflowId, String workflowName,
                        Project project, Map<String, Object> workflowMeta) {
+        // The run token ends before anything else, the completion listeners included (TODO cfb5d56b)
+        RunAccess.clear();
+        try {
+            runTokens.revoke(run.getId(), workflowId);
+        } catch (RuntimeException e) {
+            log.warn("Could not log the run token summary of {}: {}", run.getId(), e.getMessage());
+        }
         run.setCompletedAt(Instant.now());
         run.setDurationMs(
                 run.getCompletedAt().toEpochMilli() - run.getStartedAt().toEpochMilli()

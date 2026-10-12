@@ -12,6 +12,7 @@ import com.automation.repository.StepResultRepository;
 import com.automation.service.activitylog.ActivityLogService;
 import com.automation.service.live.LiveOutput;
 import com.automation.util.ProcessTracking;
+import com.automation.util.RunAccess;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -125,9 +126,10 @@ public class BlockStepRunner {
             liveLog.flush(run.getId()); // live lines must reach the client before the final step message
         }
 
-        // Update the persisted step with the actual results
-        step.setInput(result.getInput());
-        step.setOutput(result.getOutput());
+        // Update the persisted step with the actual results; a run token a step printed is masked before
+        // it reaches the database, the broadcast, later prompts or the run error (TODO cfb5d56b)
+        step.setInput(RunAccess.mask(result.getInput()));
+        step.setOutput(RunAccess.mask(result.getOutput()));
         step.setStatus(result.getStatus());
         step.setCompletedAt(result.getCompletedAt());
         step.setDurationMs(result.getDurationMs());

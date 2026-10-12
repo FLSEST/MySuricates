@@ -146,7 +146,9 @@ curl -s --noproxy '*' -X POST http://localhost:9090/api/v1/workflows/<workflow-i
 
 Im Workflow selbst kommen Ziel-Daten nie per REST, sondern als Kontextvariablen `{{ goal_status }}`
 und `{{ goal_guard_* }}`, sobald der Lauf `goal_id` traegt ([docs/WORKFLOW-GUIDE.md](docs/WORKFLOW-GUIDE.md)
-→ „Ziel-Kontext“).
+→ „Ziel-Kontext“). Braucht ein Workflow mehr, liest er nur mit dem Lauf-Token
+(`metadata.permissions: ["read"]`, Header `X-Run-Token: $MYSURICATES_RUN_TOKEN`, Basis `$MYSURICATES_API`),
+nie mit dem API-Key ([docs/WORKFLOW-GUIDE.md](docs/WORKFLOW-GUIDE.md) → „Plattformdaten lesen mit dem Lauf-Token“).
 
 Referenz: [docs/api-referenz.md](docs/api-referenz.md#apiv1goals) → `/api/v1/goals`.
 
@@ -421,6 +423,7 @@ DELETE /api/v1/webhooks/{id}/secret
 - Versiegelt: PUT/DELETE mit Definitionsänderung → `409 WORKFLOW_SEALED`; manipulierte Definition startet nicht → `409 WORKFLOW_TAMPERED`
 - `require-sealed-for-unattended`: Schedules, Webhooks, TODO-/Completion-Trigger, Auto-Repair und Wishes (auch über Chains/Sub-Workflows) starten nur versiegelte Workflows → sonst `403 UNATTENDED_REQUIRES_SEAL`
 - Immer (ohne Schalter): Dieselben unbeaufsichtigten Auslöser starten keinen Workflow, den der Analyzer mit `HIGH` `self-api-call`/`direct-db-access` meldet → `403 UNATTENDED_PLATFORM_ACCESS`; Speichern und manueller Start bleiben erlaubt
+- Lauf-Token (Modul `run-tokens`, nur Startkonfiguration): Ein Workflow mit `metadata.permissions: ["read"]` bekommt je Lauf `MYSURICATES_RUN_TOKEN`; damit nur `GET` auf die Liste `security/RunTokenPaths` → sonst `403 RUN_TOKEN_SCOPE`, nach dem Lauf `401 RUN_TOKEN_INVALID`
 - Runs tragen `triggerSource`, `definitionHash`, `definitionVersionId`; Einträge einer Chain zusätzlich `chainRunId`
 
 ### 9. Test-Instanz
@@ -482,7 +485,9 @@ GET /api/v1/workflows/{id}/analyze
 #         Bloecken; deren detail beginnt mit dem Pfad, z. B. "Block 2 › cases[0] › Block 1: …",
 #         self-api-call (Shell-Code ruft die eigene REST-API, ausser den schluesselfreien Sonden = HIGH;
 #         KI-Auftrag nennt einen lokalen Aufruf = MEDIUM "pruefen"), direct-db-access (app_settings oder
-#         automation.db mit Lesezugriff = HIGH; sqlite3 allein = MEDIUM "pruefen")
+#         automation.db mit Lesezugriff = HIGH; sqlite3 allein = MEDIUM "pruefen"),
+#         run-token-not-requested (Block nutzt $MYSURICATES_RUN_TOKEN/$MYSURICATES_API/X-Run-Token,
+#         der Workflow fordert den Lauf-Token aber nicht an = MEDIUM)
 #         sowie dead-nested-blocks (config.blocks: kein Block-Typ fuehrt die Liste aus = HIGH),
 #         unknown-block-field (Feld neben type/name/config/requiredCapabilities/skillIds; Config-Schluessel
 #         wie on_failure auf Blockebene = HIGH, nahe Schreibweise = MEDIUM, sonst LOW — solche Felder

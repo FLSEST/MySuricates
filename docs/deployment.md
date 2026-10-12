@@ -738,6 +738,14 @@ Diese Endpunkte erweitern das nicht, sie sind bequemere Wege zu Dingen, die ein 
 Datenbanksicherung enthält allerdings alle Runs, Ausgaben und Einstellungen der Instanz und ist so
 vertraulich zu behandeln wie der Key selbst.
 
+Der Key darf alles; eine eingeschränkte Berechtigung gibt es genau eine: den **Lauf-Token**. Ein
+Workflow mit `metadata.permissions: ["read"]` bekommt für die Dauer seines Laufs einen Token
+(`MYSURICATES_RUN_TOKEN`), der nur `GET` auf eine feste Liste darf — Workflows, Läufe, TODOs, Projekte,
+Skills, Ziele, Audits, Learning — und mit dem Lauf endet. So braucht kein Workflow den Key, um
+Plattformdaten zu lesen. Was auf der Liste steht, ist auch über den eigenen Lauf hinaus lesbar
+(Ein- und Ausgaben anderer Läufe). Einzelheiten:
+[WORKFLOW-GUIDE → Plattformdaten lesen mit dem Lauf-Token](WORKFLOW-GUIDE.md#plattformdaten-lesen-mit-dem-lauf-token).
+
 ### Webhooks
 
 Der Trigger-Endpunkt wird durch ein Token im Pfad geschützt (32 Zufallsbytes aus

@@ -23,7 +23,17 @@ report — security included.
   the data directories or the Docker socket.
 - API access is protected by a single static API key (`X-API-Key`), compared
   in constant time; a handful of endpoints (health/info/auth-status, webhook
-  ingestion) are reachable without one.
+  ingestion) are reachable without one. **The key grants full access** — read,
+  write, start runs, change settings: whoever holds it controls the instance.
+  There is no finer-grained key yet.
+- The only restricted credential is the **run token**: a workflow that asks for
+  it (`metadata.permissions: ["read"]`) gets a random token for the duration of
+  one run (`MYSURICATES_RUN_TOKEN`), kept in memory only. It allows `GET` on a
+  fixed list (workflows, runs, TODOs, projects, skills, goals, audits, learning)
+  and nothing else, ends with the run and is masked in outputs. Whatever is on
+  the list is readable beyond its own run, inputs and outputs of other runs
+  included. The startup switch `automation.modules.run-tokens: false` turns it
+  off.
 - Webhook triggers accept inbound requests authenticated by a per-webhook
   token/signing secret, not the API key.
 
@@ -67,7 +77,12 @@ Dateizugriffe und ist damit ein Teilschutz; `automation.hardening.unattended-in-
 trennt sie mit Docker ganz: Solche Schritte laufen in einem frischen Container,
 der nur Arbeitsverzeichnis, CLI-Programm und dessen Anmeldung bekommt); der API-Zugriff läuft über einen einzelnen statischen
 API-Key, einzelne Endpunkte (Health/Info/Auth-Status, Webhook-Eingang) sind
-unauthentifiziert erreichbar. Details:
+unauthentifiziert erreichbar. **Der Key darf alles** (lesen, schreiben, Läufe
+starten, Einstellungen ändern); eingeschränkt ist nur der Lauf-Token, den ein
+Workflow mit `metadata.permissions: ["read"]` für die Dauer eines Laufs
+bekommt: nur `GET` auf eine feste Liste (Workflows, Läufe, TODOs, Projekte,
+Skills, Ziele, Audits, Learning), nur im Speicher, in Ausgaben maskiert;
+abschaltbar mit `automation.modules.run-tokens: false`. Details:
 [Vertrauensmodell und Netzwerk-Exposition](docs/deployment.md#vertrauensmodell-und-netzwerk-exposition).
 Unterstützt wird nur der `main`-Branch. Sicherheitslücken bitte **nicht** als
 öffentliches Issue melden, sondern über die privaten Sicherheitshinweise von

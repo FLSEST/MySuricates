@@ -110,6 +110,14 @@ class WorkflowExecutorTest {
     private RunWorkspaceService runWorkspaceService;
 
     private WorkflowExecutor workflowExecutor;
+
+    /** Real token service (module on), so tests see the token a run gets and loses (TODO cfb5d56b). */
+    private final com.automation.security.RunTokenService runTokenService = runTokenService();
+
+    private static com.automation.security.RunTokenService runTokenService() {
+        return new com.automation.security.RunTokenService(com.automation.modules.ModuleRegistry.allEnabled(),
+                mock(ActivityLogService.class));
+    }
     private WorkflowExecutionRegistry registry;
     /** Cancel and ad-hoc commands go through the real control service, on the executor's registry. */
     private RunControlService runControl;
@@ -193,7 +201,8 @@ class WorkflowExecutorTest {
                                 new GoalVariables(org.mockito.Mockito.mock(GoalContextSource.class), com.automation.modules.ModuleRegistry.allEnabled()),
                                 new AuditFindingsVariable(org.mockito.Mockito.mock(AuditContextSource.class))),
                                 activityLogService),
-                        agentInstructionsService, commandExecutorService, workflowMemoryService, projectContextService),
+                        agentInstructionsService, commandExecutorService, workflowMemoryService, projectContextService,
+                        runTokenService, new org.springframework.mock.env.MockEnvironment()),
                 activityLogService,
                 new RunCompletionHandler(templateVerificationService, activityLogService),
                 registry,
@@ -201,7 +210,7 @@ class WorkflowExecutorTest {
                 new BlockStepRunner(stepResultRepository, broadcaster, new BlockOutputValidator(),
                         activityLogService, containerRepository, mock(RunLiveLogService.class),
                         new RunIfGate(commandExecutorService)),
-                new RunFinalizer(runRepository, broadcaster, eventPublisher),
+                new RunFinalizer(runRepository, broadcaster, eventPublisher, runTokenService),
                 runWorkspaceService,
                 new RunAdmission(ModuleRegistry.of(Map.of(), Map.of()), new WorkflowDefinitionHasher(), new WorkflowSealVerifier(new WorkflowDefinitionHasher(), org.mockito.Mockito.mock(WorkflowSkillPins.class), RunAdmissionTest.unsignedSigner(), ModuleRegistry.of(Map.of(), Map.of())), workflowVersionService, activityLogService,
                         new com.automation.service.workflow.analyzer.WorkflowAnalyzer()),
@@ -1422,7 +1431,8 @@ class WorkflowExecutorTest {
                                 new GoalVariables(org.mockito.Mockito.mock(GoalContextSource.class), com.automation.modules.ModuleRegistry.allEnabled()),
                                 new AuditFindingsVariable(org.mockito.Mockito.mock(AuditContextSource.class))),
                                 activityLogService),
-                        agentInstructionsService, commandExecutorService, workflowMemoryService, projectContextService),
+                        agentInstructionsService, commandExecutorService, workflowMemoryService, projectContextService,
+                        runTokenService, new org.springframework.mock.env.MockEnvironment()),
                 activityLogService,
                 new RunCompletionHandler(templateVerificationService, activityLogService),
                 executionRegistry,
@@ -1430,7 +1440,7 @@ class WorkflowExecutorTest {
                 new BlockStepRunner(stepResultRepository, broadcaster, new BlockOutputValidator(),
                         activityLogService, containerRepository, mock(RunLiveLogService.class),
                         new RunIfGate(commandExecutorService)),
-                new RunFinalizer(runRepository, broadcaster, eventPublisher),
+                new RunFinalizer(runRepository, broadcaster, eventPublisher, runTokenService),
                 runWorkspaceService,
                 new RunAdmission(ModuleRegistry.of(Map.of(), Map.of()), new WorkflowDefinitionHasher(), new WorkflowSealVerifier(new WorkflowDefinitionHasher(), org.mockito.Mockito.mock(WorkflowSkillPins.class), RunAdmissionTest.unsignedSigner(), ModuleRegistry.of(Map.of(), Map.of())), workflowVersionService, activityLogService,
                         new com.automation.service.workflow.analyzer.WorkflowAnalyzer()),
@@ -2278,5 +2288,62 @@ class WorkflowExecutorTest {
         workflowExecutor.resumeFromStep("run-1", TriggerSource.RESUME);
 
         assertThat(resolved).containsExactly("echo 'x; id' 'x; id'");
+    }
+
+    @org.junit.jupiter.api.Nested
+    @org.junit.jupiter.api.DisplayName("run token (TODO cfb5d56b)")
+    class RunTokens {
+
+        private final List<java.util.Optional<com.automation.util.RunAccess.Grant>> seen = new ArrayList<>();
+
+        private void recordGrantDuringBlocks() {
+            when(simpleBlockExecutor.execute(any(BlockDefinition.class), any(ExecutionContext.class))).thenAnswer(inv -> {
+                seen.add(com.automation.util.RunAccess.current());
+                return StepResult.builder().status(StepStatus.COMPLETED).output("ok").build();
+            });
+        }
+
+        @Test
+        @org.junit.jupiter.api.DisplayName("a workflow asking for read gets a token on its thread for every block, revoked at the end")
+        void issuedForTheRunAndRevokedAtItsEnd() {
+            testWorkflow.setMetadata(Map.of("permissions", List.of("read")));
+            recordGrantDuringBlocks();
+
+            workflowExecutor.execute(testWorkflow, null, TriggerSource.MANUAL);
+
+            assertThat(seen).hasSize(2).allSatisfy(grant -> assertThat(grant).isPresent());
+            String token = seen.get(0).orElseThrow().token();
+            assertThat(seen.get(1).orElseThrow().token()).isEqualTo(token);
+            assertThat(seen.get(0).orElseThrow().apiBase()).isEqualTo("http://127.0.0.1:9090/api/v1");
+            assertThat(runTokenService.resolve(token)).isEmpty();              // revoked when the run ended
+            assertThat(com.automation.util.RunAccess.current()).isEmpty();     // and unbound from the thread
+        }
+
+        @Test
+        @org.junit.jupiter.api.DisplayName("a workflow without the permission gets none")
+        void noTokenWithoutPermission() {
+            testWorkflow.setMetadata(Map.of());
+            recordGrantDuringBlocks();
+
+            workflowExecutor.execute(testWorkflow, null, TriggerSource.MANUAL);
+
+            assertThat(seen).hasSize(2).allSatisfy(grant -> assertThat(grant).isEmpty());
+        }
+
+        @Test
+        @org.junit.jupiter.api.DisplayName("a failing run loses its token as well")
+        void revokedWhenTheRunFails() {
+            testWorkflow.setMetadata(Map.of("permissions", List.of("read")));
+            when(simpleBlockExecutor.execute(any(BlockDefinition.class), any(ExecutionContext.class))).thenAnswer(inv -> {
+                seen.add(com.automation.util.RunAccess.current());
+                throw new IllegalStateException("block exploded");
+            });
+
+            workflowExecutor.execute(testWorkflow, null, TriggerSource.MANUAL);
+
+            String token = seen.get(0).orElseThrow().token();
+            assertThat(runTokenService.resolve(token)).isEmpty();
+            assertThat(com.automation.util.RunAccess.current()).isEmpty();
+        }
     }
 }

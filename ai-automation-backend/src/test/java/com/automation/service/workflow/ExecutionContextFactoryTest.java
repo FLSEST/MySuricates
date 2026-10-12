@@ -43,6 +43,8 @@ class ExecutionContextFactoryTest {
     @Mock private WorkflowMemoryService workflowMemoryService;
     @Mock private ProjectContextService projectContextService;
 
+    @Mock private com.automation.security.RunTokenService runTokenService;
+    @Mock private org.springframework.core.env.Environment environment;
     @InjectMocks private ExecutionContextFactory factory;
 
     private Project project;

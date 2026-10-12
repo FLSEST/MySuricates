@@ -22,6 +22,9 @@ automation:
     # Standard module (on by default): goals, work packages, milestones, TODO planning. Off here too; the
     # goal data stays in the database and is back when the module is switched on again.
     goals: false
+    # Standard module (on by default), startup configuration only: read-only run tokens for workflows that
+    # ask for them (metadata.permissions: ["read"]). Off here, so no run gets one.
+    run-tokens: false
   hardening:
     # No definition hash or version id on runs (the trigger source is still recorded).
     provenance: false

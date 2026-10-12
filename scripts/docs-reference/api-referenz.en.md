@@ -14,7 +14,10 @@ effects – is listed below the table as “Notes”. Request and response field
 ## General
 
 - **Base URL:** `http://localhost:9090/api/v1`, content type `application/json`
-- **Authentication:** header `X-API-Key: <key>` (when `automation.security.enabled=true`)
+- **Authentication:** header `X-API-Key: <key>` (when `automation.security.enabled=true`) – the key
+  may do everything. Only the run token is restricted (`X-Run-Token`, valid only during a run whose
+  workflow sets `metadata.permissions: ["read"]`): only `GET` on a fixed list, see
+  [WORKFLOW-GUIDE → Read platform data with the run token](WORKFLOW-GUIDE.md#read-platform-data-with-the-run-token).
 - **Proxy:** always call `curl` with an API key as `curl --noproxy '*'` – with `http_proxy` set,
   curl sends even requests to `localhost` through the proxy, key included. The documentation gate
   `doc-facts-check.sh` checks every example in `docs/` and `AGENTS.md` for it.
