@@ -10,9 +10,13 @@
 
 # MySuricates
 
-A research project on the question of how software development and other work change with AI agents,
-and how that work can be put together in different ways from repeatable, as traceable as possible
-building blocks — and a working system in which this can be observed.
+A research project on one question: how do you get projects done with AI? There are many ways to go
+about it, and more keep appearing: new forms of collaboration, different levels of abstraction for
+different participants. The assumption behind this project is that the work breaks down into building
+blocks that can be combined freely, here and elsewhere. MySuricates puts that to the test with workflows
+made of fixed, AI and human steps, with gates, visibility and traceability: deterministic wherever
+possible, model and provider swappable per step, and readable by every participant at their own level,
+from the code through the diagram to the approval. All of it is cast into a running platform as a showcase.
 
 ## Quickstart
 
@@ -217,4 +221,4 @@ Please do **not** report security vulnerabilities as public issues; use the repo
 
 > 🌍 **README.de.md is the source, `README.md` the translation.** Content changes belong in the German file. The author generates the English version from it in their MySuricates instance using the "README DE↔EN Sync" workflow; the repository holds the result and the deterministic part of the sync (`scripts/readme-sync/readme_sync.py`), not the workflow definition itself. So if you contribute from outside, change the German source and adjust `README.md` by hand in the same commit — or change only the German one and note in the pull request that the translation still needs to follow.
 
-<!-- synced-from: 2f066e0ecf5e sha256:f7a75235c4ca97601c839b051d0306fb036f4068e0dcdbc42536c88891d365f0 -->
+<!-- synced-from: fba0efdd4176 sha256:2681c3e4af3ff830f5f70adf0669ab69afe3065736d2fa52b3f9cb64378f1879 -->
