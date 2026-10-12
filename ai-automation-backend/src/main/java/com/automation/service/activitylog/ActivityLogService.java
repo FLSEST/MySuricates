@@ -79,7 +79,7 @@ public class ActivityLogService {
         entry = repository.save(entry);
 
         try {
-            messagingTemplate.convertAndSend("/topic/activity-log", Map.of(
+            messagingTemplate.convertAndSend("/topic/activity-log", (Object) Map.of(
                     "id", entry.getId(),
                     "timestamp", entry.getTimestamp().toString(),
                     "level", entry.getLevel().name(),

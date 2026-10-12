@@ -33,8 +33,11 @@ class ContainerRepositoryTest {
 
     @BeforeEach
     void cleanUp() {
-        containerRepository.deleteAll();
+        // Project first: its REMOVE cascade takes the container row with it. Deleting the container
+        // row first leaves the (eagerly loaded) Project pointing at a removed entity, which Hibernate 7
+        // rejects on flush (TransientPropertyValueException).
         projectRepository.deleteAll();
+        containerRepository.deleteAll();
     }
 
     private Project saveProject(String name) {

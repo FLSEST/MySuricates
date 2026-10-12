@@ -168,7 +168,7 @@ public class ConnectionPoolWatchdogService {
 
     private void broadcastAlert(String message) {
         try {
-            messagingTemplate.convertAndSend("/topic/activity-log", Map.of(
+            messagingTemplate.convertAndSend("/topic/activity-log", (Object) Map.of(
                     "timestamp", clock.instant().toString(),
                     "level", "ERROR",
                     "category", "SYSTEM",

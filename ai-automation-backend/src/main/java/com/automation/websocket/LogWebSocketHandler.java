@@ -64,7 +64,7 @@ public class LogWebSocketHandler {
                 try {
                     // Send current status immediately
                     runRepository.findById(runId).ifPresent(run -> {
-                        messagingTemplate.convertAndSend(destination, Map.of(
+                        messagingTemplate.convertAndSend(destination, (Object) Map.of(
                                 "type", "status",
                                 "runId", runId,
                                 "status", run.getStatus(),

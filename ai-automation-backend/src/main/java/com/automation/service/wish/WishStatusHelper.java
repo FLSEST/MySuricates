@@ -21,7 +21,7 @@ final class WishStatusHelper {
                     "iterationCount", wish.getIterationCount(),
                     "maxIterations", wish.getMaxIterations()
             );
-            messagingTemplate.convertAndSend("/topic/wishes/" + wishId + "/status", payload);
+            messagingTemplate.convertAndSend("/topic/wishes/" + wishId + "/status", (Object) payload);
         } catch (Exception e) {
             log.debug("Failed to broadcast wish status", e);
         }

@@ -81,7 +81,7 @@ class ApprovalBlockExecutorTest {
             payloads.add(new HashMap<>(payload));
             if ("approval_required".equals(payload.get("type"))) context.resolveApproval("No");
             return null;
-        }).when(messagingTemplate).convertAndSend(eq("/topic/executions/run-1/logs"), any(Map.class));
+        }).when(messagingTemplate).convertAndSend(eq("/topic/executions/run-1/logs"), (Object) any(Map.class));
         BlockDefinition block = BlockDefinition.builder()
                 .type("approval")
                 .config(new HashMap<>(Map.of("question", "Ship it?", "mode", "ask")))
@@ -152,7 +152,7 @@ class ApprovalBlockExecutorTest {
             return null;
         }).when(messagingTemplate).convertAndSend(
                 eq("/topic/executions/run-1/logs"),
-                any(Map.class)
+                (Object) any(Map.class)
         );
 
         BlockDefinition block = BlockDefinition.builder()
@@ -176,7 +176,7 @@ class ApprovalBlockExecutorTest {
             return null;
         }).when(messagingTemplate).convertAndSend(
                 eq("/topic/executions/run-1/logs"),
-                any(Map.class)
+                (Object) any(Map.class)
         );
 
         BlockDefinition block = BlockDefinition.builder()
@@ -201,7 +201,7 @@ class ApprovalBlockExecutorTest {
             return null;
         }).when(messagingTemplate).convertAndSend(
                 eq("/topic/executions/run-1/logs"),
-                any(Map.class)
+                (Object) any(Map.class)
         );
 
         BlockDefinition block = BlockDefinition.builder()
@@ -225,7 +225,7 @@ class ApprovalBlockExecutorTest {
             return null;
         }).when(messagingTemplate).convertAndSend(
                 eq("/topic/executions/run-1/logs"),
-                any(Map.class)
+                (Object) any(Map.class)
         );
 
         BlockDefinition block = BlockDefinition.builder()
@@ -250,7 +250,7 @@ class ApprovalBlockExecutorTest {
             return null;
         }).when(messagingTemplate).convertAndSend(
                 eq("/topic/executions/run-1/logs"),
-                any(Map.class)
+                (Object) any(Map.class)
         );
 
         BlockDefinition block = BlockDefinition.builder()
@@ -300,7 +300,7 @@ class ApprovalBlockExecutorTest {
                 context.resolveApproval("Ja");
             }
             return null;
-        }).when(messagingTemplate).convertAndSend(eq("/topic/executions/run-1/logs"), any(Map.class));
+        }).when(messagingTemplate).convertAndSend(eq("/topic/executions/run-1/logs"), (Object) any(Map.class));
 
         BlockDefinition block = BlockDefinition.builder()
                 .type("approval")
@@ -329,7 +329,7 @@ class ApprovalBlockExecutorTest {
         doAnswer(invocation -> {
             context.resolveApproval("Nein");
             return null;
-        }).when(messagingTemplate).convertAndSend(eq("/topic/executions/run-1/logs"), any(Map.class));
+        }).when(messagingTemplate).convertAndSend(eq("/topic/executions/run-1/logs"), (Object) any(Map.class));
 
         BlockDefinition block = BlockDefinition.builder()
                 .type("approval")
@@ -351,7 +351,7 @@ class ApprovalBlockExecutorTest {
         doAnswer(invocation -> {
             context.resolveApproval("Verwerfen");
             return null;
-        }).when(messagingTemplate).convertAndSend(eq("/topic/executions/run-1/logs"), any(Map.class));
+        }).when(messagingTemplate).convertAndSend(eq("/topic/executions/run-1/logs"), (Object) any(Map.class));
 
         BlockDefinition block = BlockDefinition.builder()
                 .type("approval")
@@ -412,7 +412,7 @@ class ApprovalBlockExecutorTest {
         doAnswer(invocation -> {
             context.resolveApproval("No");
             return null;
-        }).when(messagingTemplate).convertAndSend(eq("/topic/executions/run-1/logs"), any(Map.class));
+        }).when(messagingTemplate).convertAndSend(eq("/topic/executions/run-1/logs"), (Object) any(Map.class));
         BlockDefinition block = BlockDefinition.builder()
                 .type("approval")
                 .config(new HashMap<>(Map.of(
@@ -435,7 +435,7 @@ class ApprovalBlockExecutorTest {
         doAnswer(invocation -> {
             context.resolveApproval("No");
             return null;
-        }).when(messagingTemplate).convertAndSend(eq("/topic/executions/run-1/logs"), any(Map.class));
+        }).when(messagingTemplate).convertAndSend(eq("/topic/executions/run-1/logs"), (Object) any(Map.class));
         BlockDefinition block = BlockDefinition.builder()
                 .type("approval")
                 .config(new HashMap<>(Map.of(

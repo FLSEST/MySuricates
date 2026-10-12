@@ -162,7 +162,7 @@ complete list with all modules is in [Architecture](docs/en/architektur.md#modul
 
 | Component | Technology |
 |---|---|
-| Backend | Spring Boot 3.5, Java 21 |
+| Backend | Spring Boot 4.1, Java 21 |
 | Frontend | React 19, TypeScript 6, Vite 8 |
 | Database | SQLite (WAL mode) + Flyway |
 | Container | Docker (Java Docker Client 3.7.1) — optional; for shell blocks with `container_image`, project containers and the terminal |
@@ -221,4 +221,4 @@ Please do **not** report security vulnerabilities as public issues; use the repo
 
 > 🌍 **README.de.md is the source, `README.md` the translation.** Content changes belong in the German file. The author generates the English version from it in their MySuricates instance using the "README DE↔EN Sync" workflow; the repository holds the result and the deterministic part of the sync (`scripts/readme-sync/readme_sync.py`), not the workflow definition itself. So if you contribute from outside, change the German source and adjust `README.md` by hand in the same commit — or change only the German one and note in the pull request that the translation still needs to follow.
 
-<!-- synced-from: fba0efdd4176 sha256:2681c3e4af3ff830f5f70adf0669ab69afe3065736d2fa52b3f9cb64378f1879 -->
+<!-- synced-from: 22e283cc22a2 sha256:5b7f84fed242f4574d16334dbec4c082bab55af3dad65b686be84bef508850d0 -->

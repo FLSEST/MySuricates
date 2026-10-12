@@ -48,7 +48,7 @@ class ExecutionBroadcasterTest {
 
         @SuppressWarnings("unchecked")
         ArgumentCaptor<Map<String, Object>> captor = ArgumentCaptor.forClass(Map.class);
-        verify(messagingTemplate).convertAndSend(eq(EXPECTED_TOPIC), captor.capture());
+        verify(messagingTemplate).convertAndSend(eq(EXPECTED_TOPIC), (Object) captor.capture());
 
         Map<String, Object> payload = captor.getValue();
         assertThat(payload).containsEntry("stepIndex", 2);
@@ -70,7 +70,7 @@ class ExecutionBroadcasterTest {
         broadcaster.broadcastStepResult(RUN_ID, unlabelled);
 
         ArgumentCaptor<Map<String, Object>> captor = ArgumentCaptor.forClass(Map.class);
-        verify(messagingTemplate, times(2)).convertAndSend(eq(EXPECTED_TOPIC), captor.capture());
+        verify(messagingTemplate, times(2)).convertAndSend(eq(EXPECTED_TOPIC), (Object) captor.capture());
         assertThat(captor.getAllValues().get(0))
                 .containsEntry("blockType", "shell").containsEntry("blockName", "Build").doesNotContainKey("tokens");
         assertThat(captor.getAllValues().get(1)).doesNotContainKeys("blockType", "blockName");
@@ -90,7 +90,7 @@ class ExecutionBroadcasterTest {
 
         @SuppressWarnings("unchecked")
         ArgumentCaptor<Map<String, Object>> captor = ArgumentCaptor.forClass(Map.class);
-        verify(messagingTemplate).convertAndSend(eq(EXPECTED_TOPIC), captor.capture());
+        verify(messagingTemplate).convertAndSend(eq(EXPECTED_TOPIC), (Object) captor.capture());
 
         Map<String, Object> payload = captor.getValue();
         assertThat(payload).containsEntry("input", "");
@@ -122,7 +122,7 @@ class ExecutionBroadcasterTest {
 
         @SuppressWarnings("unchecked")
         ArgumentCaptor<Map<String, Object>> captor = ArgumentCaptor.forClass(Map.class);
-        verify(messagingTemplate).convertAndSend(eq(EXPECTED_TOPIC), captor.capture());
+        verify(messagingTemplate).convertAndSend(eq(EXPECTED_TOPIC), (Object) captor.capture());
 
         Map<String, Object> payload = captor.getValue();
         assertThat(payload).containsEntry("type", "status");
@@ -152,7 +152,7 @@ class ExecutionBroadcasterTest {
 
         @SuppressWarnings("unchecked")
         ArgumentCaptor<Map<String, Object>> captor = ArgumentCaptor.forClass(Map.class);
-        verify(messagingTemplate).convertAndSend(eq(EXPECTED_TOPIC), captor.capture());
+        verify(messagingTemplate).convertAndSend(eq(EXPECTED_TOPIC), (Object) captor.capture());
 
         Map<String, Object> payload = captor.getValue();
         assertThat(payload).containsEntry("type", "log");
@@ -196,7 +196,7 @@ class ExecutionBroadcasterTest {
 
         @SuppressWarnings("unchecked")
         ArgumentCaptor<Map<String, Object>> captor = ArgumentCaptor.forClass(Map.class);
-        verify(messagingTemplate).convertAndSend(eq(EXPECTED_TOPIC), captor.capture());
+        verify(messagingTemplate).convertAndSend(eq(EXPECTED_TOPIC), (Object) captor.capture());
 
         Map<String, Object> payload = captor.getValue();
         assertThat(payload).containsEntry("type", "new-type");
@@ -211,7 +211,7 @@ class ExecutionBroadcasterTest {
 
         @SuppressWarnings("unchecked")
         ArgumentCaptor<Map<String, Object>> captor = ArgumentCaptor.forClass(Map.class);
-        verify(messagingTemplate).convertAndSend(eq(EXPECTED_TOPIC), captor.capture());
+        verify(messagingTemplate).convertAndSend(eq(EXPECTED_TOPIC), (Object) captor.capture());
 
         Map<String, Object> payload = captor.getValue();
         assertThat(payload).containsEntry("type", "heartbeat");
@@ -234,7 +234,7 @@ class ExecutionBroadcasterTest {
 
         @SuppressWarnings("unchecked")
         ArgumentCaptor<Map<String, Object>> captor = ArgumentCaptor.forClass(Map.class);
-        verify(messagingTemplate).convertAndSend(eq(EXPECTED_TOPIC), captor.capture());
+        verify(messagingTemplate).convertAndSend(eq(EXPECTED_TOPIC), (Object) captor.capture());
 
         assertThat(captor.getValue()).hasSize(5)
                 .containsOnlyKeys("stepIndex", "status", "input", "output", "durationMs");
@@ -249,7 +249,7 @@ class ExecutionBroadcasterTest {
             broadcaster.broadcastLogMessage(RUN_ID, "foreach_item_completed", Map.of("output", "x tok-live-789", "itemIndex", 3));
 
             ArgumentCaptor<Map<String, Object>> captor = ArgumentCaptor.forClass(Map.class);
-            verify(messagingTemplate).convertAndSend(eq(EXPECTED_TOPIC), captor.capture());
+            verify(messagingTemplate).convertAndSend(eq(EXPECTED_TOPIC), (Object) captor.capture());
             assertThat(captor.getValue()).containsEntry("output", "x ***").containsEntry("itemIndex", 3);
         } finally {
             com.automation.util.RunAccess.unregister("tok-live-789");

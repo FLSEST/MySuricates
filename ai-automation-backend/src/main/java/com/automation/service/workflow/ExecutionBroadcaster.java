@@ -39,7 +39,7 @@ public class ExecutionBroadcaster {
                     message.put(label, value);
                 }
             }
-            messagingTemplate.convertAndSend("/topic/executions/" + runId + "/logs", message);
+            messagingTemplate.convertAndSend("/topic/executions/" + runId + "/logs", (Object) message);
         } catch (Exception e) {
             log.warn("Failed to broadcast step result: {}", e.getMessage());
         }
@@ -49,7 +49,7 @@ public class ExecutionBroadcaster {
         try {
             messagingTemplate.convertAndSend(
                     "/topic/executions/" + runId + "/logs",
-                    Map.of("type", "status", "runId", runId, "status", status)
+                    (Object) Map.of("type", "status", "runId", runId, "status", status)
             );
         } catch (Exception e) {
             log.warn("Failed to broadcast final status: {}", e.getMessage());
@@ -62,7 +62,7 @@ public class ExecutionBroadcaster {
             msg.put("type", type);
             msg.put("runId", runId);
             msg.put("timestamp", Instant.now().toString());
-            messagingTemplate.convertAndSend("/topic/executions/" + runId + "/logs", msg);
+            messagingTemplate.convertAndSend("/topic/executions/" + runId + "/logs", (Object) msg);
         } catch (Exception e) {
             log.warn("Failed to broadcast log message: {}", e.getMessage());
         }

@@ -30,7 +30,7 @@ public class AgenticEventBroadcaster {
             message.put("stepIndex", stepIndex);
             message.putAll(RunAccess.maskValues(data));
             messagingTemplate.convertAndSend(
-                    "/topic/executions/" + runId + "/logs", message);
+                    "/topic/executions/" + runId + "/logs", (Object) message);
         } catch (Exception e) {
             log.warn("Failed to broadcast agentic event: {}", e.getMessage());
         }

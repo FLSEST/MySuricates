@@ -35,7 +35,7 @@ public class DashboardRunBroadcaster {
             return;
         }
         try {
-            messagingTemplate.convertAndSend(TOPIC, Map.of(
+            messagingTemplate.convertAndSend(TOPIC, (Object) Map.of(
                     "type", "run_completed",
                     "runId", event.getRunId(),
                     "workflowId", event.getWorkflowId(),

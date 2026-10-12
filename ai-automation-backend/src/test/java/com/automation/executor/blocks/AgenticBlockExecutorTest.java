@@ -339,7 +339,7 @@ class AgenticBlockExecutorTest {
         // Should broadcast at least: agentic_started, agentic_reasoning, agentic_reasoned, agentic_goal_achieved, agentic_completed
         verify(messagingTemplate, atLeast(4)).convertAndSend(
                 eq("/topic/executions/run-1/logs"),
-                any(Map.class));
+                (Object) any(Map.class));
     }
 
     @Test
@@ -738,7 +738,7 @@ class AgenticBlockExecutorTest {
 
         // WebSocket broadcast throws
         doThrow(new RuntimeException("WebSocket connection lost"))
-                .when(messagingTemplate).convertAndSend(anyString(), any(Map.class));
+                .when(messagingTemplate).convertAndSend(anyString(), (Object) any(Map.class));
 
         StepResult result = executor.execute(buildBlock("WS fail test"), buildContext());
 

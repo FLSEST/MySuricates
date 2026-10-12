@@ -148,7 +148,7 @@ public class RequestMetricsDriftWatchdogService {
     private void broadcast(String message) {
         try {
             messagingTemplate.convertAndSend("/topic/activity-log",
-                    Map.of("level", "WARN", "category", "SYSTEM", "message", message, "source", SOURCE));
+                    (Object) Map.of("level", "WARN", "category", "SYSTEM", "message", message, "source", SOURCE));
         } catch (Exception e) {
             log.debug("WebSocket broadcast failed: {}", e.getMessage());
         }

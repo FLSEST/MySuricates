@@ -76,7 +76,7 @@ class ActivityLogServiceTest {
 
         service.log(LogLevel.WARN, LogCategory.SECURITY, "Alert", "guard", null, null);
 
-        verify(messagingTemplate).convertAndSend(eq("/topic/activity-log"), any(Map.class));
+        verify(messagingTemplate).convertAndSend(eq("/topic/activity-log"), (Object) any(Map.class));
     }
 
     @Test
@@ -87,7 +87,7 @@ class ActivityLogServiceTest {
             return entry;
         });
         doThrow(new RuntimeException("WS down")).when(messagingTemplate)
-                .convertAndSend(anyString(), any(Map.class));
+                .convertAndSend(anyString(), (Object) any(Map.class));
 
         // Should not throw
         ActivityLog result = service.log(LogLevel.INFO, LogCategory.SYSTEM, "test", null, null, null);

@@ -123,7 +123,7 @@ public class RunLiveLogService {
             message.put("bufferId", buffer.bufferId);
             message.put("lines", batch.lines());
             message.put("skipped", batch.skipped());
-            messagingTemplate.convertAndSend("/topic/executions/" + runId + "/logs", message);
+            messagingTemplate.convertAndSend("/topic/executions/" + runId + "/logs", (Object) message);
         } catch (Exception e) {
             log.warn("Failed to broadcast live output for run {}: {}", runId, e.getMessage());
         } finally {

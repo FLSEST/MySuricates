@@ -98,7 +98,7 @@ class LogWebSocketHandlerTest {
         assertThat(handler.hasSubscribers("run-42")).isTrue();
         @SuppressWarnings("rawtypes")
         ArgumentCaptor<Map> captor = ArgumentCaptor.forClass(Map.class);
-        verify(messagingTemplate).convertAndSend(eq("/topic/executions/run-42/logs"), captor.capture());
+        verify(messagingTemplate).convertAndSend(eq("/topic/executions/run-42/logs"), (Object) captor.capture());
         assertThat(captor.getValue().get("type")).isEqualTo("status");
         assertThat(captor.getValue().get("runId")).isEqualTo("run-42");
         assertThat(captor.getValue().get("status")).isEqualTo(RunStatus.RUNNING);
@@ -114,7 +114,7 @@ class LogWebSocketHandlerTest {
         handler.handleSubscribe(event);
 
         assertThat(handler.hasSubscribers("missing-run")).isTrue();
-        verify(messagingTemplate, never()).convertAndSend(any(String.class), any(Map.class));
+        verify(messagingTemplate, never()).convertAndSend(any(String.class), (Object) any(Map.class));
     }
 
     @Test
@@ -147,7 +147,7 @@ class LogWebSocketHandlerTest {
         handler.handleSubscribe(event); // must not throw
 
         assertThat(handler.hasSubscribers("run-x")).isTrue();
-        verify(messagingTemplate, never()).convertAndSend(any(String.class), any(Map.class));
+        verify(messagingTemplate, never()).convertAndSend(any(String.class), (Object) any(Map.class));
     }
 
     @Test

@@ -97,7 +97,7 @@ class WishStatusHelperTest {
             WishStatusHelper.broadcastStatus(messagingTemplate, "w-1", wish);
 
             ArgumentCaptor<Map<String, Object>> captor = ArgumentCaptor.forClass(Map.class);
-            verify(messagingTemplate).convertAndSend(eq("/topic/wishes/w-1/status"), captor.capture());
+            verify(messagingTemplate).convertAndSend(eq("/topic/wishes/w-1/status"), (Object) captor.capture());
 
             Map<String, Object> payload = captor.getValue();
             assertThat(payload).containsEntry("wishId", "w-1");
@@ -129,7 +129,7 @@ class WishStatusHelperTest {
 
             assertThat(wish.getStatus()).isEqualTo(WishStatus.DECOMPOSING);
             verify(wishRepository).save(wish);
-            verify(messagingTemplate).convertAndSend(eq("/topic/wishes/w-1/status"), any(Map.class));
+            verify(messagingTemplate).convertAndSend(eq("/topic/wishes/w-1/status"), (Object) any(Map.class));
         }
     }
 

@@ -2,6 +2,13 @@ spring:
   application:
     name: ai-automation-backend
 
+  http:
+    converters:
+      # Boot 4 converts HTTP bodies with Jackson 3 when it is on the classpath (it comes in through
+      # Flyway); the code still speaks Jackson 2 (JsonNode, ObjectMapper), so the request/response
+      # bodies must use the Jackson 2 converter. Goes away with the move to tools.jackson.* (TODO 11cbf800).
+      preferred-json-mapper: jackson2
+
   datasource:
     url: jdbc:sqlite:${AUTOMATION_DB_PATH:./data/automation.db}?journal_mode=WAL&busy_timeout=10000&foreign_keys=true
     driver-class-name: org.sqlite.JDBC
@@ -60,6 +67,12 @@ management:
     web:
       exposure:
         include: health,info,metrics
+  endpoint:
+    health:
+      # Boot 4 turns the liveness/readiness probes on by default, which adds a "groups" array to
+      # /actuator/health. Off keeps the key-free probe answer as it was ({"status":"UP"}).
+      probes:
+        enabled: false
 
 docker:
   host: ${DOCKER_HOST:unix:///var/run/docker.sock}

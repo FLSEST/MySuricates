@@ -159,7 +159,7 @@ class HumanInputBlockExecutorTest {
 
         ArgumentCaptor<Map<String, Object>> captor = ArgumentCaptor.forClass(Map.class);
         verify(messagingTemplate, times(2)).convertAndSend(
-                eq("/topic/executions/run-1/logs"), captor.capture());
+                eq("/topic/executions/run-1/logs"), (Object) captor.capture());
 
         var payloads = captor.getAllValues();
         // First: human_input_required
@@ -187,7 +187,7 @@ class HumanInputBlockExecutorTest {
         var result = executor.execute(block, context);
 
         ArgumentCaptor<Map<String, Object>> captor = ArgumentCaptor.forClass(Map.class);
-        verify(messagingTemplate, times(2)).convertAndSend(eq("/topic/executions/run-1/logs"), captor.capture());
+        verify(messagingTemplate, times(2)).convertAndSend(eq("/topic/executions/run-1/logs"), (Object) captor.capture());
         int stepIndex = result.getStepIndex();
         // Sent through ExecutionBroadcaster.broadcastLogMessage, like every other run log event
         assertThat(captor.getAllValues()).allSatisfy(payload ->
@@ -224,7 +224,7 @@ class HumanInputBlockExecutorTest {
 
         @SuppressWarnings("unchecked")
         ArgumentCaptor<Map<String, Object>> captor = ArgumentCaptor.forClass(Map.class);
-        verify(messagingTemplate, times(2)).convertAndSend(eq("/topic/executions/run-1/logs"), captor.capture());
+        verify(messagingTemplate, times(2)).convertAndSend(eq("/topic/executions/run-1/logs"), (Object) captor.capture());
         assertThat(captor.getAllValues().get(1))
                 .containsEntry("type", "human_input_resolved")
                 .containsEntry("answer", "anon");
@@ -329,7 +329,7 @@ class HumanInputBlockExecutorTest {
         executor.execute(block, context);
 
         ArgumentCaptor<Map<String, Object>> payloadCaptor = ArgumentCaptor.forClass(Map.class);
-        verify(messagingTemplate, atLeastOnce()).convertAndSend(any(String.class), payloadCaptor.capture());
+        verify(messagingTemplate, atLeastOnce()).convertAndSend(any(String.class), (Object) payloadCaptor.capture());
         var firstPayload = payloadCaptor.getAllValues().get(0);
         assertThat(firstPayload).containsEntry("type", "human_input_required");
         assertThat(firstPayload).containsKey("fields");

@@ -165,7 +165,7 @@ steht in [Architektur](docs/architektur.md#module-system-startkonfiguration).
 
 | Komponente | Technologie |
 |---|---|
-| Backend | Spring Boot 3.5, Java 21 |
+| Backend | Spring Boot 4.1, Java 21 |
 | Frontend | React 19, TypeScript 6, Vite 8 |
 | Datenbank | SQLite (WAL-Modus) + Flyway |
 | Container | Docker (Java Docker Client 3.7.1) — optional; fuer Shell-Bloecke mit `container_image`, Projekt-Container und Terminal |
