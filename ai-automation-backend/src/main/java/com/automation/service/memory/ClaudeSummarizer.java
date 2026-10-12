@@ -1,5 +1,6 @@
 package com.automation.service.memory;
 
+import com.automation.service.ai.AiProvider;
 import com.automation.service.ai.HostClaudeService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -32,7 +33,8 @@ public class ClaudeSummarizer implements KnowledgeSummarizer {
         try {
             // max-turns 1: pure text generation, no tool use needed
             HostClaudeService.ReasoningResult result =
-                    hostClaudeService.reasonStructured(prompt, null, workDir, 1);
+                    hostClaudeService.reasonStructured(
+                            new AiProvider.ReasoningRequest(prompt, null, workDir, 1, null));
             long durationMs = System.currentTimeMillis() - start;
             log.info("Claude summarization completed in {}s (response length: {} chars)",
                     durationMs / 1000, result.text().length());

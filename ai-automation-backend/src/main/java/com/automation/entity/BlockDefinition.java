@@ -87,6 +87,11 @@ public class BlockDefinition {
      * opts in. The one place that reads the key.
      */
     public boolean userMcpServers() {
+        return userMcpServers(config);
+    }
+
+    /** The same rule for callers that hold only the config map, such as {@code AgenticBlockConfig}. */
+    public static boolean userMcpServers(Map<String, Object> config) {
         return config != null && Boolean.TRUE.equals(config.get("user_mcp_servers"));
     }
 }

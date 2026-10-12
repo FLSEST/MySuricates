@@ -289,7 +289,7 @@ class HostPiServiceTest {
             }
         };
 
-        assertThatThrownBy(() -> service.executeAction("test", null, null, null, null, false, null, null))
+        assertThatThrownBy(() -> service.executeAction(new AiProvider.ActionRequest("test", null, null, null, null, false, false, null, null, null, false)))
                 .isInstanceOf(IOException.class)
                 .hasMessageContaining("timed out");
     }
@@ -308,7 +308,7 @@ class HostPiServiceTest {
             }
         };
 
-        assertThatThrownBy(() -> service.reason("test", null, null, null, null, 2))
+        assertThatThrownBy(() -> service.reason(new AiProvider.ReasoningRequest("test", null, null, null, null, 2, null)))
                 .isInstanceOf(IOException.class)
                 .hasMessageContaining("timed out after 2 seconds");
     }
@@ -320,7 +320,7 @@ class HostPiServiceTest {
     void reason_piEndsWithNonZeroExitCode_throwsWithExitCodeAndItsMessage() {
         HostPiService service = ShellScriptCli.piReasoning("No API key found for anthropic", 1);
 
-        assertThatThrownBy(() -> service.reason("summarize", null, null, null, 1, null, null))
+        assertThatThrownBy(() -> service.reason(new AiProvider.ReasoningRequest("summarize", null, null, null, 1, null, null)))
                 .isInstanceOf(IOException.class)
                 .hasMessageContaining("exit code 1")
                 .hasMessageContaining("No API key found for anthropic");
@@ -330,7 +330,7 @@ class HostPiServiceTest {
     void reason_piEndsWithZeroExitCode_returnsItsAnswer() throws IOException {
         HostPiService service = ShellScriptCli.piReasoning("SAME", 0);
 
-        assertThat(service.reason("compare", null, null, null, 1, null, null).text().strip()).isEqualTo("SAME");
+        assertThat(service.reason(new AiProvider.ReasoningRequest("compare", null, null, null, 1, null, null)).text().strip()).isEqualTo("SAME");
     }
 
     // --- live output ---
@@ -350,10 +350,10 @@ class HostPiServiceTest {
         };
         List<String> lines = new ArrayList<>();
 
-        HostPiService.ActionResult unbound = service.executeAction("p", null, null, null, 10, false, null, null);
+        HostPiService.ActionResult unbound = service.executeAction(new AiProvider.ActionRequest("p", null, null, null, 10, false, false, null, null, null, false));
         HostPiService.ActionResult bound = LiveOutput.bind((kind, text) -> lines.add(kind + ":" + text), () -> {
             try {
-                return service.executeAction("p", null, null, null, 10, false, null, null);
+                return service.executeAction(new AiProvider.ActionRequest("p", null, null, null, 10, false, false, null, null, null, false));
             } catch (IOException e) {
                 throw new UncheckedIOException(e);
             }

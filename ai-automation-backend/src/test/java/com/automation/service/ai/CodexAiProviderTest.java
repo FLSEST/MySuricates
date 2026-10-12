@@ -44,31 +44,31 @@ class CodexAiProviderTest {
 
     @Test
     void reason_withModel_passesModelToService() throws IOException {
-        when(hostCodexService.execute(anyString(), isNull(), eq(60), eq(true), eq("gpt-5.5"), eq(false)))
+        when(hostCodexService.execute(anyString(), isNull(), eq(60), eq(CodexSandbox.READ_ONLY), eq("gpt-5.5"), eq(false)))
                 .thenReturn("output");
 
         var request = new AiProvider.ReasoningRequest("my prompt", null, "gpt-5.5", null, null, 60, null);
         provider.reason(request);
 
-        verify(hostCodexService).execute(anyString(), isNull(), eq(60), eq(true), eq("gpt-5.5"), eq(false));
+        verify(hostCodexService).execute(anyString(), isNull(), eq(60), eq(CodexSandbox.READ_ONLY), eq("gpt-5.5"), eq(false));
     }
 
     @Test
     void executeAction_withModel_passesModelToService() throws IOException {
-        when(hostCodexService.execute(anyString(), isNull(), eq(120), eq(false), eq("gpt-6-astra"), eq(false)))
+        when(hostCodexService.execute(anyString(), isNull(), eq(120), eq(CodexSandbox.WORKSPACE_WRITE), eq("gpt-6-astra"), eq(false)))
                 .thenReturn("done");
 
         var request = new AiProvider.ActionRequest("do it", "gpt-6-astra", null, null, 120, false, false);
         AiProvider.ActionResult result = provider.executeAction(request);
 
         assertThat(result.exitCode()).isZero();
-        verify(hostCodexService).execute(anyString(), isNull(), eq(120), eq(false), eq("gpt-6-astra"), eq(false));
+        verify(hostCodexService).execute(anyString(), isNull(), eq(120), eq(CodexSandbox.WORKSPACE_WRITE), eq("gpt-6-astra"), eq(false));
     }
 
     @Test
     void reason_delegatesToHostService() throws IOException {
         when(summarizationConfig.getTimeoutSeconds()).thenReturn(120);
-        when(hostCodexService.execute(contains("SYSTEM INSTRUCTIONS"), eq(Path.of("/path")), eq(120), eq(true), any(), eq(false)))
+        when(hostCodexService.execute(contains("SYSTEM INSTRUCTIONS"), eq(Path.of("/path")), eq(120), eq(CodexSandbox.READ_ONLY), any(), eq(false)))
                 .thenReturn("codex output");
 
         var request = new AiProvider.ReasoningRequest("prompt", "system", "/path", 3, null);
@@ -80,18 +80,18 @@ class CodexAiProviderTest {
     @Test
     void reason_alwaysUsesReadOnly() throws IOException {
         when(summarizationConfig.getTimeoutSeconds()).thenReturn(120);
-        when(hostCodexService.execute(anyString(), any(), eq(120), eq(true), any(), eq(false)))
+        when(hostCodexService.execute(anyString(), any(), eq(120), eq(CodexSandbox.READ_ONLY), any(), eq(false)))
                 .thenReturn("output");
 
         var request = new AiProvider.ReasoningRequest("prompt", null, null, 3, null);
         provider.reason(request);
 
-        verify(hostCodexService).execute(anyString(), isNull(), eq(120), eq(true), any(), eq(false));
+        verify(hostCodexService).execute(anyString(), isNull(), eq(120), eq(CodexSandbox.READ_ONLY), any(), eq(false));
     }
 
     @Test
     void reason_usesExplicitTimeout() throws IOException {
-        when(hostCodexService.execute(anyString(), any(), eq(60), eq(true), any(), eq(false)))
+        when(hostCodexService.execute(anyString(), any(), eq(60), eq(CodexSandbox.READ_ONLY), any(), eq(false)))
                 .thenReturn("output");
 
         var request = new AiProvider.ReasoningRequest("prompt", null, null, 3, 60);
@@ -103,7 +103,7 @@ class CodexAiProviderTest {
     @Test
     void executeAction_readOnly_passesThroughToHostService() throws IOException {
         when(summarizationConfig.getTimeoutSeconds()).thenReturn(120);
-        when(hostCodexService.execute(anyString(), isNull(), eq(120), eq(true), any(), eq(false)))
+        when(hostCodexService.execute(anyString(), isNull(), eq(120), eq(CodexSandbox.READ_ONLY), any(), eq(false)))
                 .thenReturn("action output");
 
         var request = new AiProvider.ActionRequest("prompt", null, null, null, null, false, true);
@@ -111,13 +111,13 @@ class CodexAiProviderTest {
 
         assertThat(result.text()).isEqualTo("action output");
         assertThat(result.exitCode()).isEqualTo(0);
-        verify(hostCodexService).execute(anyString(), isNull(), eq(120), eq(true), any(), eq(false));
+        verify(hostCodexService).execute(anyString(), isNull(), eq(120), eq(CodexSandbox.READ_ONLY), any(), eq(false));
     }
 
     @Test
     void executeAction_withEffort_isIgnoredWithoutError() throws IOException {
         when(summarizationConfig.getTimeoutSeconds()).thenReturn(120);
-        when(hostCodexService.execute(anyString(), isNull(), eq(120), eq(true), any(), eq(false)))
+        when(hostCodexService.execute(anyString(), isNull(), eq(120), eq(CodexSandbox.READ_ONLY), any(), eq(false)))
                 .thenReturn("action output");
 
         var request = new AiProvider.ActionRequest("prompt", null, null, null, null, false, true,
@@ -136,20 +136,20 @@ class CodexAiProviderTest {
     @Test
     void executeAction_notReadOnly_passesFalse() throws IOException {
         when(summarizationConfig.getTimeoutSeconds()).thenReturn(120);
-        when(hostCodexService.execute(anyString(), isNull(), eq(120), eq(false), any(), eq(false)))
+        when(hostCodexService.execute(anyString(), isNull(), eq(120), eq(CodexSandbox.WORKSPACE_WRITE), any(), eq(false)))
                 .thenReturn("action output");
 
         var request = new AiProvider.ActionRequest("prompt", null, null, null, null, false, false);
         AiProvider.ActionResult result = provider.executeAction(request);
 
         assertThat(result.text()).isEqualTo("action output");
-        verify(hostCodexService).execute(anyString(), isNull(), eq(120), eq(false), any(), eq(false));
+        verify(hostCodexService).execute(anyString(), isNull(), eq(120), eq(CodexSandbox.WORKSPACE_WRITE), any(), eq(false));
     }
 
     @Test
     void executeAction_ioException_returnsExitCode1() throws IOException {
         when(summarizationConfig.getTimeoutSeconds()).thenReturn(120);
-        when(hostCodexService.execute(anyString(), isNull(), eq(120), eq(true), any(), eq(false)))
+        when(hostCodexService.execute(anyString(), isNull(), eq(120), eq(CodexSandbox.READ_ONLY), any(), eq(false)))
                 .thenThrow(new IOException("CLI failed"));
 
         var request = new AiProvider.ActionRequest("prompt", null, null, null, null, false, true);
@@ -161,30 +161,25 @@ class CodexAiProviderTest {
 
     @Test
     void reason_readOnly_prependsInlineInstruction() throws IOException {
-        when(hostCodexService.execute(argThat(s -> s.startsWith("Output your entire response")),
-                any(), anyInt(), eq(true), any(), eq(false))).thenReturn("output");
+        when(hostCodexService.execute(argThat(s -> s.startsWith("Output your entire response")), any(), anyInt(), eq(CodexSandbox.READ_ONLY), any(), eq(false))).thenReturn("output");
 
         var request = new AiProvider.ReasoningRequest("my prompt", null, null, null, 60);
         provider.reason(request);
 
-        verify(hostCodexService).execute(
-                argThat(s -> s.contains("Output your entire response as direct text")
+        verify(hostCodexService).execute(argThat(s -> s.contains("Output your entire response as direct text")
                         && s.contains("Do NOT write any files")
-                        && s.contains("my prompt")),
-                isNull(), eq(60), eq(true), any(), eq(false));
+                        && s.contains("my prompt")), isNull(), eq(60), eq(CodexSandbox.READ_ONLY), any(), eq(false));
     }
 
     @Test
     void executeAction_notReadOnly_noInlineInstruction() throws IOException {
-        when(hostCodexService.execute(anyString(), any(), anyInt(), eq(false), any(), eq(false)))
+        when(hostCodexService.execute(anyString(), any(), anyInt(), eq(CodexSandbox.WORKSPACE_WRITE), any(), eq(false)))
                 .thenReturn("output");
 
         var request = new AiProvider.ActionRequest("my prompt", null, null, null, 60, false, false);
         provider.executeAction(request);
 
-        verify(hostCodexService).execute(
-                argThat(s -> !s.contains("Do NOT write any files") && s.contains("my prompt")),
-                isNull(), eq(60), eq(false), any(), eq(false));
+        verify(hostCodexService).execute(argThat(s -> !s.contains("Do NOT write any files") && s.contains("my prompt")), isNull(), eq(60), eq(CodexSandbox.WORKSPACE_WRITE), any(), eq(false));
     }
 
     @Test
@@ -217,12 +212,12 @@ class CodexAiProviderTest {
         Path context = project.resolve(RunContextFiles.PROJECT_CONTEXT);
         java.nio.file.Files.createDirectories(context.getParent());
         java.nio.file.Files.writeString(context, "## Project\nSpring Boot backend");
-        when(hostCodexService.execute(anyString(), eq(project), eq(90), eq(false), isNull(), eq(false))).thenReturn("done");
+        when(hostCodexService.execute(anyString(), eq(project), eq(90), eq(CodexSandbox.WORKSPACE_WRITE), isNull(), eq(false))).thenReturn("done");
 
         provider.executeAction(new AiProvider.ActionRequest("do it", null, "instructions", project.toString(), 90, false, false));
 
         org.mockito.ArgumentCaptor<String> prompt = org.mockito.ArgumentCaptor.forClass(String.class);
-        verify(hostCodexService).execute(prompt.capture(), eq(project), eq(90), eq(false), isNull(), eq(false));
+        verify(hostCodexService).execute(prompt.capture(), eq(project), eq(90), eq(CodexSandbox.WORKSPACE_WRITE), isNull(), eq(false));
         assertThat(prompt.getValue())
                 .contains("=== SYSTEM INSTRUCTIONS ===\ninstructions\n\n## Project\nSpring Boot backend")
                 .contains("=== TASK ===\ndo it");

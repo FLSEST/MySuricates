@@ -1,5 +1,6 @@
 package com.automation.service.factory;
 
+import com.automation.service.ai.AiProvider;
 import com.automation.service.ai.HostClaudeService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -23,7 +24,7 @@ public class ClaudeWorkflowGenerator implements WorkflowTextGenerator {
                 prompt.length(), timeoutSeconds);
 
         HostClaudeService.ReasoningResult result = hostClaudeService.reasonStructured(
-                prompt, systemPrompt, null, 1, timeoutSeconds);
+                new AiProvider.ReasoningRequest(prompt, systemPrompt, null, 1, timeoutSeconds));
 
         return result.text();
     }

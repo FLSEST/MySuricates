@@ -57,40 +57,21 @@ public class HostPiService {
      * ({@link CliExit}). An explicit {@code effort} wins; otherwise the {@code maxTurns} hint is mapped
      * onto pi's {@code --thinking} level: 1 → low, 3 → medium, ≥5 → high.
      */
-    public ReasoningResult reason(String prompt, String systemPrompt, String model,
-                                   String workingDirectory, Integer maxTurns,
-                                   Integer timeoutSeconds, String effort) throws IOException {
-        List<String> cmd = buildReasonCommand(systemPrompt, model, maxTurns, effort);
-        var result = executeProcess(cmd, prompt, workingDirectory, timeoutSeconds, "Host pi reasoning", false);
+    public ReasoningResult reason(AiProvider.ReasoningRequest request) throws IOException {
+        List<String> cmd = buildReasonCommand(request.systemPrompt(), request.model(), request.maxTurns(), request.effort());
+        var result = executeProcess(cmd, request.prompt(), request.workingDirectory(), request.timeoutSeconds(),
+                "Host pi reasoning", false);
         return new ReasoningResult(CliExit.answerOrThrow("Host pi reasoning", result.exitCode, result.text),
-                reasonThinkingLevel(maxTurns, effort));
+                reasonThinkingLevel(request.maxTurns(), request.effort()));
     }
 
-    /** Backwards-compat overload for call-sites written before effort support existed. */
-    public ReasoningResult reason(String prompt, String systemPrompt, String model,
-                                   String workingDirectory, Integer maxTurns,
-                                   Integer timeoutSeconds) throws IOException {
-        return reason(prompt, systemPrompt, model, workingDirectory, maxTurns, timeoutSeconds, null);
-    }
-
-    public ActionResult executeAction(String prompt, String model, String systemPrompt,
-                                       String workingDirectory, Integer timeoutSeconds,
-                                       boolean priority,
-                                       List<String> allowedTools,
-                                       List<String> disallowedTools, String effort) throws IOException {
-        List<String> cmd = buildActionCommand(model, systemPrompt, allowedTools, disallowedTools, effort);
-        var result = executeProcess(cmd, prompt, workingDirectory, timeoutSeconds, "Host pi action", priority);
+    /** One request record instead of positional overloads, like {@link HostClaudeService#executeAction}. */
+    public ActionResult executeAction(AiProvider.ActionRequest request) throws IOException {
+        List<String> cmd = buildActionCommand(request.model(), request.systemPrompt(), request.allowedTools(),
+                request.disallowedTools(), request.effort());
+        var result = executeProcess(cmd, request.prompt(), request.workingDirectory(), request.timeoutSeconds(),
+                "Host pi action", request.priority());
         return new ActionResult(result.text, result.exitCode);
-    }
-
-    /** Backwards-compat overload for call-sites written before effort support existed. */
-    public ActionResult executeAction(String prompt, String model, String systemPrompt,
-                                       String workingDirectory, Integer timeoutSeconds,
-                                       boolean priority,
-                                       List<String> allowedTools,
-                                       List<String> disallowedTools) throws IOException {
-        return executeAction(prompt, model, systemPrompt, workingDirectory, timeoutSeconds,
-                priority, allowedTools, disallowedTools, null);
     }
 
     // --- Command builders (package-private for testability) ---

@@ -76,15 +76,8 @@ public class PiAiProvider implements AiProvider {
 
     @Override
     public ReasoningResult reason(ReasoningRequest request) throws IOException {
-        HostPiService.ReasoningResult result = hostPiService.reason(
-                request.prompt(),
-                RunContextFiles.withRunContext(request.systemPrompt(), request.workingDirectory()),
-                request.model(),
-                request.workingDirectory(),
-                request.maxTurns(),
-                request.timeoutSeconds(),
-                request.effort()
-        );
+        HostPiService.ReasoningResult result = hostPiService.reason(request.withSystemPrompt(
+                RunContextFiles.withRunContext(request.systemPrompt(), request.workingDirectory())));
         return new ReasoningResult(
                 result.text(),
                 AiResponseMetadata.estimated(request.prompt(), result.text()),
@@ -94,17 +87,8 @@ public class PiAiProvider implements AiProvider {
 
     @Override
     public ActionResult executeAction(ActionRequest request) throws IOException {
-        HostPiService.ActionResult result = hostPiService.executeAction(
-                request.prompt(),
-                request.model(),
-                RunContextFiles.withRunContext(request.systemPrompt(), request.workingDirectory()),
-                request.workingDirectory(),
-                request.timeoutSeconds(),
-                request.priority(),
-                request.allowedTools(),
-                request.disallowedTools(),
-                request.effort()
-        );
+        HostPiService.ActionResult result = hostPiService.executeAction(request.withSystemPrompt(
+                RunContextFiles.withRunContext(request.systemPrompt(), request.workingDirectory())));
         return new ActionResult(
                 result.text(),
                 result.exitCode(),

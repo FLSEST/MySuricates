@@ -82,6 +82,11 @@ public interface AiProvider {
                                 Integer maxTurns, Integer timeoutSeconds, String effort) {
             this(prompt, systemPrompt, null, workingDirectory, maxTurns, timeoutSeconds, effort);
         }
+
+        /** The same request with another system prompt (e.g. completed by the run context). */
+        public ReasoningRequest withSystemPrompt(String newSystemPrompt) {
+            return new ReasoningRequest(prompt, newSystemPrompt, model, workingDirectory, maxTurns, timeoutSeconds, effort);
+        }
     }
 
     record ActionRequest(
@@ -101,6 +106,12 @@ public interface AiProvider {
              */
             boolean userMcpServers
     ) {
+        /** The same request with another system prompt (e.g. completed by the run context). */
+        public ActionRequest withSystemPrompt(String newSystemPrompt) {
+            return new ActionRequest(prompt, model, newSystemPrompt, workingDirectory, timeoutSeconds, priority, readOnly,
+                    allowedTools, disallowedTools, effort, userMcpServers);
+        }
+
         public ActionRequest(String prompt, String model, String systemPrompt, String workingDirectory,
                              Integer timeoutSeconds, boolean priority, boolean readOnly,
                              List<String> allowedTools, List<String> disallowedTools, String effort) {

@@ -137,7 +137,7 @@ class HostCodexServiceTest {
 
         String result = LiveOutput.bind((kind, text) -> lines.add(kind + ":" + text), () -> {
             try {
-                return svc.execute("prompt", null, 30, true, null);
+                return svc.execute("prompt", null, 30, CodexSandbox.READ_ONLY, null, false);
             } catch (IOException e) {
                 throw new UncheckedIOException(e);
             }

@@ -1,5 +1,6 @@
 package com.automation.service.ai;
 
+import java.util.Objects;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -40,50 +41,44 @@ class ClaudeAiProviderTest {
     @Test
     void reason_delegatesToHostService() throws IOException {
         var hostResult = new HostClaudeService.ReasoningResult("reasoning text", null);
-        when(hostClaudeService.reasonStructured(
-                eq("prompt"), eq("system"), isNull(), eq("/path"), eq(3), eq(300), isNull()))
+        when(hostClaudeService.reasonStructured(argThat((AiProvider.ReasoningRequest req) -> req != null && Objects.equals(req.prompt(), "prompt") && Objects.equals(req.systemPrompt(), "system") && req.model() == null && Objects.equals(req.workingDirectory(), "/path") && Objects.equals(req.maxTurns(), 3) && Objects.equals(req.timeoutSeconds(), 300) && req.effort() == null)))
                 .thenReturn(hostResult);
 
         var request = new AiProvider.ReasoningRequest("prompt", "system", "/path", 3, 300);
         AiProvider.ReasoningResult result = provider.reason(request);
 
         assertThat(result.text()).isEqualTo("reasoning text");
-        verify(hostClaudeService).reasonStructured("prompt", "system", null, "/path", 3, 300, null);
+        verify(hostClaudeService).reasonStructured(new AiProvider.ReasoningRequest("prompt", "system", null, "/path", 3, 300, null));
     }
 
     @Test
     void reason_forwardsEffortToHostService() throws IOException {
         var hostResult = new HostClaudeService.ReasoningResult("out", null);
-        when(hostClaudeService.reasonStructured(
-                eq("prompt"), isNull(), isNull(), isNull(), isNull(), isNull(), eq("high")))
+        when(hostClaudeService.reasonStructured(argThat((AiProvider.ReasoningRequest req) -> req != null && Objects.equals(req.prompt(), "prompt") && req.systemPrompt() == null && req.model() == null && req.workingDirectory() == null && req.maxTurns() == null && req.timeoutSeconds() == null && Objects.equals(req.effort(), "high"))))
                 .thenReturn(hostResult);
 
         var request = new AiProvider.ReasoningRequest("prompt", null, null, null, null, "high");
         provider.reason(request);
 
-        verify(hostClaudeService).reasonStructured(eq("prompt"), isNull(), isNull(), isNull(), isNull(), isNull(), eq("high"));
+        verify(hostClaudeService).reasonStructured(argThat((AiProvider.ReasoningRequest req) -> req != null && Objects.equals(req.prompt(), "prompt") && req.systemPrompt() == null && req.model() == null && req.workingDirectory() == null && req.maxTurns() == null && req.timeoutSeconds() == null && Objects.equals(req.effort(), "high")));
     }
 
     @Test
     void reason_forwardsModelToHostService() throws IOException {
         var hostResult = new HostClaudeService.ReasoningResult("out", null);
-        when(hostClaudeService.reasonStructured(
-                eq("prompt"), isNull(), eq("claude-opus-4-6"), isNull(), isNull(), isNull(), isNull()))
+        when(hostClaudeService.reasonStructured(argThat((AiProvider.ReasoningRequest req) -> req != null && Objects.equals(req.prompt(), "prompt") && req.systemPrompt() == null && Objects.equals(req.model(), "claude-opus-4-6") && req.workingDirectory() == null && req.maxTurns() == null && req.timeoutSeconds() == null && req.effort() == null)))
                 .thenReturn(hostResult);
 
         var request = new AiProvider.ReasoningRequest("prompt", null, "claude-opus-4-6", null, null, null, null);
         provider.reason(request);
 
-        verify(hostClaudeService).reasonStructured(
-                eq("prompt"), isNull(), eq("claude-opus-4-6"), isNull(), isNull(), isNull(), isNull());
+        verify(hostClaudeService).reasonStructured(argThat((AiProvider.ReasoningRequest req) -> req != null && Objects.equals(req.prompt(), "prompt") && req.systemPrompt() == null && Objects.equals(req.model(), "claude-opus-4-6") && req.workingDirectory() == null && req.maxTurns() == null && req.timeoutSeconds() == null && req.effort() == null));
     }
 
     @Test
     void executeAction_delegatesToHostService() throws IOException {
         var hostResult = new HostClaudeService.ActionResult("output", 0, null);
-        when(hostClaudeService.executeAction(
-                eq("prompt"), eq("model"), eq("system"), eq("/path"), eq(300), eq(false),
-                any(), any(), isNull(), eq(false)))
+        when(hostClaudeService.executeAction(argThat((AiProvider.ActionRequest req) -> req != null && Objects.equals(req.prompt(), "prompt") && Objects.equals(req.model(), "model") && Objects.equals(req.systemPrompt(), "system") && Objects.equals(req.workingDirectory(), "/path") && Objects.equals(req.timeoutSeconds(), 300) && req.priority() == false && req.effort() == null && req.userMcpServers() == false)))
                 .thenReturn(hostResult);
 
         var request = new AiProvider.ActionRequest("prompt", "model", "system", "/path", 300, false);
@@ -96,33 +91,25 @@ class ClaudeAiProviderTest {
     @Test
     void executeAction_forwardsEffortToHostService() throws IOException {
         var hostResult = new HostClaudeService.ActionResult("output", 0, null);
-        when(hostClaudeService.executeAction(
-                eq("prompt"), isNull(), isNull(), isNull(), isNull(), eq(false),
-                any(), any(), eq("xhigh"), eq(false)))
+        when(hostClaudeService.executeAction(argThat((AiProvider.ActionRequest req) -> req != null && Objects.equals(req.prompt(), "prompt") && req.model() == null && req.systemPrompt() == null && req.workingDirectory() == null && req.timeoutSeconds() == null && req.priority() == false && Objects.equals(req.effort(), "xhigh") && req.userMcpServers() == false)))
                 .thenReturn(hostResult);
 
         var request = new AiProvider.ActionRequest("prompt", null, null, null, null, false, true, null, null, "xhigh");
         provider.executeAction(request);
 
-        verify(hostClaudeService).executeAction(
-                eq("prompt"), isNull(), isNull(), isNull(), isNull(), eq(false),
-                any(), any(), eq("xhigh"), eq(false));
+        verify(hostClaudeService).executeAction(argThat((AiProvider.ActionRequest req) -> req != null && Objects.equals(req.prompt(), "prompt") && req.model() == null && req.systemPrompt() == null && req.workingDirectory() == null && req.timeoutSeconds() == null && req.priority() == false && Objects.equals(req.effort(), "xhigh") && req.userMcpServers() == false));
     }
 
     @Test
     void executeAction_forwardsTheBlockOptInForUserMcpServers() throws IOException {
         var hostResult = new HostClaudeService.ActionResult("output", 0, null);
-        when(hostClaudeService.executeAction(
-                eq("prompt"), isNull(), isNull(), isNull(), isNull(), eq(false),
-                any(), any(), isNull(), eq(true)))
+        when(hostClaudeService.executeAction(argThat((AiProvider.ActionRequest req) -> req != null && Objects.equals(req.prompt(), "prompt") && req.model() == null && req.systemPrompt() == null && req.workingDirectory() == null && req.timeoutSeconds() == null && req.priority() == false && req.effort() == null && req.userMcpServers() == true)))
                 .thenReturn(hostResult);
 
         provider.executeAction(new AiProvider.ActionRequest("prompt", null, null, null, null, false, true, null, null,
                 null, true));
 
-        verify(hostClaudeService).executeAction(
-                eq("prompt"), isNull(), isNull(), isNull(), isNull(), eq(false),
-                any(), any(), isNull(), eq(true));
+        verify(hostClaudeService).executeAction(argThat((AiProvider.ActionRequest req) -> req != null && Objects.equals(req.prompt(), "prompt") && req.model() == null && req.systemPrompt() == null && req.workingDirectory() == null && req.timeoutSeconds() == null && req.priority() == false && req.effort() == null && req.userMcpServers() == true));
     }
 
     @Test

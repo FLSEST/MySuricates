@@ -52,15 +52,7 @@ public class ClaudeAiProvider implements AiProvider {
 
     @Override
     public ReasoningResult reason(ReasoningRequest request) throws IOException {
-        HostClaudeService.ReasoningResult result = hostClaudeService.reasonStructured(
-                request.prompt(),
-                request.systemPrompt(),
-                request.model(),
-                request.workingDirectory(),
-                request.maxTurns(),
-                request.timeoutSeconds(),
-                request.effort()
-        );
+        HostClaudeService.ReasoningResult result = hostClaudeService.reasonStructured(request);
         return new ReasoningResult(
                 result.text(),
                 AiResponseMetadata.fromClaudeResponse(result.parsed())
@@ -69,18 +61,7 @@ public class ClaudeAiProvider implements AiProvider {
 
     @Override
     public ActionResult executeAction(ActionRequest request) throws IOException {
-        HostClaudeService.ActionResult result = hostClaudeService.executeAction(
-                request.prompt(),
-                request.model(),
-                request.systemPrompt(),
-                request.workingDirectory(),
-                request.timeoutSeconds(),
-                request.priority(),
-                request.allowedTools(),
-                request.disallowedTools(),
-                request.effort(),
-                request.userMcpServers()
-        );
+        HostClaudeService.ActionResult result = hostClaudeService.executeAction(request);
         return new ActionResult(
                 result.text(),
                 result.exitCode(),

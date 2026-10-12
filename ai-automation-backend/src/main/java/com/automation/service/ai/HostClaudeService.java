@@ -59,36 +59,20 @@ public class HostClaudeService {
      * tool usage). An exit code ≠ 0 throws: the CLI then printed an error, not an answer ({@link CliExit}).
      */
     public ReasoningResult reasonStructured(String prompt) throws IOException {
-        return reasonStructured(prompt, null);
+        return reasonStructured(new AiProvider.ReasoningRequest(prompt));
     }
 
-    public ReasoningResult reasonStructured(String prompt, String systemPrompt) throws IOException {
-        return reasonStructured(prompt, systemPrompt, null, null);
-    }
-
-    public ReasoningResult reasonStructured(String prompt, String systemPrompt,
-                                             String workingDirectory, Integer maxTurns) throws IOException {
-        return reasonStructured(prompt, systemPrompt, workingDirectory, maxTurns, null);
-    }
-
-    public ReasoningResult reasonStructured(String prompt, String systemPrompt,
-                                             String workingDirectory, Integer maxTurns,
-                                             Integer timeoutSeconds) throws IOException {
-        return reasonStructured(prompt, systemPrompt, workingDirectory, maxTurns, timeoutSeconds, null);
-    }
-
-    public ReasoningResult reasonStructured(String prompt, String systemPrompt,
-                                             String workingDirectory, Integer maxTurns,
-                                             Integer timeoutSeconds, String effort) throws IOException {
-        return reasonStructured(prompt, systemPrompt, null, workingDirectory, maxTurns, timeoutSeconds, effort);
-    }
-
-    public ReasoningResult reasonStructured(String prompt, String systemPrompt, String model,
-                                             String workingDirectory, Integer maxTurns,
-                                             Integer timeoutSeconds, String effort) throws IOException {
+    /**
+     * Like {@link #reasonStructured(String)} with every setting of the request. One request record instead of
+     * positional overloads: prompt, system prompt, model and working directory are all strings and were easy to
+     * swap without the compiler noticing.
+     */
+    public ReasoningResult reasonStructured(AiProvider.ReasoningRequest request) throws IOException {
         List<String> cmd = ClaudeToolFlags.isolateFromUserMcpServers(
-                buildReasonCommand(prompt, systemPrompt, model, maxTurns, effort), modules, false);
-        var result = executeProcess(cmd, prompt, workingDirectory, timeoutSeconds, "Host Claude reasoning");
+                buildReasonCommand(request.prompt(), request.systemPrompt(), request.model(), request.maxTurns(),
+                        request.effort()), modules, false);
+        var result = executeProcess(cmd, request.prompt(), request.workingDirectory(), request.timeoutSeconds(),
+                "Host Claude reasoning");
         return new ReasoningResult(CliExit.answerOrThrow("Host Claude reasoning", result.exitCode, result.text,
                 result.parsed.failed()), result.parsed);
     }
@@ -99,53 +83,15 @@ public class HostClaudeService {
      * and --dangerously-skip-permissions with --allowedTools from CliPermissionsConfig.
      * Removes CLAUDE_CODE env var to prevent nested-session detection.
      */
-    public ActionResult executeAction(String prompt, String model,
-                                       String systemPrompt, String workingDirectory) throws IOException {
-        return executeAction(prompt, model, systemPrompt, workingDirectory, null, false);
-    }
-
-    public ActionResult executeAction(String prompt, String model,
-                                       String systemPrompt, String workingDirectory,
-                                       Integer timeoutSeconds) throws IOException {
-        return executeAction(prompt, model, systemPrompt, workingDirectory, timeoutSeconds, false);
-    }
-
-    public ActionResult executeAction(String prompt, String model,
-                                       String systemPrompt, String workingDirectory,
-                                       Integer timeoutSeconds, boolean priority) throws IOException {
-        return executeAction(prompt, model, systemPrompt, workingDirectory, timeoutSeconds, priority, null, null);
-    }
-
-    /**
-     * Action call with explicit tool restrictions. When {@code allowedTools} is non-empty,
-     * {@code --dangerously-skip-permissions} is suppressed and only the listed tools are available
-     * (via {@code --allowed-tools}). Used by the assistant chat flow to prevent ungated
-     * Edit/Write/Bash execution in the user's project directory.
-     */
-    public ActionResult executeAction(String prompt, String model,
-                                       String systemPrompt, String workingDirectory,
-                                       Integer timeoutSeconds, boolean priority,
-                                       List<String> allowedTools, List<String> disallowedTools) throws IOException {
-        return executeAction(prompt, model, systemPrompt, workingDirectory, timeoutSeconds, priority,
-                allowedTools, disallowedTools, null);
-    }
-
-    public ActionResult executeAction(String prompt, String model, String systemPrompt, String workingDirectory,
-                                       Integer timeoutSeconds, boolean priority, List<String> allowedTools,
-                                       List<String> disallowedTools, String effort) throws IOException {
-        return executeAction(prompt, model, systemPrompt, workingDirectory, timeoutSeconds, priority,
-                allowedTools, disallowedTools, effort, false);
-    }
-
-    /** @param userMcpServers the block opted in to the user's MCP servers ({@link ClaudeToolFlags#isolateFromUserMcpServers}) */
-    public ActionResult executeAction(String prompt, String model, String systemPrompt, String workingDirectory,
-                                       Integer timeoutSeconds, boolean priority, List<String> allowedTools,
-                                       List<String> disallowedTools, String effort, boolean userMcpServers)
-            throws IOException {
+    public ActionResult executeAction(AiProvider.ActionRequest request) throws IOException {
+        // With allowedTools set, --dangerously-skip-permissions is suppressed and only those tools are available
+        // (assistant chat: no ungated Edit/Write/Bash in the user's project). userMcpServers: the block opted in
+        // to the user's MCP servers ({@link ClaudeToolFlags#isolateFromUserMcpServers}).
         List<String> cmd = ClaudeToolFlags.isolateFromUserMcpServers(
-                buildActionCommand(prompt, model, systemPrompt, allowedTools, disallowedTools, effort), modules,
-                userMcpServers);
-        var result = executeProcess(cmd, prompt, workingDirectory, timeoutSeconds, "Host Claude action", priority);
+                buildActionCommand(request.prompt(), request.model(), request.systemPrompt(), request.allowedTools(),
+                        request.disallowedTools(), request.effort()), modules, request.userMcpServers());
+        var result = executeProcess(cmd, request.prompt(), request.workingDirectory(), request.timeoutSeconds(),
+                "Host Claude action", request.priority());
         return new ActionResult(result.text, result.exitCode, result.parsed);
     }
 

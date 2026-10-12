@@ -331,7 +331,7 @@ class HostClaudeServiceTest {
             }
         };
 
-        assertThatThrownBy(() -> service.executeAction("test", null, null, null))
+        assertThatThrownBy(() -> service.executeAction(new AiProvider.ActionRequest("test", null, null, null, null, false, false, null, null, null, false)))
                 .isInstanceOf(IOException.class)
                 .hasMessageContaining("timed out");
     }
@@ -348,7 +348,7 @@ class HostClaudeServiceTest {
         HostClaudeService service = ShellScriptCli.claudeReasoning(
                 "{\"type\":\"result\",\"subtype\":\"success\",\"is_error\":true,\"result\":\"Claude AI usage limit reached\"}", 1);
 
-        assertThatThrownBy(() -> service.reasonStructured("summarize", null, null, 1))
+        assertThatThrownBy(() -> service.reasonStructured(new AiProvider.ReasoningRequest("summarize", null, null, null, 1, null, null)))
                 .isInstanceOf(IOException.class)
                 .hasMessageContaining("exit code 1")
                 .hasMessageContaining("Claude AI usage limit reached");
@@ -372,7 +372,7 @@ class HostClaudeServiceTest {
         HostClaudeService service = ShellScriptCli.claudeReasoning(
                 "{\"type\":\"result\",\"subtype\":\"error_max_turns\",\"is_error\":false,\"num_turns\":1}", 0);
 
-        assertThatThrownBy(() -> service.reasonStructured("summarize", null, null, 1))
+        assertThatThrownBy(() -> service.reasonStructured(new AiProvider.ReasoningRequest("summarize", null, null, null, 1, null, null)))
                 .isInstanceOf(IOException.class)
                 .hasMessage("Host Claude reasoning failed: Claude CLI reported an error (error_max_turns) after 1 turn");
     }
@@ -382,7 +382,7 @@ class HostClaudeServiceTest {
         String line = "{\"type\":\"result\",\"subtype\":\"success\",\"is_error\":true,\"result\":\"API Error: 500\"}";
         HostClaudeService service = scriptedAction(line, 0);
 
-        HostClaudeService.ActionResult result = service.executeAction("do it", null, null, null);
+        HostClaudeService.ActionResult result = service.executeAction(new AiProvider.ActionRequest("do it", null, null, null, null, false, false, null, null, null, false));
 
         assertThat(result.exitCode()).isNotZero();
         assertThat(result.text()).isEqualTo("Claude CLI reported an error: API Error: 500");
@@ -394,7 +394,7 @@ class HostClaudeServiceTest {
         HostClaudeService service = scriptedAction(
                 "{\"type\":\"result\",\"subtype\":\"success\",\"is_error\":false,\"result\":\"done\"}", 0);
 
-        HostClaudeService.ActionResult result = service.executeAction("do it", null, null, null);
+        HostClaudeService.ActionResult result = service.executeAction(new AiProvider.ActionRequest("do it", null, null, null, null, false, false, null, null, null, false));
 
         assertThat(result.exitCode()).isZero();
         assertThat(result.text()).isEqualTo("done");
@@ -435,7 +435,7 @@ class HostClaudeServiceTest {
         };
 
         // Per-call timeout of 2s should override the 300s global default
-        assertThatThrownBy(() -> service.reasonStructured("test", null, null, null, 2))
+        assertThatThrownBy(() -> service.reasonStructured(new AiProvider.ReasoningRequest("test", null, null, null, null, 2, null)))
                 .isInstanceOf(IOException.class)
                 .hasMessageContaining("timed out after 2 seconds");
     }
@@ -457,7 +457,7 @@ class HostClaudeServiceTest {
         };
 
         // null timeout → falls back to global 1s
-        assertThatThrownBy(() -> service.reasonStructured("test", null, null, null, null))
+        assertThatThrownBy(() -> service.reasonStructured(new AiProvider.ReasoningRequest("test", null, null, null, null, null, null)))
                 .isInstanceOf(IOException.class)
                 .hasMessageContaining("timed out after 1 seconds");
     }
@@ -481,7 +481,7 @@ class HostClaudeServiceTest {
         };
 
         // Per-call timeout of 2s should override the 300s global default
-        assertThatThrownBy(() -> service.executeAction("test", null, null, null, 2))
+        assertThatThrownBy(() -> service.executeAction(new AiProvider.ActionRequest("test", null, null, null, 2, false, false, null, null, null, false)))
                 .isInstanceOf(IOException.class)
                 .hasMessageContaining("timed out after 2 seconds");
     }
@@ -505,7 +505,7 @@ class HostClaudeServiceTest {
         };
 
         // null timeout → falls back to global 1s
-        assertThatThrownBy(() -> service.executeAction("test", null, null, null, null))
+        assertThatThrownBy(() -> service.executeAction(new AiProvider.ActionRequest("test", null, null, null, null, false, false, null, null, null, false)))
                 .isInstanceOf(IOException.class)
                 .hasMessageContaining("timed out after 1 seconds");
     }
@@ -542,10 +542,10 @@ class HostClaudeServiceTest {
         HostClaudeService service = serviceReplaying(stream, 30, "");
         List<String> lines = new ArrayList<>();
 
-        HostClaudeService.ActionResult unbound = service.executeAction("prompt", null, null, null);
+        HostClaudeService.ActionResult unbound = service.executeAction(new AiProvider.ActionRequest("prompt", null, null, null, null, false, false, null, null, null, false));
         HostClaudeService.ActionResult bound = LiveOutput.bind((kind, text) -> lines.add(kind + ":" + text), () -> {
             try {
-                return service.executeAction("prompt", null, null, null);
+                return service.executeAction(new AiProvider.ActionRequest("prompt", null, null, null, null, false, false, null, null, null, false));
             } catch (IOException e) {
                 throw new UncheckedIOException(e);
             }
@@ -572,7 +572,7 @@ class HostClaudeServiceTest {
 
         assertThatThrownBy(() -> LiveOutput.bind((kind, text) -> lines.add(kind + ":" + text), () -> {
             try {
-                return service.executeAction("prompt", null, null, null);
+                return service.executeAction(new AiProvider.ActionRequest("prompt", null, null, null, null, false, false, null, null, null, false));
             } catch (IOException e) {
                 throw new UncheckedIOException(e);
             }
@@ -636,8 +636,8 @@ class HostClaudeServiceTest {
             }
         };
 
-        assertThat(service.executeAction("x", null, null, null).text()).isEqualTo("args:--strict-mcp-config");
-        assertThat(service.executeAction("x", null, null, null, null, false, null, null, null, true).text())
+        assertThat(service.executeAction(new AiProvider.ActionRequest("x", null, null, null, null, false, false, null, null, null, false)).text()).isEqualTo("args:--strict-mcp-config");
+        assertThat(service.executeAction(new AiProvider.ActionRequest("x", null, null, null, null, false, false, null, null, null, true)).text())
                 .isEqualTo("args:");
     }
 }

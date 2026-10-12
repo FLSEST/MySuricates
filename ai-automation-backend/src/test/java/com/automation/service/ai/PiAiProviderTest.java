@@ -1,5 +1,6 @@
 package com.automation.service.ai;
 
+import java.util.Objects;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -12,6 +13,7 @@ import java.util.List;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.verify;
@@ -50,7 +52,7 @@ class PiAiProviderTest {
 
     @Test
     void reason_delegatesToHostService() throws IOException {
-        when(hostPiService.reason(eq("prompt"), eq("system"), isNull(), eq("/path"), eq(3), eq(60), isNull()))
+        when(hostPiService.reason(argThat((AiProvider.ReasoningRequest req) -> req != null && Objects.equals(req.prompt(), "prompt") && Objects.equals(req.systemPrompt(), "system") && req.model() == null && Objects.equals(req.workingDirectory(), "/path") && Objects.equals(req.maxTurns(), 3) && Objects.equals(req.timeoutSeconds(), 60) && req.effort() == null)))
                 .thenReturn(new HostPiService.ReasoningResult("pi reasoning output"));
 
         var request = new AiProvider.ReasoningRequest("prompt", "system", "/path", 3, 60);
@@ -64,7 +66,7 @@ class PiAiProviderTest {
     /** TODO 20861200: the --thinking level pi reasoned with reaches the caller (agentic aiRequest). */
     @Test
     void reason_passesTheThinkingLevelOn() throws IOException {
-        when(hostPiService.reason(eq("prompt"), eq("system"), isNull(), eq("/path"), eq(5), eq(60), isNull()))
+        when(hostPiService.reason(argThat((AiProvider.ReasoningRequest req) -> req != null && Objects.equals(req.prompt(), "prompt") && Objects.equals(req.systemPrompt(), "system") && req.model() == null && Objects.equals(req.workingDirectory(), "/path") && Objects.equals(req.maxTurns(), 5) && Objects.equals(req.timeoutSeconds(), 60) && req.effort() == null)))
                 .thenReturn(new HostPiService.ReasoningResult("out", "high"));
 
         var result = provider.reason(new AiProvider.ReasoningRequest("prompt", "system", "/path", 5, 60));
@@ -74,38 +76,29 @@ class PiAiProviderTest {
 
     @Test
     void reason_forwardsWorkflowModelToHostService() throws IOException {
-        when(hostPiService.reason(eq("prompt"), eq("system"), eq("openai-codex/gpt-5.5"), eq("/path"), eq(3), eq(60), isNull()))
+        when(hostPiService.reason(argThat((AiProvider.ReasoningRequest req) -> req != null && Objects.equals(req.prompt(), "prompt") && Objects.equals(req.systemPrompt(), "system") && Objects.equals(req.model(), "openai-codex/gpt-5.5") && Objects.equals(req.workingDirectory(), "/path") && Objects.equals(req.maxTurns(), 3) && Objects.equals(req.timeoutSeconds(), 60) && req.effort() == null)))
                 .thenReturn(new HostPiService.ReasoningResult("out"));
 
         var request = new AiProvider.ReasoningRequest("prompt", "system", "openai-codex/gpt-5.5", "/path", 3, 60, null);
         provider.reason(request);
 
-        verify(hostPiService).reason(eq("prompt"), eq("system"), eq("openai-codex/gpt-5.5"), eq("/path"), eq(3), eq(60), isNull());
+        verify(hostPiService).reason(argThat((AiProvider.ReasoningRequest req) -> req != null && Objects.equals(req.prompt(), "prompt") && Objects.equals(req.systemPrompt(), "system") && Objects.equals(req.model(), "openai-codex/gpt-5.5") && Objects.equals(req.workingDirectory(), "/path") && Objects.equals(req.maxTurns(), 3) && Objects.equals(req.timeoutSeconds(), 60) && req.effort() == null));
     }
 
     @Test
     void reason_forwardsEffortToHostService() throws IOException {
-        when(hostPiService.reason(eq("prompt"), isNull(), isNull(), isNull(), isNull(), isNull(), eq("xhigh")))
+        when(hostPiService.reason(argThat((AiProvider.ReasoningRequest req) -> req != null && Objects.equals(req.prompt(), "prompt") && req.systemPrompt() == null && req.model() == null && req.workingDirectory() == null && req.maxTurns() == null && req.timeoutSeconds() == null && Objects.equals(req.effort(), "xhigh"))))
                 .thenReturn(new HostPiService.ReasoningResult("out"));
 
         var request = new AiProvider.ReasoningRequest("prompt", null, null, null, null, "xhigh");
         provider.reason(request);
 
-        verify(hostPiService).reason(eq("prompt"), isNull(), isNull(), isNull(), isNull(), isNull(), eq("xhigh"));
+        verify(hostPiService).reason(argThat((AiProvider.ReasoningRequest req) -> req != null && Objects.equals(req.prompt(), "prompt") && req.systemPrompt() == null && req.model() == null && req.workingDirectory() == null && req.maxTurns() == null && req.timeoutSeconds() == null && Objects.equals(req.effort(), "xhigh")));
     }
 
     @Test
     void executeAction_delegatesAllFieldsToHostService() throws IOException {
-        when(hostPiService.executeAction(
-                eq("user prompt"),
-                eq("google/gemini-2.0-flash"),
-                eq("instructions"),
-                eq("/work"),
-                eq(120),
-                eq(true),
-                eq(List.of("read", "bash")),
-                isNull(),
-                eq("high")))
+        when(hostPiService.executeAction(argThat((AiProvider.ActionRequest req) -> req != null && Objects.equals(req.prompt(), "user prompt") && Objects.equals(req.model(), "google/gemini-2.0-flash") && Objects.equals(req.systemPrompt(), "instructions") && Objects.equals(req.workingDirectory(), "/work") && Objects.equals(req.timeoutSeconds(), 120) && req.priority() == true && Objects.equals(req.allowedTools(), List.of("read", "bash")) && req.disallowedTools() == null && Objects.equals(req.effort(), "high"))))
                 .thenReturn(new HostPiService.ActionResult("done", 0));
 
         var request = new AiProvider.ActionRequest(
@@ -116,21 +109,12 @@ class PiAiProviderTest {
         assertThat(result.text()).isEqualTo("done");
         assertThat(result.exitCode()).isEqualTo(0);
         assertThat(result.metadata().estimated()).isTrue();
-        verify(hostPiService).executeAction(
-                eq("user prompt"),
-                eq("google/gemini-2.0-flash"),
-                eq("instructions"),
-                eq("/work"),
-                eq(120),
-                eq(true),
-                eq(List.of("read", "bash")),
-                isNull(),
-                eq("high"));
+        verify(hostPiService).executeAction(argThat((AiProvider.ActionRequest req) -> req != null && Objects.equals(req.prompt(), "user prompt") && Objects.equals(req.model(), "google/gemini-2.0-flash") && Objects.equals(req.systemPrompt(), "instructions") && Objects.equals(req.workingDirectory(), "/work") && Objects.equals(req.timeoutSeconds(), 120) && req.priority() == true && Objects.equals(req.allowedTools(), List.of("read", "bash")) && req.disallowedTools() == null && Objects.equals(req.effort(), "high")));
     }
 
     @Test
     void executeAction_nonZeroExit_isPropagated() throws IOException {
-        when(hostPiService.executeAction(any(), any(), any(), any(), any(), anyBoolean(), any(), any(), any()))
+        when(hostPiService.executeAction(any(AiProvider.ActionRequest.class)))
                 .thenReturn(new HostPiService.ActionResult("error message", 2));
 
         var request = new AiProvider.ActionRequest("prompt", null, null, null, null, false, true, null, null);
@@ -172,15 +156,15 @@ class PiAiProviderTest {
         java.nio.file.Files.writeString(project.resolve(RunContextFiles.WORKFLOW_MEMORY), "## Memory\nuse mvnw");
         String dir = project.toString();
         String expectedSystem = "instructions\n\n## Skills\nreview carefully\n\n## Memory\nuse mvnw";
-        when(hostPiService.executeAction(eq("do it"), isNull(), eq(expectedSystem), eq(dir), isNull(), anyBoolean(), isNull(), isNull(), isNull()))
+        when(hostPiService.executeAction(argThat((AiProvider.ActionRequest req) -> req != null && Objects.equals(req.prompt(), "do it") && req.model() == null && Objects.equals(req.systemPrompt(), expectedSystem) && Objects.equals(req.workingDirectory(), dir) && req.timeoutSeconds() == null && req.allowedTools() == null && req.disallowedTools() == null && req.effort() == null)))
                 .thenReturn(new HostPiService.ActionResult("ok", 0));
-        when(hostPiService.reason(eq("think"), eq(expectedSystem), isNull(), eq(dir), isNull(), isNull(), isNull()))
+        when(hostPiService.reason(argThat((AiProvider.ReasoningRequest req) -> req != null && Objects.equals(req.prompt(), "think") && Objects.equals(req.systemPrompt(), expectedSystem) && req.model() == null && Objects.equals(req.workingDirectory(), dir) && req.maxTurns() == null && req.timeoutSeconds() == null && req.effort() == null)))
                 .thenReturn(new HostPiService.ReasoningResult("thought"));
 
         provider.executeAction(new AiProvider.ActionRequest("do it", null, "instructions", dir));
         provider.reason(new AiProvider.ReasoningRequest("think", "instructions", null, dir, null, null, null));
 
-        verify(hostPiService).executeAction(eq("do it"), isNull(), eq(expectedSystem), eq(dir), isNull(), anyBoolean(), isNull(), isNull(), isNull());
-        verify(hostPiService).reason(eq("think"), eq(expectedSystem), isNull(), eq(dir), isNull(), isNull(), isNull());
+        verify(hostPiService).executeAction(argThat((AiProvider.ActionRequest req) -> req != null && Objects.equals(req.prompt(), "do it") && req.model() == null && Objects.equals(req.systemPrompt(), expectedSystem) && Objects.equals(req.workingDirectory(), dir) && req.timeoutSeconds() == null && req.allowedTools() == null && req.disallowedTools() == null && req.effort() == null));
+        verify(hostPiService).reason(argThat((AiProvider.ReasoningRequest req) -> req != null && Objects.equals(req.prompt(), "think") && Objects.equals(req.systemPrompt(), expectedSystem) && req.model() == null && Objects.equals(req.workingDirectory(), dir) && req.maxTurns() == null && req.timeoutSeconds() == null && req.effort() == null));
     }
 }

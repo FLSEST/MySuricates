@@ -1,5 +1,6 @@
 package com.automation.executor.blocks;
 
+import com.automation.entity.BlockDefinition;
 import com.automation.exception.WorkflowExecutionException;
 import com.automation.executor.ExecutionContext;
 import lombok.extern.slf4j.Slf4j;
@@ -74,7 +75,7 @@ public record AgenticBlockConfig(
         return new AgenticBlockConfig(
                 goal, successCriteria, maxIterations, iterationTimeoutSeconds,
                 totalTimeoutSeconds, maxTotalTokens, maxRepeatedActions,
-                requireApproval, claudeTimeout, Boolean.TRUE.equals(config.get("user_mcp_servers")));
+                requireApproval, claudeTimeout, BlockDefinition.userMcpServers(config));
     }
 
     private static String requireString(Map<String, Object> config, String key) {

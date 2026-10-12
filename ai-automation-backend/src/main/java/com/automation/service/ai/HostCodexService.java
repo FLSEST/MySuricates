@@ -55,7 +55,7 @@ public class HostCodexService {
      * Uses the default timeout from SummarizationConfig.
      */
     public String execute(String prompt, Path workingDirectory) throws IOException {
-        return execute(prompt, workingDirectory, config.getTimeoutSeconds(), false);
+        return execute(prompt, workingDirectory, config.getTimeoutSeconds(), CodexSandbox.WORKSPACE_WRITE, null, false);
     }
 
     /**
@@ -63,33 +63,18 @@ public class HostCodexService {
      * Prompt is delivered via stdin to avoid E2BIG errors on large prompts.
      */
     public String execute(String prompt, Path workingDirectory, int timeoutSeconds) throws IOException {
-        return execute(prompt, workingDirectory, timeoutSeconds, false);
+        return execute(prompt, workingDirectory, timeoutSeconds, CodexSandbox.WORKSPACE_WRITE, null, false);
     }
 
     /**
-     * Executes a one-shot codex prompt with a custom timeout and returns the text result.
-     * When readOnly is true, adds --sandbox read-only to prevent file writes (analysis mode).
+     * Executes a one-shot codex prompt with timeout, sandbox and model; a blank {@code model} lets codex pick its
+     * configured default (~/.codex/config.toml). {@code priority} marks an interactive call (assistant chat),
+     * which may use the slots the Codex limit keeps free for it (TODO bd5df8d7).
      */
-    public String execute(String prompt, Path workingDirectory, int timeoutSeconds, boolean readOnly) throws IOException {
-        return execute(prompt, workingDirectory, timeoutSeconds, readOnly, null);
-    }
-
-    /**
-     * Executes a one-shot codex prompt with a custom timeout, sandbox mode and model.
-     * A blank {@code model} lets codex pick its configured default (~/.codex/config.toml).
-     */
-    public String execute(String prompt, Path workingDirectory, int timeoutSeconds, boolean readOnly, String model) throws IOException {
-        return execute(prompt, workingDirectory, timeoutSeconds, readOnly, model, false);
-    }
-
-    /**
-     * Like {@link #execute(String, Path, int, boolean, String)}; {@code priority} marks an interactive call
-     * (assistant chat), which may use the slots the Codex limit keeps free for it (TODO bd5df8d7).
-     */
-    public String execute(String prompt, Path workingDirectory, int timeoutSeconds, boolean readOnly, String model,
+    public String execute(String prompt, Path workingDirectory, int timeoutSeconds, CodexSandbox sandbox, String model,
                           boolean priority) throws IOException {
         try (var permit = throttles.acquire(AiCliThrottles.CODEX, priority)) {
-            return run(prompt, workingDirectory, timeoutSeconds, readOnly, model);
+            return run(prompt, workingDirectory, timeoutSeconds, sandbox == CodexSandbox.READ_ONLY, model);
         }
     }
 

@@ -4,6 +4,7 @@ import com.automation.entity.BlockDefinition;
 import com.automation.entity.StepResult;
 import com.automation.entity.StepStatus;
 import com.automation.executor.ExecutionContext;
+import com.automation.service.ai.AiProvider;
 import com.automation.service.ai.AiProviderRegistry;
 import com.automation.service.ai.ClaudeAiProvider;
 import com.automation.service.ai.HostClaudeService;
@@ -17,6 +18,7 @@ import com.automation.repository.WorkflowRunRepository;
 import com.automation.service.learning.LearningService;
 import com.automation.service.system.SystemIdentityService;
 import com.automation.service.ai.ConversationPrompt;
+import java.util.Objects;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -125,7 +127,7 @@ class AgenticBlockExecutorTest {
     @Test
     void execute_goalAchievedOnFirstIteration() throws Exception {
         when(claudeProvider.buildConversationPrompt(anyString(), anyList())).thenReturn("prompt");
-        when(hostClaude.reasonStructured(eq("prompt"), anyString(), isNull(), isNull(), isNull(), isNull(), isNull())).thenReturn(
+        when(hostClaude.reasonStructured(argThat((AiProvider.ReasoningRequest req) -> req != null && Objects.equals(req.prompt(), "prompt") && req.systemPrompt() != null && req.model() == null && req.workingDirectory() == null && req.maxTurns() == null && req.timeoutSeconds() == null && req.effort() == null))).thenReturn(
                 rr("GOAL_STATUS: ACHIEVED\nRATIONALE: Already done\nACTION:\nSUMMARY: Goal was already met"));
 
         when(learningService.getAgenticStrategyHistory(anyString())).thenReturn(List.of());
@@ -140,18 +142,18 @@ class AgenticBlockExecutorTest {
         assertThat(metadata.get("totalIterations")).isEqualTo(1);
 
         // Should not have called action execution
-        verify(hostClaude, never()).executeAction(anyString(), any(), any(), any(), any(), anyBoolean(), any(), any(), any(), anyBoolean());
+        verify(hostClaude, never()).executeAction(argThat((AiProvider.ActionRequest req) -> req != null && req.prompt() != null));
     }
 
     @Test
     void execute_multiIterationUntilGoalAchieved() throws Exception {
         when(claudeProvider.buildConversationPrompt(anyString(), anyList())).thenReturn("prompt");
 
-        when(hostClaude.reasonStructured(eq("prompt"), anyString(), isNull(), isNull(), isNull(), isNull(), isNull()))
+        when(hostClaude.reasonStructured(argThat((AiProvider.ReasoningRequest req) -> req != null && Objects.equals(req.prompt(), "prompt") && req.systemPrompt() != null && req.model() == null && req.workingDirectory() == null && req.maxTurns() == null && req.timeoutSeconds() == null && req.effort() == null)))
                 .thenReturn(rr("GOAL_STATUS: IN_PROGRESS\nRATIONALE: Need to create file\nACTION: Create test.txt\nSUMMARY: Creating file"))
                 .thenReturn(rr("GOAL_STATUS: ACHIEVED\nRATIONALE: File created\nACTION:\nSUMMARY: Done"));
 
-        when(hostClaude.executeAction(eq("Create test.txt"), isNull(), isNull(), eq("/test/project"), isNull(), eq(false), isNull(), isNull(), isNull(), eq(false)))
+        when(hostClaude.executeAction(argThat((AiProvider.ActionRequest req) -> req != null && Objects.equals(req.prompt(), "Create test.txt") && req.model() == null && req.systemPrompt() == null && Objects.equals(req.workingDirectory(), "/test/project") && req.timeoutSeconds() == null && req.priority() == false && req.allowedTools() == null && req.disallowedTools() == null && req.effort() == null && req.userMcpServers() == false)))
                 .thenReturn(new HostClaudeService.ActionResult("File created", 0, null));
 
         when(learningService.getAgenticStrategyHistory(anyString())).thenReturn(List.of());
@@ -168,10 +170,10 @@ class AgenticBlockExecutorTest {
     @Test
     void execute_maxIterationsReached() throws Exception {
         when(claudeProvider.buildConversationPrompt(anyString(), anyList())).thenReturn("prompt");
-        when(hostClaude.reasonStructured(eq("prompt"), anyString(), isNull(), isNull(), isNull(), isNull(), isNull())).thenReturn(
+        when(hostClaude.reasonStructured(argThat((AiProvider.ReasoningRequest req) -> req != null && Objects.equals(req.prompt(), "prompt") && req.systemPrompt() != null && req.model() == null && req.workingDirectory() == null && req.maxTurns() == null && req.timeoutSeconds() == null && req.effort() == null))).thenReturn(
                 rr("GOAL_STATUS: IN_PROGRESS\nRATIONALE: Still working\nACTION: Try again\nSUMMARY: Retrying"));
 
-        when(hostClaude.executeAction(eq("Try again"), isNull(), isNull(), eq("/test/project"), isNull(), eq(false), isNull(), isNull(), isNull(), eq(false)))
+        when(hostClaude.executeAction(argThat((AiProvider.ActionRequest req) -> req != null && Objects.equals(req.prompt(), "Try again") && req.model() == null && req.systemPrompt() == null && Objects.equals(req.workingDirectory(), "/test/project") && req.timeoutSeconds() == null && req.priority() == false && req.allowedTools() == null && req.disallowedTools() == null && req.effort() == null && req.userMcpServers() == false)))
                 .thenReturn(new HostClaudeService.ActionResult("Still failing", 1, null));
 
         when(learningService.getAgenticStrategyHistory(anyString())).thenReturn(List.of());
@@ -199,14 +201,14 @@ class AgenticBlockExecutorTest {
     void execute_cancellationStopsLoop() throws Exception {
         when(claudeProvider.buildConversationPrompt(anyString(), anyList())).thenReturn("prompt");
 
-        when(hostClaude.executeAction(eq("Do something"), isNull(), isNull(), eq("/test/project"), isNull(), eq(false), isNull(), isNull(), isNull(), eq(false)))
+        when(hostClaude.executeAction(argThat((AiProvider.ActionRequest req) -> req != null && Objects.equals(req.prompt(), "Do something") && req.model() == null && req.systemPrompt() == null && Objects.equals(req.workingDirectory(), "/test/project") && req.timeoutSeconds() == null && req.priority() == false && req.allowedTools() == null && req.disallowedTools() == null && req.effort() == null && req.userMcpServers() == false)))
                 .thenReturn(new HostClaudeService.ActionResult("partial", 0, null));
 
         when(learningService.getAgenticStrategyHistory(anyString())).thenReturn(List.of());
 
         ExecutionContext context = buildContext();
         // Cancel after first iteration observe
-        when(hostClaude.reasonStructured(eq("prompt"), anyString(), isNull(), isNull(), isNull(), isNull(), isNull()))
+        when(hostClaude.reasonStructured(argThat((AiProvider.ReasoningRequest req) -> req != null && Objects.equals(req.prompt(), "prompt") && req.systemPrompt() != null && req.model() == null && req.workingDirectory() == null && req.maxTurns() == null && req.timeoutSeconds() == null && req.effort() == null)))
                 .thenReturn(rr("GOAL_STATUS: IN_PROGRESS\nRATIONALE: Working\nACTION: Do something\nSUMMARY: Step 1"))
                 .thenAnswer(invocation -> {
                     context.cancel();
@@ -218,13 +220,13 @@ class AgenticBlockExecutorTest {
         assertThat(result.getStatus()).isEqualTo(StepStatus.FAILED);
         // Cancelled during the second REASON: its action must not start. The unstubbed ACT call
         // used to return null and fail the step with an NPE, which made this test pass by accident.
-        verify(hostClaude, never()).executeAction(eq("More work"), any(), any(), any(), any(), anyBoolean(), any(), any(), any(), anyBoolean());
+        verify(hostClaude, never()).executeAction(argThat((AiProvider.ActionRequest req) -> req != null && Objects.equals(req.prompt(), "More work")));
     }
 
     @Test
     void execute_hostClaudeError_stopsWithFailure() throws Exception {
         when(claudeProvider.buildConversationPrompt(anyString(), anyList())).thenReturn("prompt");
-        when(hostClaude.reasonStructured(eq("prompt"), anyString(), isNull(), isNull(), isNull(), isNull(), isNull())).thenThrow(new java.io.IOException("Connection refused"));
+        when(hostClaude.reasonStructured(argThat((AiProvider.ReasoningRequest req) -> req != null && Objects.equals(req.prompt(), "prompt") && req.systemPrompt() != null && req.model() == null && req.workingDirectory() == null && req.maxTurns() == null && req.timeoutSeconds() == null && req.effort() == null))).thenThrow(new java.io.IOException("Connection refused"));
         when(learningService.getAgenticStrategyHistory(anyString())).thenReturn(List.of());
 
         StepResult result = executor.execute(buildBlock("Test"), buildContext());
@@ -255,14 +257,14 @@ class AgenticBlockExecutorTest {
     void execute_containerCommandFailure_isObservedAndRetried() throws Exception {
         when(claudeProvider.buildConversationPrompt(anyString(), anyList())).thenReturn("prompt");
 
-        when(hostClaude.reasonStructured(eq("prompt"), anyString(), isNull(), isNull(), isNull(), isNull(), isNull()))
+        when(hostClaude.reasonStructured(argThat((AiProvider.ReasoningRequest req) -> req != null && Objects.equals(req.prompt(), "prompt") && req.systemPrompt() != null && req.model() == null && req.workingDirectory() == null && req.maxTurns() == null && req.timeoutSeconds() == null && req.effort() == null)))
                 .thenReturn(rr("GOAL_STATUS: IN_PROGRESS\nRATIONALE: First try\nACTION: Run tests\nSUMMARY: Running tests"))
                 .thenReturn(rr("GOAL_STATUS: IN_PROGRESS\nRATIONALE: Try different approach\nACTION: Fix and run\nSUMMARY: Fixing"))
                 .thenReturn(rr("GOAL_STATUS: ACHIEVED\nRATIONALE: Fixed\nACTION:\nSUMMARY: All good"));
 
-        when(hostClaude.executeAction(eq("Run tests"), isNull(), isNull(), eq("/test/project"), isNull(), eq(false), isNull(), isNull(), isNull(), eq(false)))
+        when(hostClaude.executeAction(argThat((AiProvider.ActionRequest req) -> req != null && Objects.equals(req.prompt(), "Run tests") && req.model() == null && req.systemPrompt() == null && Objects.equals(req.workingDirectory(), "/test/project") && req.timeoutSeconds() == null && req.priority() == false && req.allowedTools() == null && req.disallowedTools() == null && req.effort() == null && req.userMcpServers() == false)))
                 .thenReturn(new HostClaudeService.ActionResult("Tests failed: 3 errors", 1, null));
-        when(hostClaude.executeAction(eq("Fix and run"), isNull(), isNull(), eq("/test/project"), isNull(), eq(false), isNull(), isNull(), isNull(), eq(false)))
+        when(hostClaude.executeAction(argThat((AiProvider.ActionRequest req) -> req != null && Objects.equals(req.prompt(), "Fix and run") && req.model() == null && req.systemPrompt() == null && Objects.equals(req.workingDirectory(), "/test/project") && req.timeoutSeconds() == null && req.priority() == false && req.allowedTools() == null && req.disallowedTools() == null && req.effort() == null && req.userMcpServers() == false)))
                 .thenReturn(new HostClaudeService.ActionResult("All tests pass", 0, null));
 
         when(learningService.getAgenticStrategyHistory(anyString())).thenReturn(List.of());
@@ -277,7 +279,7 @@ class AgenticBlockExecutorTest {
     @Test
     void execute_metadataStoredCorrectly() throws Exception {
         when(claudeProvider.buildConversationPrompt(anyString(), anyList())).thenReturn("prompt");
-        when(hostClaude.reasonStructured(eq("prompt"), anyString(), isNull(), isNull(), isNull(), isNull(), isNull())).thenReturn(
+        when(hostClaude.reasonStructured(argThat((AiProvider.ReasoningRequest req) -> req != null && Objects.equals(req.prompt(), "prompt") && req.systemPrompt() != null && req.model() == null && req.workingDirectory() == null && req.maxTurns() == null && req.timeoutSeconds() == null && req.effort() == null))).thenReturn(
                 rr("GOAL_STATUS: ACHIEVED\nRATIONALE: Done\nACTION:\nSUMMARY: Complete"));
         when(learningService.getAgenticStrategyHistory(anyString())).thenReturn(List.of());
 
@@ -302,7 +304,7 @@ class AgenticBlockExecutorTest {
         ));
 
         when(claudeProvider.buildConversationPrompt(anyString(), anyList())).thenReturn("prompt");
-        when(hostClaude.reasonStructured(eq("prompt"), anyString(), isNull(), isNull(), isNull(), isNull(), isNull())).thenReturn(
+        when(hostClaude.reasonStructured(argThat((AiProvider.ReasoningRequest req) -> req != null && Objects.equals(req.prompt(), "prompt") && req.systemPrompt() != null && req.model() == null && req.workingDirectory() == null && req.maxTurns() == null && req.timeoutSeconds() == null && req.effort() == null))).thenReturn(
                 rr("GOAL_STATUS: ACHIEVED\nRATIONALE: Done\nACTION:\nSUMMARY: Complete"));
 
         executor.execute(buildBlock("Test"), buildContext());
@@ -314,7 +316,7 @@ class AgenticBlockExecutorTest {
     @Test
     void execute_learningServiceCalledWithWorkflowId_notRunId() throws Exception {
         when(claudeProvider.buildConversationPrompt(anyString(), anyList())).thenReturn("prompt");
-        when(hostClaude.reasonStructured(eq("prompt"), anyString(), isNull(), isNull(), isNull(), isNull(), isNull())).thenReturn(
+        when(hostClaude.reasonStructured(argThat((AiProvider.ReasoningRequest req) -> req != null && Objects.equals(req.prompt(), "prompt") && req.systemPrompt() != null && req.model() == null && req.workingDirectory() == null && req.maxTurns() == null && req.timeoutSeconds() == null && req.effort() == null))).thenReturn(
                 rr("GOAL_STATUS: ACHIEVED\nRATIONALE: Done\nACTION:\nSUMMARY: Complete"));
         when(learningService.getAgenticStrategyHistory("workflow-1")).thenReturn(List.of());
 
@@ -328,7 +330,7 @@ class AgenticBlockExecutorTest {
     @Test
     void execute_broadcastsWebSocketEvents() throws Exception {
         when(claudeProvider.buildConversationPrompt(anyString(), anyList())).thenReturn("prompt");
-        when(hostClaude.reasonStructured(eq("prompt"), anyString(), isNull(), isNull(), isNull(), isNull(), isNull())).thenReturn(
+        when(hostClaude.reasonStructured(argThat((AiProvider.ReasoningRequest req) -> req != null && Objects.equals(req.prompt(), "prompt") && req.systemPrompt() != null && req.model() == null && req.workingDirectory() == null && req.maxTurns() == null && req.timeoutSeconds() == null && req.effort() == null))).thenReturn(
                 rr("GOAL_STATUS: ACHIEVED\nRATIONALE: Done\nACTION:\nSUMMARY: Complete"));
         when(learningService.getAgenticStrategyHistory(anyString())).thenReturn(List.of());
 
@@ -343,7 +345,7 @@ class AgenticBlockExecutorTest {
     @Test
     void execute_goalImpossible_returnsFailed() throws Exception {
         when(claudeProvider.buildConversationPrompt(anyString(), anyList())).thenReturn("prompt");
-        when(hostClaude.reasonStructured(eq("prompt"), anyString(), isNull(), isNull(), isNull(), isNull(), isNull())).thenReturn(
+        when(hostClaude.reasonStructured(argThat((AiProvider.ReasoningRequest req) -> req != null && Objects.equals(req.prompt(), "prompt") && req.systemPrompt() != null && req.model() == null && req.workingDirectory() == null && req.maxTurns() == null && req.timeoutSeconds() == null && req.effort() == null))).thenReturn(
                 rr("GOAL_STATUS: IMPOSSIBLE\nRATIONALE: No access\nACTION:\nSUMMARY: Cannot proceed"));
         when(learningService.getAgenticStrategyHistory(anyString())).thenReturn(List.of());
 
@@ -373,11 +375,11 @@ class AgenticBlockExecutorTest {
                 "result", null, 1.0, 1000L, 800L, 1, highUsage, null, null);
 
         when(claudeProvider.buildConversationPrompt(anyString(), anyList())).thenReturn("prompt");
-        when(hostClaude.reasonStructured(eq("prompt"), anyString(), isNull(), isNull(), isNull(), isNull(), isNull()))
+        when(hostClaude.reasonStructured(argThat((AiProvider.ReasoningRequest req) -> req != null && Objects.equals(req.prompt(), "prompt") && req.systemPrompt() != null && req.model() == null && req.workingDirectory() == null && req.maxTurns() == null && req.timeoutSeconds() == null && req.effort() == null)))
                 .thenReturn(new ReasoningResult(
                         "GOAL_STATUS: IN_PROGRESS\nRATIONALE: Working\nACTION: Do work\nSUMMARY: Step", parsedWithUsage));
 
-        when(hostClaude.executeAction(eq("Do work"), isNull(), isNull(), eq("/test/project"), isNull(), eq(false), isNull(), isNull(), isNull(), eq(false)))
+        when(hostClaude.executeAction(argThat((AiProvider.ActionRequest req) -> req != null && Objects.equals(req.prompt(), "Do work") && req.model() == null && req.systemPrompt() == null && Objects.equals(req.workingDirectory(), "/test/project") && req.timeoutSeconds() == null && req.priority() == false && req.allowedTools() == null && req.disallowedTools() == null && req.effort() == null && req.userMcpServers() == false)))
                 .thenReturn(new HostClaudeService.ActionResult("Done", 0, parsedWithUsage));
 
         when(learningService.getAgenticStrategyHistory(anyString())).thenReturn(List.of());
@@ -405,14 +407,14 @@ class AgenticBlockExecutorTest {
     void execute_tokenTrackingFailed_afterConsecutiveBlindIterations() throws Exception {
         // All iterations return null parsed (no usage data) — triggers fallback estimation + abort after 3
         when(claudeProvider.buildConversationPrompt(anyString(), anyList())).thenReturn("prompt");
-        when(hostClaude.reasonStructured(eq("prompt"), anyString(), isNull(), isNull(), isNull(), isNull(), isNull()))
+        when(hostClaude.reasonStructured(argThat((AiProvider.ReasoningRequest req) -> req != null && Objects.equals(req.prompt(), "prompt") && req.systemPrompt() != null && req.model() == null && req.workingDirectory() == null && req.maxTurns() == null && req.timeoutSeconds() == null && req.effort() == null)))
                 .thenReturn(rr("GOAL_STATUS: IN_PROGRESS\nRATIONALE: Working\nACTION: Step A\nSUMMARY: Doing A"))
                 .thenReturn(rr("GOAL_STATUS: IN_PROGRESS\nRATIONALE: Continuing\nACTION: Step B\nSUMMARY: Doing B"))
                 .thenReturn(rr("GOAL_STATUS: IN_PROGRESS\nRATIONALE: More work\nACTION: Step C\nSUMMARY: Doing C"))
                 .thenReturn(rr("GOAL_STATUS: IN_PROGRESS\nRATIONALE: Keep going\nACTION: Step D\nSUMMARY: Doing D"));
 
         // ActionResult with null parsed → no usage data
-        when(hostClaude.executeAction(anyString(), isNull(), isNull(), eq("/test/project"), isNull(), eq(false), isNull(), isNull(), isNull(), eq(false)))
+        when(hostClaude.executeAction(argThat((AiProvider.ActionRequest req) -> req != null && req.prompt() != null && req.model() == null && req.systemPrompt() == null && Objects.equals(req.workingDirectory(), "/test/project") && req.timeoutSeconds() == null && req.priority() == false && req.allowedTools() == null && req.disallowedTools() == null && req.effort() == null && req.userMcpServers() == false)))
                 .thenReturn(new HostClaudeService.ActionResult("output", 0, null));
 
         when(learningService.getAgenticStrategyHistory(anyString())).thenReturn(List.of());
@@ -447,18 +449,18 @@ class AgenticBlockExecutorTest {
                 "result", null, 0.01, 500L, 400L, 1, realUsage, null, null);
 
         when(claudeProvider.buildConversationPrompt(anyString(), anyList())).thenReturn("prompt");
-        when(hostClaude.reasonStructured(eq("prompt"), anyString(), isNull(), isNull(), isNull(), isNull(), isNull()))
+        when(hostClaude.reasonStructured(argThat((AiProvider.ReasoningRequest req) -> req != null && Objects.equals(req.prompt(), "prompt") && req.systemPrompt() != null && req.model() == null && req.workingDirectory() == null && req.maxTurns() == null && req.timeoutSeconds() == null && req.effort() == null)))
                 .thenReturn(rr("GOAL_STATUS: IN_PROGRESS\nRATIONALE: First\nACTION: Step 1\nSUMMARY: S1"))
                 .thenReturn(new ReasoningResult(
                         "GOAL_STATUS: IN_PROGRESS\nRATIONALE: Second\nACTION: Step 2\nSUMMARY: S2", parsedWithUsage))
                 .thenReturn(rr("GOAL_STATUS: IN_PROGRESS\nRATIONALE: Third\nACTION: Step 3\nSUMMARY: S3"))
                 .thenReturn(rr("GOAL_STATUS: ACHIEVED\nRATIONALE: Done\nACTION:\nSUMMARY: Complete"));
 
-        when(hostClaude.executeAction(eq("Step 1"), isNull(), isNull(), eq("/test/project"), isNull(), eq(false), isNull(), isNull(), isNull(), eq(false)))
+        when(hostClaude.executeAction(argThat((AiProvider.ActionRequest req) -> req != null && Objects.equals(req.prompt(), "Step 1") && req.model() == null && req.systemPrompt() == null && Objects.equals(req.workingDirectory(), "/test/project") && req.timeoutSeconds() == null && req.priority() == false && req.allowedTools() == null && req.disallowedTools() == null && req.effort() == null && req.userMcpServers() == false)))
                 .thenReturn(new HostClaudeService.ActionResult("out1", 0, null));
-        when(hostClaude.executeAction(eq("Step 2"), isNull(), isNull(), eq("/test/project"), isNull(), eq(false), isNull(), isNull(), isNull(), eq(false)))
+        when(hostClaude.executeAction(argThat((AiProvider.ActionRequest req) -> req != null && Objects.equals(req.prompt(), "Step 2") && req.model() == null && req.systemPrompt() == null && Objects.equals(req.workingDirectory(), "/test/project") && req.timeoutSeconds() == null && req.priority() == false && req.allowedTools() == null && req.disallowedTools() == null && req.effort() == null && req.userMcpServers() == false)))
                 .thenReturn(new HostClaudeService.ActionResult("out2", 0, parsedWithUsage));
-        when(hostClaude.executeAction(eq("Step 3"), isNull(), isNull(), eq("/test/project"), isNull(), eq(false), isNull(), isNull(), isNull(), eq(false)))
+        when(hostClaude.executeAction(argThat((AiProvider.ActionRequest req) -> req != null && Objects.equals(req.prompt(), "Step 3") && req.model() == null && req.systemPrompt() == null && Objects.equals(req.workingDirectory(), "/test/project") && req.timeoutSeconds() == null && req.priority() == false && req.allowedTools() == null && req.disallowedTools() == null && req.effort() == null && req.userMcpServers() == false)))
                 .thenReturn(new HostClaudeService.ActionResult("out3", 0, null));
 
         when(learningService.getAgenticStrategyHistory(anyString())).thenReturn(List.of());
@@ -473,7 +475,7 @@ class AgenticBlockExecutorTest {
     @Test
     void execute_setsContextVariables() throws Exception {
         when(claudeProvider.buildConversationPrompt(anyString(), anyList())).thenReturn("prompt");
-        when(hostClaude.reasonStructured(eq("prompt"), anyString(), isNull(), isNull(), isNull(), isNull(), isNull())).thenReturn(
+        when(hostClaude.reasonStructured(argThat((AiProvider.ReasoningRequest req) -> req != null && Objects.equals(req.prompt(), "prompt") && req.systemPrompt() != null && req.model() == null && req.workingDirectory() == null && req.maxTurns() == null && req.timeoutSeconds() == null && req.effort() == null))).thenReturn(
                 rr("GOAL_STATUS: ACHIEVED\nRATIONALE: Done\nACTION:\nSUMMARY: Complete"));
         when(learningService.getAgenticStrategyHistory(anyString())).thenReturn(List.of());
 
@@ -490,10 +492,10 @@ class AgenticBlockExecutorTest {
         ClaudeJsonResponse parsed = new ClaudeJsonResponse("result", null, 0.01, 200L, 100L, 1, usage, null, null);
 
         when(claudeProvider.buildConversationPrompt(anyString(), anyList())).thenReturn("prompt");
-        when(hostClaude.reasonStructured(eq("prompt"), anyString(), isNull(), isNull(), isNull(), isNull(), isNull()))
+        when(hostClaude.reasonStructured(argThat((AiProvider.ReasoningRequest req) -> req != null && Objects.equals(req.prompt(), "prompt") && req.systemPrompt() != null && req.model() == null && req.workingDirectory() == null && req.maxTurns() == null && req.timeoutSeconds() == null && req.effort() == null)))
                 .thenReturn(new ReasoningResult("GOAL_STATUS: IN_PROGRESS\nRATIONALE: Trying\nACTION: same action\nSUMMARY: Retry", parsed));
 
-        when(hostClaude.executeAction(eq("same action"), isNull(), isNull(), eq("/test/project"), isNull(), eq(false), isNull(), isNull(), isNull(), eq(false)))
+        when(hostClaude.executeAction(argThat((AiProvider.ActionRequest req) -> req != null && Objects.equals(req.prompt(), "same action") && req.model() == null && req.systemPrompt() == null && Objects.equals(req.workingDirectory(), "/test/project") && req.timeoutSeconds() == null && req.priority() == false && req.allowedTools() == null && req.disallowedTools() == null && req.effort() == null && req.userMcpServers() == false)))
                 .thenReturn(new HostClaudeService.ActionResult("failed", 1, parsed));
 
         when(learningService.getAgenticStrategyHistory(anyString())).thenReturn(List.of());
@@ -517,7 +519,7 @@ class AgenticBlockExecutorTest {
     @Test
     void execute_noActionInPlan_asksForAction() throws Exception {
         when(claudeProvider.buildConversationPrompt(anyString(), anyList())).thenReturn("prompt");
-        when(hostClaude.reasonStructured(eq("prompt"), anyString(), isNull(), isNull(), isNull(), isNull(), isNull()))
+        when(hostClaude.reasonStructured(argThat((AiProvider.ReasoningRequest req) -> req != null && Objects.equals(req.prompt(), "prompt") && req.systemPrompt() != null && req.model() == null && req.workingDirectory() == null && req.maxTurns() == null && req.timeoutSeconds() == null && req.effort() == null)))
                 // First response has no action
                 .thenReturn(rr("GOAL_STATUS: IN_PROGRESS\nRATIONALE: Thinking\nACTION: \nSUMMARY: Planning"))
                 // Second response achieves goal
@@ -530,7 +532,7 @@ class AgenticBlockExecutorTest {
         assertThat(result.getStatus()).isEqualTo(StepStatus.COMPLETED);
         assertThat(result.getMetadata().get("totalIterations")).isEqualTo(2);
         // No executeAction call for the empty-action iteration
-        verify(hostClaude, never()).executeAction(anyString(), any(), any(), any(), any(), anyBoolean(), any(), any(), any(), anyBoolean());
+        verify(hostClaude, never()).executeAction(argThat((AiProvider.ActionRequest req) -> req != null && req.prompt() != null));
     }
 
     @Test
@@ -542,14 +544,14 @@ class AgenticBlockExecutorTest {
         ClaudeJsonResponse parsed = new ClaudeJsonResponse("result", null, 0.01, 200L, 100L, 1, usage, null, null);
 
         when(claudeProvider.buildConversationPrompt(anyString(), anyList())).thenReturn("prompt");
-        when(hostClaude.reasonStructured(eq("prompt"), anyString(), isNull(), isNull(), isNull(), isNull(), isNull()))
+        when(hostClaude.reasonStructured(argThat((AiProvider.ReasoningRequest req) -> req != null && Objects.equals(req.prompt(), "prompt") && req.systemPrompt() != null && req.model() == null && req.workingDirectory() == null && req.maxTurns() == null && req.timeoutSeconds() == null && req.effort() == null)))
                 .thenReturn(new ReasoningResult("GOAL_STATUS: IN_PROGRESS\nRATIONALE: Step1\nACTION: Action A\nSUMMARY: S1", parsed))
                 .thenReturn(new ReasoningResult("GOAL_STATUS: IN_PROGRESS\nRATIONALE: Step2\nACTION: Action B\nSUMMARY: S2", parsed))
                 .thenReturn(new ReasoningResult("GOAL_STATUS: IN_PROGRESS\nRATIONALE: Step3\nACTION: Action C\nSUMMARY: S3", parsed))
                 .thenReturn(new ReasoningResult("GOAL_STATUS: IN_PROGRESS\nRATIONALE: Step4\nACTION: Action D\nSUMMARY: S4", parsed))
                 .thenReturn(new ReasoningResult("GOAL_STATUS: ACHIEVED\nRATIONALE: Done\nACTION:\nSUMMARY: Complete", parsed));
 
-        when(hostClaude.executeAction(anyString(), isNull(), isNull(), eq("/test/project"), isNull(), eq(false), isNull(), isNull(), isNull(), eq(false)))
+        when(hostClaude.executeAction(argThat((AiProvider.ActionRequest req) -> req != null && req.prompt() != null && req.model() == null && req.systemPrompt() == null && Objects.equals(req.workingDirectory(), "/test/project") && req.timeoutSeconds() == null && req.priority() == false && req.allowedTools() == null && req.disallowedTools() == null && req.effort() == null && req.userMcpServers() == false)))
                 .thenReturn(new HostClaudeService.ActionResult("ok", 0, parsed));
 
         when(learningService.getAgenticStrategyHistory(anyString())).thenReturn(List.of());
@@ -571,15 +573,15 @@ class AgenticBlockExecutorTest {
                 "x".repeat(110_000) + "\nSUMMARY: Large action";
 
         when(claudeProvider.buildConversationPrompt(anyString(), anyList())).thenReturn("prompt");
-        when(hostClaude.reasonStructured(eq("prompt"), anyString(), isNull(), isNull(), isNull(), isNull(), isNull()))
+        when(hostClaude.reasonStructured(argThat((AiProvider.ReasoningRequest req) -> req != null && Objects.equals(req.prompt(), "prompt") && req.systemPrompt() != null && req.model() == null && req.workingDirectory() == null && req.maxTurns() == null && req.timeoutSeconds() == null && req.effort() == null)))
                 .thenReturn(rr(oversizedAction))
                 .thenReturn(rr("GOAL_STATUS: ACHIEVED\nRATIONALE: Done\nACTION:\nSUMMARY: Complete"));
 
         // The compression call via reason (provider.reason)
-        when(hostClaude.reasonStructured(contains("OVERSIZED ACTION"), isNull(), isNull(), isNull(), eq(1), eq(60), isNull()))
+        when(hostClaude.reasonStructured(argThat((AiProvider.ReasoningRequest req) -> req != null && req.prompt() != null && req.prompt().contains("OVERSIZED ACTION") && req.systemPrompt() == null && req.model() == null && req.workingDirectory() == null && Objects.equals(req.maxTurns(), 1) && Objects.equals(req.timeoutSeconds(), 60) && req.effort() == null)))
                 .thenReturn(rr("Compressed: do the thing"));
 
-        when(hostClaude.executeAction(anyString(), isNull(), isNull(), eq("/test/project"), isNull(), eq(false), isNull(), isNull(), isNull(), eq(false)))
+        when(hostClaude.executeAction(argThat((AiProvider.ActionRequest req) -> req != null && req.prompt() != null && req.model() == null && req.systemPrompt() == null && Objects.equals(req.workingDirectory(), "/test/project") && req.timeoutSeconds() == null && req.priority() == false && req.allowedTools() == null && req.disallowedTools() == null && req.effort() == null && req.userMcpServers() == false)))
                 .thenReturn(new HostClaudeService.ActionResult("done", 0, null));
 
         when(learningService.getAgenticStrategyHistory(anyString())).thenReturn(List.of());
@@ -588,7 +590,7 @@ class AgenticBlockExecutorTest {
 
         assertThat(result.getStatus()).isEqualTo(StepStatus.COMPLETED);
         // The compressed action should have been used for execution
-        verify(hostClaude).executeAction(eq("Compressed: do the thing"), isNull(), isNull(), eq("/test/project"), isNull(), eq(false), isNull(), isNull(), isNull(), eq(false));
+        verify(hostClaude).executeAction(argThat((AiProvider.ActionRequest req) -> req != null && Objects.equals(req.prompt(), "Compressed: do the thing") && req.model() == null && req.systemPrompt() == null && Objects.equals(req.workingDirectory(), "/test/project") && req.timeoutSeconds() == null && req.priority() == false && req.allowedTools() == null && req.disallowedTools() == null && req.effort() == null && req.userMcpServers() == false));
     }
 
     @Test
@@ -597,15 +599,15 @@ class AgenticBlockExecutorTest {
                 "y".repeat(110_000) + "\nSUMMARY: Large";
 
         when(claudeProvider.buildConversationPrompt(anyString(), anyList())).thenReturn("prompt");
-        when(hostClaude.reasonStructured(eq("prompt"), anyString(), isNull(), isNull(), isNull(), isNull(), isNull()))
+        when(hostClaude.reasonStructured(argThat((AiProvider.ReasoningRequest req) -> req != null && Objects.equals(req.prompt(), "prompt") && req.systemPrompt() != null && req.model() == null && req.workingDirectory() == null && req.maxTurns() == null && req.timeoutSeconds() == null && req.effort() == null)))
                 .thenReturn(rr(oversizedAction))
                 .thenReturn(rr("GOAL_STATUS: ACHIEVED\nRATIONALE: Done\nACTION:\nSUMMARY: Complete"));
 
         // Compression fails
-        when(hostClaude.reasonStructured(contains("OVERSIZED ACTION"), isNull(), isNull(), eq(1), eq(60), isNull()))
+        when(hostClaude.reasonStructured(argThat((AiProvider.ReasoningRequest req) -> req != null && req.prompt() != null && req.prompt().contains("OVERSIZED ACTION") && req.systemPrompt() == null && req.workingDirectory() == null && Objects.equals(req.maxTurns(), 1) && Objects.equals(req.timeoutSeconds(), 60) && req.effort() == null)))
                 .thenThrow(new java.io.IOException("Compression failed"));
 
-        when(hostClaude.executeAction(anyString(), isNull(), isNull(), eq("/test/project"), isNull(), eq(false), isNull(), isNull(), isNull(), eq(false)))
+        when(hostClaude.executeAction(argThat((AiProvider.ActionRequest req) -> req != null && req.prompt() != null && req.model() == null && req.systemPrompt() == null && Objects.equals(req.workingDirectory(), "/test/project") && req.timeoutSeconds() == null && req.priority() == false && req.allowedTools() == null && req.disallowedTools() == null && req.effort() == null && req.userMcpServers() == false)))
                 .thenReturn(new HostClaudeService.ActionResult("done", 0, null));
 
         when(learningService.getAgenticStrategyHistory(anyString())).thenReturn(List.of());
@@ -615,17 +617,17 @@ class AgenticBlockExecutorTest {
         // Should still complete — fallback truncation was used
         assertThat(result.getStatus()).isEqualTo(StepStatus.COMPLETED);
         // The action passed to executeAction should be truncated (contains [TRUNCATED:...)
-        verify(hostClaude).executeAction(contains("[TRUNCATED:"), isNull(), isNull(), eq("/test/project"), isNull(), eq(false), isNull(), isNull(), isNull(), eq(false));
+        verify(hostClaude).executeAction(argThat((AiProvider.ActionRequest req) -> req != null && req.prompt() != null && req.prompt().contains("[TRUNCATED:") && req.model() == null && req.systemPrompt() == null && Objects.equals(req.workingDirectory(), "/test/project") && req.timeoutSeconds() == null && req.priority() == false && req.allowedTools() == null && req.disallowedTools() == null && req.effort() == null && req.userMcpServers() == false));
     }
 
     @Test
     void execute_withModelAndInstructions_passedToProvider() throws Exception {
         when(claudeProvider.buildConversationPrompt(anyString(), anyList())).thenReturn("prompt");
-        when(hostClaude.reasonStructured(eq("prompt"), anyString(), eq("claude-opus-4-6"), isNull(), isNull(), isNull(), isNull()))
+        when(hostClaude.reasonStructured(argThat((AiProvider.ReasoningRequest req) -> req != null && Objects.equals(req.prompt(), "prompt") && req.systemPrompt() != null && Objects.equals(req.model(), "claude-opus-4-6") && req.workingDirectory() == null && req.maxTurns() == null && req.timeoutSeconds() == null && req.effort() == null)))
                 .thenReturn(rr("GOAL_STATUS: IN_PROGRESS\nRATIONALE: Working\nACTION: Do it\nSUMMARY: Step"))
                 .thenReturn(rr("GOAL_STATUS: ACHIEVED\nRATIONALE: Done\nACTION:\nSUMMARY: Complete"));
 
-        when(hostClaude.executeAction(eq("Do it"), eq("claude-opus-4-6"), eq("Custom instructions for this workflow"), eq("/test/project"), isNull(), eq(false), isNull(), isNull(), isNull(), eq(false)))
+        when(hostClaude.executeAction(argThat((AiProvider.ActionRequest req) -> req != null && Objects.equals(req.prompt(), "Do it") && Objects.equals(req.model(), "claude-opus-4-6") && Objects.equals(req.systemPrompt(), "Custom instructions for this workflow") && Objects.equals(req.workingDirectory(), "/test/project") && req.timeoutSeconds() == null && req.priority() == false && req.allowedTools() == null && req.disallowedTools() == null && req.effort() == null && req.userMcpServers() == false)))
                 .thenReturn(new HostClaudeService.ActionResult("done", 0, null));
 
         when(learningService.getAgenticStrategyHistory(anyString())).thenReturn(List.of());
@@ -640,13 +642,13 @@ class AgenticBlockExecutorTest {
         // System prompt should include custom instructions (called once per iteration)
         verify(claudeProvider, atLeast(1)).buildConversationPrompt(contains("Custom instructions for this workflow"), anyList());
         // Model and instructions passed to executeAction
-        verify(hostClaude).executeAction(eq("Do it"), eq("claude-opus-4-6"), eq("Custom instructions for this workflow"), eq("/test/project"), isNull(), eq(false), isNull(), isNull(), isNull(), eq(false));
+        verify(hostClaude).executeAction(argThat((AiProvider.ActionRequest req) -> req != null && Objects.equals(req.prompt(), "Do it") && Objects.equals(req.model(), "claude-opus-4-6") && Objects.equals(req.systemPrompt(), "Custom instructions for this workflow") && Objects.equals(req.workingDirectory(), "/test/project") && req.timeoutSeconds() == null && req.priority() == false && req.allowedTools() == null && req.disallowedTools() == null && req.effort() == null && req.userMcpServers() == false));
     }
 
     @Test
     void execute_workflowModel_usedInReasonPhase() throws Exception {
         when(claudeProvider.buildConversationPrompt(anyString(), anyList())).thenReturn("prompt");
-        when(hostClaude.reasonStructured(eq("prompt"), anyString(), eq("claude-opus-4-6"), isNull(), isNull(), isNull(), isNull()))
+        when(hostClaude.reasonStructured(argThat((AiProvider.ReasoningRequest req) -> req != null && Objects.equals(req.prompt(), "prompt") && req.systemPrompt() != null && Objects.equals(req.model(), "claude-opus-4-6") && req.workingDirectory() == null && req.maxTurns() == null && req.timeoutSeconds() == null && req.effort() == null)))
                 .thenReturn(rr("GOAL_STATUS: ACHIEVED\nRATIONALE: Done\nACTION:\nSUMMARY: Complete"));
 
         when(learningService.getAgenticStrategyHistory(anyString())).thenReturn(List.of());
@@ -658,18 +660,18 @@ class AgenticBlockExecutorTest {
 
         assertThat(result.getStatus()).isEqualTo(StepStatus.COMPLETED);
         // REASON must receive the workflow model, same as ACT
-        verify(hostClaude).reasonStructured(eq("prompt"), anyString(), eq("claude-opus-4-6"), isNull(), isNull(), isNull(), isNull());
+        verify(hostClaude).reasonStructured(argThat((AiProvider.ReasoningRequest req) -> req != null && Objects.equals(req.prompt(), "prompt") && req.systemPrompt() != null && Objects.equals(req.model(), "claude-opus-4-6") && req.workingDirectory() == null && req.maxTurns() == null && req.timeoutSeconds() == null && req.effort() == null));
     }
 
     @Test
     void execute_actPhaseException_capturedAsError() throws Exception {
         when(claudeProvider.buildConversationPrompt(anyString(), anyList())).thenReturn("prompt");
-        when(hostClaude.reasonStructured(eq("prompt"), anyString(), isNull(), isNull(), isNull(), isNull(), isNull()))
+        when(hostClaude.reasonStructured(argThat((AiProvider.ReasoningRequest req) -> req != null && Objects.equals(req.prompt(), "prompt") && req.systemPrompt() != null && req.model() == null && req.workingDirectory() == null && req.maxTurns() == null && req.timeoutSeconds() == null && req.effort() == null)))
                 .thenReturn(rr("GOAL_STATUS: IN_PROGRESS\nRATIONALE: Working\nACTION: Do something\nSUMMARY: Step"))
                 .thenReturn(rr("GOAL_STATUS: ACHIEVED\nRATIONALE: Done\nACTION:\nSUMMARY: Complete"));
 
         // ACT phase throws exception
-        when(hostClaude.executeAction(eq("Do something"), isNull(), isNull(), eq("/test/project"), isNull(), eq(false), isNull(), isNull(), isNull(), eq(false)))
+        when(hostClaude.executeAction(argThat((AiProvider.ActionRequest req) -> req != null && Objects.equals(req.prompt(), "Do something") && req.model() == null && req.systemPrompt() == null && Objects.equals(req.workingDirectory(), "/test/project") && req.timeoutSeconds() == null && req.priority() == false && req.allowedTools() == null && req.disallowedTools() == null && req.effort() == null && req.userMcpServers() == false)))
                 .thenThrow(new RuntimeException("Process crashed"));
 
         when(learningService.getAgenticStrategyHistory(anyString())).thenReturn(List.of());
@@ -683,7 +685,7 @@ class AgenticBlockExecutorTest {
     @Test
     void execute_providerResolved_fromContext() throws Exception {
         when(claudeProvider.buildConversationPrompt(anyString(), anyList())).thenReturn("prompt");
-        when(hostClaude.reasonStructured(eq("prompt"), anyString(), isNull(), isNull(), isNull(), isNull(), isNull()))
+        when(hostClaude.reasonStructured(argThat((AiProvider.ReasoningRequest req) -> req != null && Objects.equals(req.prompt(), "prompt") && req.systemPrompt() != null && req.model() == null && req.workingDirectory() == null && req.maxTurns() == null && req.timeoutSeconds() == null && req.effort() == null)))
                 .thenReturn(rr("GOAL_STATUS: ACHIEVED\nRATIONALE: Done\nACTION:\nSUMMARY: Complete"));
         when(learningService.getAgenticStrategyHistory(anyString())).thenReturn(List.of());
 
@@ -702,7 +704,7 @@ class AgenticBlockExecutorTest {
                 .thenThrow(new RuntimeException("DB connection failed"));
 
         when(claudeProvider.buildConversationPrompt(anyString(), anyList())).thenReturn("prompt");
-        when(hostClaude.reasonStructured(eq("prompt"), anyString(), isNull(), isNull(), isNull(), isNull(), isNull()))
+        when(hostClaude.reasonStructured(argThat((AiProvider.ReasoningRequest req) -> req != null && Objects.equals(req.prompt(), "prompt") && req.systemPrompt() != null && req.model() == null && req.workingDirectory() == null && req.maxTurns() == null && req.timeoutSeconds() == null && req.effort() == null)))
                 .thenReturn(rr("GOAL_STATUS: ACHIEVED\nRATIONALE: Done\nACTION:\nSUMMARY: Complete"));
 
         StepResult result = executor.execute(buildBlock("Resilience test"), buildContext());
@@ -717,7 +719,7 @@ class AgenticBlockExecutorTest {
         when(runRepository.findById("run-1")).thenReturn(Optional.empty());
 
         when(claudeProvider.buildConversationPrompt(anyString(), anyList())).thenReturn("prompt");
-        when(hostClaude.reasonStructured(eq("prompt"), anyString(), isNull(), isNull(), isNull(), isNull(), isNull()))
+        when(hostClaude.reasonStructured(argThat((AiProvider.ReasoningRequest req) -> req != null && Objects.equals(req.prompt(), "prompt") && req.systemPrompt() != null && req.model() == null && req.workingDirectory() == null && req.maxTurns() == null && req.timeoutSeconds() == null && req.effort() == null)))
                 .thenReturn(rr("GOAL_STATUS: ACHIEVED\nRATIONALE: Done\nACTION:\nSUMMARY: Complete"));
 
         StepResult result = executor.execute(buildBlock("No run test"), buildContext());
@@ -730,7 +732,7 @@ class AgenticBlockExecutorTest {
     @Test
     void execute_websocketBroadcastFailure_doesNotAbortExecution() throws Exception {
         when(claudeProvider.buildConversationPrompt(anyString(), anyList())).thenReturn("prompt");
-        when(hostClaude.reasonStructured(eq("prompt"), anyString(), isNull(), isNull(), isNull(), isNull(), isNull()))
+        when(hostClaude.reasonStructured(argThat((AiProvider.ReasoningRequest req) -> req != null && Objects.equals(req.prompt(), "prompt") && req.systemPrompt() != null && req.model() == null && req.workingDirectory() == null && req.maxTurns() == null && req.timeoutSeconds() == null && req.effort() == null)))
                 .thenReturn(rr("GOAL_STATUS: ACHIEVED\nRATIONALE: Done\nACTION:\nSUMMARY: Complete"));
         when(learningService.getAgenticStrategyHistory(anyString())).thenReturn(List.of());
 
@@ -756,27 +758,27 @@ class AgenticBlockExecutorTest {
         BlockDefinition block = BlockDefinition.builder().type("agentic").config(config).build();
 
         when(claudeProvider.buildConversationPrompt(anyString(), anyList())).thenReturn("prompt");
-        when(hostClaude.reasonStructured(eq("prompt"), anyString(), isNull(), isNull(), isNull(), eq(600), isNull()))
+        when(hostClaude.reasonStructured(argThat((AiProvider.ReasoningRequest req) -> req != null && Objects.equals(req.prompt(), "prompt") && req.systemPrompt() != null && req.model() == null && req.workingDirectory() == null && req.maxTurns() == null && Objects.equals(req.timeoutSeconds(), 600) && req.effort() == null)))
                 .thenReturn(rr("GOAL_STATUS: IN_PROGRESS\nRATIONALE: Working\nACTION: Do it\nSUMMARY: Step"))
                 .thenReturn(rr("GOAL_STATUS: ACHIEVED\nRATIONALE: Done\nACTION:\nSUMMARY: Complete"));
-        when(hostClaude.executeAction(anyString(), isNull(), isNull(), eq("/test/project"), eq(600), eq(false), isNull(), isNull(), isNull(), eq(false)))
+        when(hostClaude.executeAction(argThat((AiProvider.ActionRequest req) -> req != null && req.prompt() != null && req.model() == null && req.systemPrompt() == null && Objects.equals(req.workingDirectory(), "/test/project") && Objects.equals(req.timeoutSeconds(), 600) && req.priority() == false && req.allowedTools() == null && req.disallowedTools() == null && req.effort() == null && req.userMcpServers() == false)))
                 .thenReturn(new HostClaudeService.ActionResult("done", 0, null));
         when(learningService.getAgenticStrategyHistory(anyString())).thenReturn(List.of());
 
         StepResult result = executor.execute(block, buildContext());
 
         assertThat(result.getStatus()).isEqualTo(StepStatus.COMPLETED);
-        verify(hostClaude, atLeast(1)).reasonStructured(anyString(), anyString(), isNull(), isNull(), isNull(), eq(600), isNull());
-        verify(hostClaude).executeAction(anyString(), isNull(), isNull(), eq("/test/project"), eq(600), eq(false), isNull(), isNull(), isNull(), eq(false));
+        verify(hostClaude, atLeast(1)).reasonStructured(argThat((AiProvider.ReasoningRequest req) -> req != null && req.prompt() != null && req.systemPrompt() != null && req.model() == null && req.workingDirectory() == null && req.maxTurns() == null && Objects.equals(req.timeoutSeconds(), 600) && req.effort() == null));
+        verify(hostClaude).executeAction(argThat((AiProvider.ActionRequest req) -> req != null && req.prompt() != null && req.model() == null && req.systemPrompt() == null && Objects.equals(req.workingDirectory(), "/test/project") && Objects.equals(req.timeoutSeconds(), 600) && req.priority() == false && req.allowedTools() == null && req.disallowedTools() == null && req.effort() == null && req.userMcpServers() == false));
     }
 
     @Test
     void execute_reasonAndActPhases_useDistinctSystemPromptArguments() throws Exception {
         when(claudeProvider.buildConversationPrompt(anyString(), anyList())).thenReturn("prompt");
-        when(hostClaude.reasonStructured(eq("prompt"), anyString(), eq("claude-opus-4-6"), isNull(), isNull(), isNull(), isNull()))
+        when(hostClaude.reasonStructured(argThat((AiProvider.ReasoningRequest req) -> req != null && Objects.equals(req.prompt(), "prompt") && req.systemPrompt() != null && Objects.equals(req.model(), "claude-opus-4-6") && req.workingDirectory() == null && req.maxTurns() == null && req.timeoutSeconds() == null && req.effort() == null)))
                 .thenReturn(rr("GOAL_STATUS: IN_PROGRESS\nRATIONALE: Working\nACTION: Do it\nSUMMARY: Step"))
                 .thenReturn(rr("GOAL_STATUS: ACHIEVED\nRATIONALE: Done\nACTION:\nSUMMARY: Complete"));
-        when(hostClaude.executeAction(anyString(), eq("claude-opus-4-6"), eq("WORKFLOW_INSTR_X"), eq("/test/project"), isNull(), eq(false), isNull(), isNull(), isNull(), eq(false)))
+        when(hostClaude.executeAction(argThat((AiProvider.ActionRequest req) -> req != null && req.prompt() != null && Objects.equals(req.model(), "claude-opus-4-6") && Objects.equals(req.systemPrompt(), "WORKFLOW_INSTR_X") && Objects.equals(req.workingDirectory(), "/test/project") && req.timeoutSeconds() == null && req.priority() == false && req.allowedTools() == null && req.disallowedTools() == null && req.effort() == null && req.userMcpServers() == false)))
                 .thenReturn(new HostClaudeService.ActionResult("done", 0, null));
         when(learningService.getAgenticStrategyHistory(anyString())).thenReturn(List.of());
 
@@ -786,18 +788,37 @@ class AgenticBlockExecutorTest {
 
         executor.execute(buildBlock("Phase-args goal"), context);
 
-        ArgumentCaptor<String> reasonSysPrompt = ArgumentCaptor.forClass(String.class);
-        verify(hostClaude, atLeast(1)).reasonStructured(anyString(), reasonSysPrompt.capture(), eq("claude-opus-4-6"), isNull(), isNull(), isNull(), isNull());
-        ArgumentCaptor<String> actSysPrompt = ArgumentCaptor.forClass(String.class);
-        verify(hostClaude).executeAction(anyString(), eq("claude-opus-4-6"), actSysPrompt.capture(), eq("/test/project"), isNull(), eq(false), isNull(), isNull(), isNull(), eq(false));
+        ArgumentCaptor<AiProvider.ReasoningRequest> reasonRequest = ArgumentCaptor.forClass(AiProvider.ReasoningRequest.class);
+        verify(hostClaude, atLeast(1)).reasonStructured(reasonRequest.capture());
+        ArgumentCaptor<AiProvider.ActionRequest> actRequest = ArgumentCaptor.forClass(AiProvider.ActionRequest.class);
+        verify(hostClaude).executeAction(actRequest.capture());
+        AiProvider.ReasoningRequest reason = reasonRequest.getValue();
+        AiProvider.ActionRequest act = actRequest.getValue();
+
+        // Both phases use the workflow model; ACT runs in the project, without timeout, tools or effort overrides
+        assertThat(reason.prompt()).isNotNull();
+        assertThat(reason.model()).isEqualTo("claude-opus-4-6");
+        assertThat(reason.workingDirectory()).isNull();
+        assertThat(reason.maxTurns()).isNull();
+        assertThat(reason.timeoutSeconds()).isNull();
+        assertThat(reason.effort()).isNull();
+        assertThat(act.prompt()).isNotNull();
+        assertThat(act.model()).isEqualTo("claude-opus-4-6");
+        assertThat(act.workingDirectory()).isEqualTo("/test/project");
+        assertThat(act.timeoutSeconds()).isNull();
+        assertThat(act.priority()).isFalse();
+        assertThat(act.allowedTools()).isNull();
+        assertThat(act.disallowedTools()).isNull();
+        assertThat(act.effort()).isNull();
+        assertThat(act.userMcpServers()).isFalse();
 
         // REASON gets the full agentic system prompt (contains goal + structured format)
-        assertThat(reasonSysPrompt.getValue()).contains("Phase-args goal");
-        assertThat(reasonSysPrompt.getValue()).contains("Your Goal");
-        assertThat(reasonSysPrompt.getValue()).contains("GOAL_STATUS:");
+        assertThat(reason.systemPrompt()).contains("Phase-args goal");
+        assertThat(reason.systemPrompt()).contains("Your Goal");
+        assertThat(reason.systemPrompt()).contains("GOAL_STATUS:");
         // ACT gets only the raw workflow instruction prefix
-        assertThat(actSysPrompt.getValue()).isEqualTo("WORKFLOW_INSTR_X");
-        assertThat(actSysPrompt.getValue()).doesNotContain("Your Goal");
+        assertThat(act.systemPrompt()).isEqualTo("WORKFLOW_INSTR_X");
+        assertThat(act.systemPrompt()).doesNotContain("Your Goal");
     }
 
     @Test
@@ -812,9 +833,9 @@ class AgenticBlockExecutorTest {
         BlockDefinition block = BlockDefinition.builder().type("agentic").config(config).build();
 
         when(claudeProvider.buildConversationPrompt(anyString(), anyList())).thenReturn("prompt");
-        when(hostClaude.reasonStructured(eq("prompt"), anyString(), isNull(), isNull(), isNull(), isNull(), isNull()))
+        when(hostClaude.reasonStructured(argThat((AiProvider.ReasoningRequest req) -> req != null && Objects.equals(req.prompt(), "prompt") && req.systemPrompt() != null && req.model() == null && req.workingDirectory() == null && req.maxTurns() == null && req.timeoutSeconds() == null && req.effort() == null)))
                 .thenReturn(rr("GOAL_STATUS: IN_PROGRESS\nRATIONALE: Working\nACTION: Do something\nSUMMARY: Step"));
-        when(hostClaude.executeAction(anyString(), isNull(), isNull(), eq("/test/project"), isNull(), eq(false), isNull(), isNull(), isNull(), eq(false)))
+        when(hostClaude.executeAction(argThat((AiProvider.ActionRequest req) -> req != null && req.prompt() != null && req.model() == null && req.systemPrompt() == null && Objects.equals(req.workingDirectory(), "/test/project") && req.timeoutSeconds() == null && req.priority() == false && req.allowedTools() == null && req.disallowedTools() == null && req.effort() == null && req.userMcpServers() == false)))
                 .thenThrow(new RuntimeException("claude binary not found in PATH"));
         when(learningService.getAgenticStrategyHistory(anyString())).thenReturn(List.of());
 
@@ -847,7 +868,7 @@ class AgenticBlockExecutorTest {
 
     private void stubOneActionThenAchieved() throws Exception {
         when(claudeProvider.buildConversationPrompt(anyString(), anyList())).thenReturn("prompt");
-        when(hostClaude.reasonStructured(eq("prompt"), anyString(), isNull(), isNull(), isNull(), isNull(), isNull()))
+        when(hostClaude.reasonStructured(argThat((AiProvider.ReasoningRequest req) -> req != null && Objects.equals(req.prompt(), "prompt") && req.systemPrompt() != null && req.model() == null && req.workingDirectory() == null && req.maxTurns() == null && req.timeoutSeconds() == null && req.effort() == null)))
                 .thenReturn(rr("GOAL_STATUS: IN_PROGRESS\nRATIONALE: Do it\nACTION: rm -rf build\nSUMMARY: Clean"))
                 .thenReturn(rr("GOAL_STATUS: ACHIEVED\nRATIONALE: Done\nACTION:\nSUMMARY: Done"));
         lenient().when(learningService.getAgenticStrategyHistory(anyString())).thenReturn(List.of());
@@ -856,7 +877,7 @@ class AgenticBlockExecutorTest {
     @Test
     void approval_yes_executesAction_andRecordsApproved() throws Exception {
         stubOneActionThenAchieved();
-        when(hostClaude.executeAction(eq("rm -rf build"), isNull(), isNull(), eq("/test/project"), isNull(), eq(false), isNull(), isNull(), isNull(), eq(false)))
+        when(hostClaude.executeAction(argThat((AiProvider.ActionRequest req) -> req != null && Objects.equals(req.prompt(), "rm -rf build") && req.model() == null && req.systemPrompt() == null && Objects.equals(req.workingDirectory(), "/test/project") && req.timeoutSeconds() == null && req.priority() == false && req.allowedTools() == null && req.disallowedTools() == null && req.effort() == null && req.userMcpServers() == false)))
                 .thenReturn(new HostClaudeService.ActionResult("cleaned", 0, null));
         ExecutionContext context = contextAnswering(java.util.concurrent.CompletableFuture.completedFuture("Yes"));
 
@@ -865,18 +886,18 @@ class AgenticBlockExecutorTest {
         assertThat(result.getStatus()).isEqualTo(StepStatus.COMPLETED);
         verify(context, times(1)).requestApproval(argThat(r -> r.getQuestion().equals("Approve action: rm -rf build")
                 && r.getOptions().equals(List.of("Yes", "Yes always", "No")) && r.getBlockId().equals("agentic-0-iter-1")));
-        verify(hostClaude).executeAction(eq("rm -rf build"), isNull(), isNull(), eq("/test/project"), isNull(), eq(false), isNull(), isNull(), isNull(), eq(false));
+        verify(hostClaude).executeAction(argThat((AiProvider.ActionRequest req) -> req != null && Objects.equals(req.prompt(), "rm -rf build") && req.model() == null && req.systemPrompt() == null && Objects.equals(req.workingDirectory(), "/test/project") && req.timeoutSeconds() == null && req.priority() == false && req.allowedTools() == null && req.disallowedTools() == null && req.effort() == null && req.userMcpServers() == false));
         verify(claudeProvider, never()).buildConversationPrompt(anyString(), argThat(h -> h.contains(REJECTION_TURN)));
     }
 
     @Test
     void approval_yesAlways_disablesGateForFollowingIterations() throws Exception {
         when(claudeProvider.buildConversationPrompt(anyString(), anyList())).thenReturn("prompt");
-        when(hostClaude.reasonStructured(eq("prompt"), anyString(), isNull(), isNull(), isNull(), isNull(), isNull()))
+        when(hostClaude.reasonStructured(argThat((AiProvider.ReasoningRequest req) -> req != null && Objects.equals(req.prompt(), "prompt") && req.systemPrompt() != null && req.model() == null && req.workingDirectory() == null && req.maxTurns() == null && req.timeoutSeconds() == null && req.effort() == null)))
                 .thenReturn(rr("GOAL_STATUS: IN_PROGRESS\nRATIONALE: a\nACTION: step one\nSUMMARY: s"))
                 .thenReturn(rr("GOAL_STATUS: IN_PROGRESS\nRATIONALE: b\nACTION: step two\nSUMMARY: s"))
                 .thenReturn(rr("GOAL_STATUS: ACHIEVED\nRATIONALE: Done\nACTION:\nSUMMARY: Done"));
-        when(hostClaude.executeAction(anyString(), isNull(), isNull(), eq("/test/project"), isNull(), eq(false), isNull(), isNull(), isNull(), eq(false)))
+        when(hostClaude.executeAction(argThat((AiProvider.ActionRequest req) -> req != null && req.prompt() != null && req.model() == null && req.systemPrompt() == null && Objects.equals(req.workingDirectory(), "/test/project") && req.timeoutSeconds() == null && req.priority() == false && req.allowedTools() == null && req.disallowedTools() == null && req.effort() == null && req.userMcpServers() == false)))
                 .thenReturn(new HostClaudeService.ActionResult("ok", 0, null));
         lenient().when(learningService.getAgenticStrategyHistory(anyString())).thenReturn(List.of());
         ExecutionContext context = contextAnswering(java.util.concurrent.CompletableFuture.completedFuture("Yes always"));
@@ -885,7 +906,7 @@ class AgenticBlockExecutorTest {
 
         assertThat(result.getStatus()).isEqualTo(StepStatus.COMPLETED);
         verify(context, times(1)).requestApproval(any(com.automation.executor.ApprovalRequest.class));
-        verify(hostClaude, times(2)).executeAction(anyString(), isNull(), isNull(), eq("/test/project"), isNull(), eq(false), isNull(), isNull(), isNull(), eq(false));
+        verify(hostClaude, times(2)).executeAction(argThat((AiProvider.ActionRequest req) -> req != null && req.prompt() != null && req.model() == null && req.systemPrompt() == null && Objects.equals(req.workingDirectory(), "/test/project") && req.timeoutSeconds() == null && req.priority() == false && req.allowedTools() == null && req.disallowedTools() == null && req.effort() == null && req.userMcpServers() == false));
     }
 
     @Test
@@ -898,7 +919,7 @@ class AgenticBlockExecutorTest {
         assertThat(result.getOutput()).contains("[iteration 1 - REJECTED]: rm -rf build");
         assertThat(result.getStatus()).isEqualTo(StepStatus.COMPLETED);
         assertThat(result.getMetadata().get("totalIterations")).isEqualTo(2);
-        verify(hostClaude, never()).executeAction(anyString(), any(), any(), any(), any(), anyBoolean(), any(), any(), any(), anyBoolean());
+        verify(hostClaude, never()).executeAction(argThat((AiProvider.ActionRequest req) -> req != null && req.prompt() != null));
     }
 
     @Test
@@ -910,7 +931,7 @@ class AgenticBlockExecutorTest {
             snapshots.add(List.copyOf(inv.<List<ConversationPrompt.Turn>>getArgument(1)));
             return "prompt";
         });
-        when(hostClaude.reasonStructured(eq("prompt"), anyString(), isNull(), isNull(), isNull(), isNull(), isNull()))
+        when(hostClaude.reasonStructured(argThat((AiProvider.ReasoningRequest req) -> req != null && Objects.equals(req.prompt(), "prompt") && req.systemPrompt() != null && req.model() == null && req.workingDirectory() == null && req.maxTurns() == null && req.timeoutSeconds() == null && req.effort() == null)))
                 .thenReturn(rr("GOAL_STATUS: IN_PROGRESS\nRATIONALE: Do it\nACTION: rm -rf build\nSUMMARY: Clean"))
                 .thenReturn(rr("GOAL_STATUS: ACHIEVED\nRATIONALE: Done\nACTION:\nSUMMARY: Done"));
         lenient().when(learningService.getAgenticStrategyHistory(anyString())).thenReturn(List.of());
@@ -936,14 +957,14 @@ class AgenticBlockExecutorTest {
         assertThat(result.getStatus()).isEqualTo(StepStatus.FAILED);
         assertThat(result.getOutput()).contains("[iteration 1 - APPROVAL ERROR: ");
         assertThat(result.getOutput()).contains("channel closed");
-        verify(hostClaude, never()).executeAction(anyString(), any(), any(), any(), any(), anyBoolean(), any(), any(), any(), anyBoolean());
+        verify(hostClaude, never()).executeAction(argThat((AiProvider.ActionRequest req) -> req != null && req.prompt() != null));
     }
 
     @Test
     @SuppressWarnings("unchecked")
     void execute_blockLevelProviderAndModel_overrideWorkflowLevel_andAppearInMetadata() throws Exception {
         when(claudeProvider.buildConversationPrompt(anyString(), anyList())).thenReturn("prompt");
-        when(hostClaude.reasonStructured(eq("prompt"), anyString(), eq("opus"), isNull(), isNull(), isNull(), isNull()))
+        when(hostClaude.reasonStructured(argThat((AiProvider.ReasoningRequest req) -> req != null && Objects.equals(req.prompt(), "prompt") && req.systemPrompt() != null && Objects.equals(req.model(), "opus") && req.workingDirectory() == null && req.maxTurns() == null && req.timeoutSeconds() == null && req.effort() == null)))
                 .thenReturn(rr("GOAL_STATUS: ACHIEVED\nRATIONALE: done\nACTION:\nSUMMARY: ok"));
         when(learningService.getAgenticStrategyHistory(anyString())).thenReturn(List.of());
 
@@ -970,7 +991,7 @@ class AgenticBlockExecutorTest {
     @SuppressWarnings("unchecked")
     void execute_withoutBlockOverride_usesWorkflowProviderAndModel() throws Exception {
         when(claudeProvider.buildConversationPrompt(anyString(), anyList())).thenReturn("prompt");
-        when(hostClaude.reasonStructured(eq("prompt"), anyString(), eq("sonnet"), isNull(), isNull(), isNull(), eq("high")))
+        when(hostClaude.reasonStructured(argThat((AiProvider.ReasoningRequest req) -> req != null && Objects.equals(req.prompt(), "prompt") && req.systemPrompt() != null && Objects.equals(req.model(), "sonnet") && req.workingDirectory() == null && req.maxTurns() == null && req.timeoutSeconds() == null && Objects.equals(req.effort(), "high"))))
                 .thenReturn(rr("GOAL_STATUS: ACHIEVED\nRATIONALE: done\nACTION:\nSUMMARY: ok"));
         when(learningService.getAgenticStrategyHistory(anyString())).thenReturn(List.of());
 

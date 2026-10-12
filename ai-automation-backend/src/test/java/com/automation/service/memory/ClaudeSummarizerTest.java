@@ -1,7 +1,9 @@
 package com.automation.service.memory;
 
+import com.automation.service.ai.AiProvider;
 import com.automation.service.ai.HostClaudeService;
 import com.automation.service.cli.claude.ClaudeJsonResponse;
+import java.util.Objects;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -34,7 +36,7 @@ class ClaudeSummarizerTest {
     @Test
     void summarize_callsHostClaudeWithWorkDir() throws IOException {
         when(setupService.getClaudeWorkDir()).thenReturn(Path.of("/tmp/test-summarization/claude"));
-        when(hostClaudeService.reasonStructured(anyString(), isNull(), anyString(), eq(1)))
+        when(hostClaudeService.reasonStructured(argThat((AiProvider.ReasoningRequest req) -> req != null && req.prompt() != null && req.systemPrompt() == null && req.workingDirectory() != null && Objects.equals(req.maxTurns(), 1))))
                 .thenReturn(new HostClaudeService.ReasoningResult(
                         "TITLE: Test\nTAGS: test\n---\nTest content",
                         new ClaudeJsonResponse(null, null, null, null, null, null, null, null, null)));
