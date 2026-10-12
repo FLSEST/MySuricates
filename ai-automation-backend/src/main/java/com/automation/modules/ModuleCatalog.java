@@ -56,6 +56,10 @@ public enum ModuleCatalog {
             "Audit center: findings from audit workflows, reports and promotion to TODOs."),
     BPMN("bpmn", RESEARCH, EXPERIMENTAL, false, Set.of(), List.of(),
             "Export workflows as BPMN and import MySuricates BPMN exports."),
+    AI_ACTORS("ai-actors", RESEARCH, EXPERIMENTAL, false, Set.of(), List.of(),
+            "Casting per step: an approval or human-input block with actor \"ai\" is answered by one AI call in "
+                    + "the role, with \"shadow\" the AI proposes first and the person still decides (both answers are "
+                    + "recorded). Off: such blocks refuse to run instead of silently asking a person."),
 
     // ── Advanced: outward-facing ─────────────────────────────────────────────
     INTEGRATIONS("integrations", ADVANCED, STABLE, false, Set.of(CREDENTIALS, NETWORK), List.of(),

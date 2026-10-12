@@ -1,0 +1,109 @@
+{
+  "id": "approval-actor-ai-answers-from-options",
+  "title": "Besetzung: actor: ai (per Laufvariable) beantwortet die Freigabe aus den Optionen; niemand wird gefragt, der Schritt trägt answeredBy: ai",
+  "derivedFrom": {
+    "spec": "WORKFLOW-GUIDE → Besetzung je Schritt (actor): Prompt = actor_prompt + aufgelöste Frage + Optionen, Antwort muss eine Option sein, Platzhalter in actor aus dem Kontext, Modell/Effort wie bei jedem KI-Block, answeredBy in den Schrittmetadaten",
+    "incidents": [
+      "dca0c03e (Besetzung je Schritt: Mensch, KI oder Schatten an Approval und Human-Input)"
+    ]
+  },
+  "workflow": {
+    "provider": "SCRIPTED",
+    "model": "opus",
+    "blocks": [
+      {
+        "type": "simple",
+        "name": "pruefen",
+        "config": {
+          "command": "Prüfe Issue PO-7."
+        }
+      },
+      {
+        "type": "approval",
+        "name": "entscheiden",
+        "config": {
+          "question": "Issue PO-7 ins Refinement nehmen? Befund: {{ block.pruefen.output }}",
+          "options": [
+            "Ja",
+            "Nein"
+          ],
+          "actor": "{{ actor_po }}",
+          "actor_prompt": "Du bist der Product Owner von {{ product }}.",
+          "effort": "low",
+          "on_no": "fail"
+        }
+      },
+      {
+        "type": "simple",
+        "name": "kommentieren",
+        "config": {
+          "command": "Kommentiere die Entscheidung: {{ approval_answer }}"
+        }
+      }
+    ]
+  },
+  "context": {
+    "actor_po": "ai",
+    "product": "Shop"
+  },
+  "ai": {
+    "SCRIPTED": [
+      {
+        "match": "Prüfe Issue PO-7.",
+        "respond": "ohne Schätzung, Akzeptanzkriterien fehlen"
+      },
+      {
+        "match": "## Allowed answers",
+        "respond": "ja\n"
+      },
+      {
+        "match": "Kommentiere die Entscheidung: Ja",
+        "respond": "kommentiert"
+      }
+    ]
+  },
+  "expect": {
+    "runStatus": "COMPLETED",
+    "aiCallCount": {
+      "SCRIPTED": 3
+    },
+    "aiCalls": {
+      "SCRIPTED": [
+        {
+          "promptContains": [
+            "Prüfe Issue PO-7."
+          ]
+        },
+        {
+          "model": "opus",
+          "effort": "low",
+          "promptContains": [
+            "Du bist der Product Owner von Shop.",
+            "Befund: ohne Schätzung, Akzeptanzkriterien fehlen",
+            "- Ja\n- Nein"
+          ],
+          "promptNotContains": [
+            "{{"
+          ]
+        },
+        {
+          "promptContains": [
+            "Kommentiere die Entscheidung: Ja"
+          ]
+        }
+      ]
+    },
+    "steps": [
+      {
+        "index": 1,
+        "status": "COMPLETED",
+        "outputContains": [
+          "Approved: Ja"
+        ],
+        "metadata": {
+          "answeredBy": "ai"
+        }
+      }
+    ]
+  }
+}

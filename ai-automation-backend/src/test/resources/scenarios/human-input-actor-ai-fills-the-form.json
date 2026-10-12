@@ -1,0 +1,136 @@
+{
+  "id": "human-input-actor-ai-fills-the-form",
+  "title": "Besetzung: actor: ai füllt das Formular eines human-input-Blocks; die Felder kommen als Variablen im nächsten Block an, eine Antwort außerhalb der Optionen scheitert",
+  "derivedFrom": {
+    "spec": "WORKFLOW-GUIDE → Besetzung je Schritt (actor): bei human-input mit fields ein JSON-Objekt mit allen Pflichtfeldern, select-Werte in der Schreibweise der Option; sonst scheitert der Schritt",
+    "incidents": [
+      "dca0c03e (Besetzung je Schritt: Mensch, KI oder Schatten an Approval und Human-Input)"
+    ]
+  },
+  "workflow": {
+    "provider": "SCRIPTED",
+    "blocks": [
+      {
+        "type": "human-input",
+        "name": "retro",
+        "config": {
+          "prompt": "Retro-Daten eintragen",
+          "variable_name": "retro",
+          "actor": "{{ actor_sm }}",
+          "actor_prompt": "Du bist der Scrum Master.",
+          "fields": [
+            {
+              "variable_name": "muster",
+              "label": "Muster",
+              "input_type": "textarea"
+            },
+            {
+              "variable_name": "groesse",
+              "input_type": "select",
+              "options": [
+                "S",
+                "M",
+                "L"
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "type": "simple",
+        "name": "auswerten",
+        "config": {
+          "command": "Muster: {{ muster }} / Größe: {{ groesse }}"
+        }
+      }
+    ]
+  },
+  "runs": [
+    {
+      "context": {
+        "actor_sm": "ai"
+      },
+      "ai": {
+        "SCRIPTED": [
+          {
+            "match": "## Form fields",
+            "respond": "{\"muster\": \"Reopen nach Review\", \"groesse\": \"m\"}"
+          },
+          {
+            "match": "Muster: Reopen nach Review / Größe: M",
+            "respond": "ausgewertet"
+          }
+        ]
+      },
+      "expect": {
+        "runStatus": "COMPLETED",
+        "aiCallCount": {
+          "SCRIPTED": 2
+        },
+        "aiCalls": {
+          "SCRIPTED": [
+            {
+              "promptContains": [
+                "Du bist der Scrum Master.",
+                "Retro-Daten eintragen",
+                "`muster` — Muster",
+                "`groesse` (one of: S, M, L)"
+              ]
+            },
+            {
+              "promptContains": [
+                "Muster: Reopen nach Review / Größe: M"
+              ]
+            }
+          ]
+        },
+        "steps": [
+          {
+            "index": 0,
+            "status": "COMPLETED",
+            "metadata": {
+              "answeredBy": "ai"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "context": {
+        "actor_sm": "ai"
+      },
+      "ai": {
+        "SCRIPTED": [
+          {
+            "match": "## Form fields",
+            "respond": "{\"muster\": \"Reopen nach Review\", \"groesse\": \"XL\"}"
+          }
+        ]
+      },
+      "expect": {
+        "runStatus": "FAILED",
+        "runError": {
+          "startsWith": "Step 0 (human-input) failed: AI actor answered",
+          "contains": [
+            "none of the options [S, M, L]"
+          ]
+        },
+        "aiCallCount": {
+          "SCRIPTED": 1
+        },
+        "steps": [
+          {
+            "index": 0,
+            "status": "FAILED",
+            "outputContains": [
+              "field 'groesse': 'XL' is none of the options"
+            ]
+          }
+        ]
+      }
+    }
+  ],
+  "expect": {
+    "runStatus": "FAILED"
+  }
+}

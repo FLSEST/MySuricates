@@ -30,7 +30,7 @@ Apply to every block type.
 
 ## AI fields
 
-Apply in addition to `simple`, `agentic`, `skill-capability`, `retry`, `foreach`, `while`, `conditional`, `switch`, `compress-ai`.
+Apply in addition to `simple`, `agentic`, `skill-capability`, `retry`, `foreach`, `while`, `conditional`, `switch`, `compress-ai`, `approval`, `human-input`.
 
 | Key | Type | Required | Default | Values | Meaning |
 |---|---|---|---|---|---|
@@ -168,7 +168,7 @@ Plus the [common fields](#common-fields) and the [AI fields](#ai-fields).
 
 ## `approval`
 
-Plus the [common fields](#common-fields).
+Plus the [common fields](#common-fields) and the [AI fields](#ai-fields).
 
 | Key | Type | Required | Default | Values | Meaning |
 |---|---|---|---|---|---|
@@ -180,10 +180,12 @@ Plus the [common fields](#common-fields).
 | `mode` | string |  | `ask` | `ask`: Waits for an answer in the UI (default). · `auto`: Answers immediately with `auto_answer`. | Ask interactively or answer automatically. |
 | `auto_answer` | string \| null |  |  |  | Answer in mode `auto`. |
 | `on_no` | string |  | `continue` | `continue`: Continue, block COMPLETED (default). · `fail`: Block FAILED. · `skip`: Block SKIPPED. | Behaviour on rejection (see `reject_options`). |
+| `actor` | string |  | `human` | `human`: A person answers (default, behaviour as before). · `ai`: One AI call in the role answers; the answer must be one of the options or fill the form, otherwise the step fails. · `shadow`: The AI proposes, the person decides and sees the proposal; both answers and `agreed` go into the step metadata. | Who answers the step (module `ai-actors`, off by default). Placeholders allowed (`{{ actor_po }}`); in a run with untrusted input it stays unresolved and `human` applies. |
+| `actor_prompt` | string |  |  |  | Role instructions for the AI actor (`actor: ai\|shadow`), placeholders are resolved. Precedes the question or form in the prompt. |
 
 ## `human-input`
 
-Plus the [common fields](#common-fields).
+Plus the [common fields](#common-fields) and the [AI fields](#ai-fields).
 
 | Key | Type | Required | Default | Values | Meaning |
 |---|---|---|---|---|---|
@@ -197,6 +199,8 @@ Plus the [common fields](#common-fields).
 | `timeout_minutes` | integer |  | `30` | ≥ 1 | Waiting time in minutes. |
 | `use_default_on_timeout` | boolean |  | `true` |  | On timeout use `default_value` instead of failing. |
 | `fields` | array |  |  |  | Form with several fields (`variable_name`, `label`, `input_type`, `required`, …). |
+| `actor` | string |  | `human` | `human`: A person answers (default, behaviour as before). · `ai`: One AI call in the role answers; the answer must be one of the options or fill the form, otherwise the step fails. · `shadow`: The AI proposes, the person decides and sees the proposal; both answers and `agreed` go into the step metadata. | Who answers the step (module `ai-actors`, off by default). Placeholders allowed (`{{ actor_po }}`); in a run with untrusted input it stays unresolved and `human` applies. |
+| `actor_prompt` | string |  |  |  | Role instructions for the AI actor (`actor: ai\|shadow`), placeholders are resolved. Precedes the question or form in the prompt. |
 
 ## `sub-workflow`
 

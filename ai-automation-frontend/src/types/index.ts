@@ -483,10 +483,12 @@ export type BlockType = (typeof BLOCK_TYPES)[number];
 /**
  * Block types that issue AI calls and therefore honour the block-level `provider`/`model`
  * override in their config (precedence block > workflow > system default). Wrapper blocks
- * are included because their inline `command` runs through the AI provider unless shell mode.
+ * are included because their inline `command` runs through the AI provider unless shell mode; approval and
+ * human-input because an AI actor (`actor: ai|shadow`, module ai-actors) answers them with one AI call.
  */
 export const AI_BLOCK_TYPES: readonly BlockType[] = [
   'simple', 'agentic', 'skill-capability', 'retry', 'foreach', 'while', 'conditional', 'switch', 'compress-ai',
+  'approval', 'human-input',
 ];
 
 export interface BlockDefinition {

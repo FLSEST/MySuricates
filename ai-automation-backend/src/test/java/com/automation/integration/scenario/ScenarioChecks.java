@@ -176,6 +176,12 @@ final class ScenarioChecks {
             for (JsonNode part : want.path("outputNotContains")) {
                 assertThat(output).as(where + " output").doesNotContain(part.asText());
             }
+            // metadata: key → expected value, compared as text (answeredBy, shadowAnswer, agreed …)
+            Map<String, Object> stepMetadata = step.getMetadata() == null ? Map.of() : step.getMetadata();
+            want.path("metadata").properties().forEach(entry ->
+                    assertThat(String.valueOf(stepMetadata.get(entry.getKey())))
+                            .as(where + " metadata." + entry.getKey())
+                            .isEqualTo(entry.getValue().asText()));
         }
     }
 

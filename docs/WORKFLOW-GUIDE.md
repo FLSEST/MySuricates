@@ -214,6 +214,21 @@ Pausiert, bis eine Person einen Wert eingibt oder ein Formular (`fields`) ausfü
 
 Bei Timeout endet der Block mit `default_value` COMPLETED, wenn `use_default_on_timeout` gilt (Standard) und ein Standardwert gesetzt ist, sonst FAILED.
 
+### Besetzung je Schritt: Mensch, KI oder Schatten (`actor`)
+
+Modul `ai-actors` (Stufe research, standardmäßig aus: `automation.modules.ai-actors: true` oder der Schalter unter Einstellungen → Module). `approval` und `human-input` nehmen den Schlüssel `actor`: `human` (Standard, Verhalten wie oben), `ai` – ein KI-Aufruf in der Rolle beantwortet den Schritt –, `shadow` – die KI schlägt vor, die Person entscheidet trotzdem und sieht den Vorschlag unter der Frage. So lässt sich eine Zuarbeit je Rolle simulieren, ohne den Workflow umzubauen.
+
+```json
+{ "type": "approval", "config": { "question": "Issue {{ issue_key }} ins Refinement nehmen?\n\n{{ previous_output }}",
+  "options": ["Ja", "Nein"], "actor": "{{ actor_po }}",
+  "actor_prompt": "Du bist der Product Owner. Entscheide nach Nutzen und Risiko.", "model": "opus" } }
+```
+
+- Prompt der KI: `actor_prompt` (aufgelöst) + aufgelöste Frage bzw. Formular + erlaubte Antworten. Die Antwort muss eine der `options` sein (bei `human-input`: das Feldformat erfüllen, bei `fields` ein JSON-Objekt mit allen Pflichtfeldern), sonst scheitert der Schritt – niemand wird stattdessen gefragt. Anbieter, Modell und Effort wie bei jedem KI-Block (`provider`, `model`, `effort`; Block > Workflow > Standard), der Aufruf bekommt keine Werkzeuge.
+- `actor` darf ein Platzhalter sein (`{{ actor_po }}` aus dem `defaultContext`): eine Laufvariable besetzt die Rolle. In einem Lauf mit fremder Eingabe (Webhook) bleibt er unaufgelöst und es gilt `human` – wie bei `mode`/`auto_answer`. `mode: auto` geht vor: dann antwortet `auto_answer`, kein Akteur.
+- Schrittmetadaten: `answeredBy` (`human`/`ai`/`shadow`), bei KI die üblichen `aiRequest`-Schlüssel, bei Schatten dazu `shadowAnswer` und `agreed`. Die Run-Ansicht stuft einen Schritt mit `answeredBy: ai` als KI ein und zeigt, wer geantwortet hat.
+- Modul aus ⇒ `actor: ai|shadow` wird nicht ausgeführt: Analyzer-Befund `actor-module-disabled` (HIGH, Platzhalter MEDIUM) und der Schritt scheitert mit klarer Meldung. Nie stilles Verhalten wie `human`.
+
 ### `sub-workflow` — Verschachtelter Workflow
 
 Führt einen anderen Workflow als Schritt aus und wartet auf ihn: höchstens 5 Ebenen, Zirkel werden erkannt, 30 Minuten. Bricht der Eltern-Lauf ab, bricht er auch den Kind-Lauf ab. Denselben Workflow je Listeneintrag startet `foreach` mit `workflow_id`.

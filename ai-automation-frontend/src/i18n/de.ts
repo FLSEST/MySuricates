@@ -1091,6 +1091,14 @@ export const de: TranslationKeys = {
         unknown: 'Unklar',
         unknownHint: 'Noch nicht feststellbar, ob eine KI beteiligt war – Block läuft noch oder der Run ist älter als diese Aufzeichnung',
       },
+      answeredBy: {
+        human: 'Beantwortet von: Mensch',
+        ai: 'Beantwortet von: KI-Akteur',
+        shadow: 'Beantwortet von: Mensch · KI-Vorschlag (Schatten): {proposal}',
+        agreed: 'Mensch und KI einig',
+        disagreed: 'Mensch wich vom KI-Vorschlag ab',
+        noProposal: '(keine Antwort)',
+      },
       container: {
         badge: 'Container · {image}',
         toolHint: 'Lief im Container {image} mit dessen eigenem Einstiegsbefehl (Werkzeug-Modus)',

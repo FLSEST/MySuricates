@@ -82,7 +82,9 @@
       "while",
       "conditional",
       "switch",
-      "compress-ai"
+      "compress-ai",
+      "approval",
+      "human-input"
     ],
     "fields": {
       "provider": {
@@ -899,6 +901,44 @@
             }
           ],
           "default": "continue"
+        },
+        "actor": {
+          "type": "string",
+          "doc": {
+            "de": "Wer den Schritt beantwortet (Modul `ai-actors`, standardmäßig aus). Platzhalter erlaubt (`{{ actor_po }}`); in einem Lauf mit fremder Eingabe bleibt er unaufgelöst und es gilt `human`.",
+            "en": "Who answers the step (module `ai-actors`, off by default). Placeholders allowed (`{{ actor_po }}`); in a run with untrusted input it stays unresolved and `human` applies."
+          },
+          "values": [
+            {
+              "value": "human",
+              "doc": {
+                "de": "Eine Person antwortet (Standard, Verhalten wie bisher).",
+                "en": "A person answers (default, behaviour as before)."
+              }
+            },
+            {
+              "value": "ai",
+              "doc": {
+                "de": "Ein KI-Aufruf in der Rolle antwortet; die Antwort muss eine der Optionen sein bzw. das Formular füllen, sonst scheitert der Schritt.",
+                "en": "One AI call in the role answers; the answer must be one of the options or fill the form, otherwise the step fails."
+              }
+            },
+            {
+              "value": "shadow",
+              "doc": {
+                "de": "Die KI schlägt vor, die Person entscheidet und sieht den Vorschlag; beide Antworten und `agreed` landen in den Schrittmetadaten.",
+                "en": "The AI proposes, the person decides and sees the proposal; both answers and `agreed` go into the step metadata."
+              }
+            }
+          ],
+          "default": "human"
+        },
+        "actor_prompt": {
+          "type": "string",
+          "doc": {
+            "de": "Rollenanweisung für den KI-Akteur (`actor: ai|shadow`), Platzhalter werden aufgelöst. Steht vor Frage bzw. Formular im Prompt.",
+            "en": "Role instructions for the AI actor (`actor: ai|shadow`), placeholders are resolved. Precedes the question or form in the prompt."
+          }
         }
       }
     },
@@ -1026,6 +1066,44 @@
           "doc": {
             "de": "Formular mit mehreren Feldern (`variable_name`, `label`, `input_type`, `required`, …).",
             "en": "Form with several fields (`variable_name`, `label`, `input_type`, `required`, …)."
+          }
+        },
+        "actor": {
+          "type": "string",
+          "doc": {
+            "de": "Wer den Schritt beantwortet (Modul `ai-actors`, standardmäßig aus). Platzhalter erlaubt (`{{ actor_po }}`); in einem Lauf mit fremder Eingabe bleibt er unaufgelöst und es gilt `human`.",
+            "en": "Who answers the step (module `ai-actors`, off by default). Placeholders allowed (`{{ actor_po }}`); in a run with untrusted input it stays unresolved and `human` applies."
+          },
+          "values": [
+            {
+              "value": "human",
+              "doc": {
+                "de": "Eine Person antwortet (Standard, Verhalten wie bisher).",
+                "en": "A person answers (default, behaviour as before)."
+              }
+            },
+            {
+              "value": "ai",
+              "doc": {
+                "de": "Ein KI-Aufruf in der Rolle antwortet; die Antwort muss eine der Optionen sein bzw. das Formular füllen, sonst scheitert der Schritt.",
+                "en": "One AI call in the role answers; the answer must be one of the options or fill the form, otherwise the step fails."
+              }
+            },
+            {
+              "value": "shadow",
+              "doc": {
+                "de": "Die KI schlägt vor, die Person entscheidet und sieht den Vorschlag; beide Antworten und `agreed` landen in den Schrittmetadaten.",
+                "en": "The AI proposes, the person decides and sees the proposal; both answers and `agreed` go into the step metadata."
+              }
+            }
+          ],
+          "default": "human"
+        },
+        "actor_prompt": {
+          "type": "string",
+          "doc": {
+            "de": "Rollenanweisung für den KI-Akteur (`actor: ai|shadow`), Platzhalter werden aufgelöst. Steht vor Frage bzw. Formular im Prompt.",
+            "en": "Role instructions for the AI actor (`actor: ai|shadow`), placeholders are resolved. Precedes the question or form in the prompt."
           }
         }
       }

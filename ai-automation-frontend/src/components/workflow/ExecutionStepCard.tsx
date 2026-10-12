@@ -3,7 +3,7 @@ import { CheckCircle2, AlertCircle } from 'lucide-react';
 import { PathLinkedOutput } from '../shared/PathLinkedOutput';
 import { useT } from '../../i18n';
 import type { StepResult } from '../../types';
-import { stepMetadataSummary, wrapperFacts, formatMetadataValue } from './stepMetadata';
+import { stepMetadataSummary, wrapperFacts, formatMetadataValue, stepAnsweredBy, shadowFacts } from './stepMetadata';
 import { StepCardFrame, StepCardHeader, StepWaitingIcon } from './StepCardChrome';
 import { CompressionPanel } from './CompressionPanel';
 
@@ -14,6 +14,8 @@ export function ExecutionStepCard({ step, runActive = true }: { step: StepResult
   const [systemPromptExpanded, setSystemPromptExpanded] = useState(false);
   const { provider, model, requestedModel, showRequestedModel, aiSystemPrompt, aiRequest } = stepMetadataSummary(step);
   const facts = wrapperFacts(step);
+  const answeredBy = stepAnsweredBy(step);
+  const shadow = shadowFacts(step);
   const systemPromptLineCount = aiSystemPrompt ? aiSystemPrompt.split('\n').length : 0;
   const aiRequestEntries = aiRequest
     ? Object.entries(aiRequest).filter(([, v]) => v !== null && v !== undefined && v !== '')
@@ -36,6 +38,23 @@ export function ExecutionStepCard({ step, runActive = true }: { step: StepResult
       </div>
       <div className="flex-1 min-w-0">
         <StepCardHeader step={step} />
+        {answeredBy && (
+          <p className="text-xs mb-2 flex flex-wrap items-center gap-2" data-answered-by={answeredBy}>
+            <span className={answeredBy === 'ai' ? 'text-ai' : 'text-human'}>
+              {answeredBy === 'shadow'
+                ? t.workflows.execution.answeredBy.shadow.replace(
+                    '{proposal}',
+                    shadow?.proposal ? shadow.proposal : t.workflows.execution.answeredBy.noProposal,
+                  )
+                : t.workflows.execution.answeredBy[answeredBy]}
+            </span>
+            {shadow && (
+              <span className={`px-2 py-0.5 rounded-full text-[11px] ${shadow.agreed ? 'bg-success-subtle text-success' : 'bg-warning-subtle text-warning'}`}>
+                {shadow.agreed ? t.workflows.execution.answeredBy.agreed : t.workflows.execution.answeredBy.disagreed}
+              </span>
+            )}
+          </p>
+        )}
         <CompressionPanel step={step} />
         {(provider || model || showRequestedModel || facts.length > 0) && (
           <div className="flex flex-wrap gap-2 mb-2">

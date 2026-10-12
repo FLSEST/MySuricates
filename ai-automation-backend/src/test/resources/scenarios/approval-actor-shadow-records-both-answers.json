@@ -1,0 +1,79 @@
+{
+  "id": "approval-actor-shadow-records-both-answers",
+  "title": "Besetzung: actor: shadow – die KI schlägt vor, die Person sieht den Vorschlag in der Frage und entscheidet; beide Antworten und agreed stehen am Schritt",
+  "derivedFrom": {
+    "spec": "WORKFLOW-GUIDE → Besetzung je Schritt (actor): shadow fragt die Person trotzdem, zeigt den KI-Vorschlag unter der Frage; Schrittmetadaten answeredBy: shadow, shadowAnswer, agreed",
+    "incidents": [
+      "dca0c03e (Besetzung je Schritt: Mensch, KI oder Schatten an Approval und Human-Input)"
+    ]
+  },
+  "workflow": {
+    "provider": "SCRIPTED",
+    "blocks": [
+      {
+        "type": "approval",
+        "name": "entscheiden",
+        "config": {
+          "question": "Issue PO-7 ins Refinement nehmen?",
+          "options": [
+            "Ja",
+            "Nein"
+          ],
+          "actor": "shadow",
+          "actor_prompt": "Du bist der Product Owner."
+        }
+      },
+      {
+        "type": "simple",
+        "name": "kommentieren",
+        "config": {
+          "command": "Kommentiere die Entscheidung: {{ approval_answer }}"
+        }
+      }
+    ]
+  },
+  "ai": {
+    "SCRIPTED": [
+      {
+        "match": "## Allowed answers",
+        "respond": "Ja"
+      },
+      {
+        "match": "Kommentiere die Entscheidung: Nein",
+        "respond": "kommentiert"
+      }
+    ]
+  },
+  "answers": [
+    {
+      "answer": "Nein",
+      "questionContains": [
+        "Issue PO-7 ins Refinement nehmen?",
+        "**AI proposal (shadow):** Ja"
+      ],
+      "rejectOptions": [
+        "Nein"
+      ]
+    }
+  ],
+  "expect": {
+    "runStatus": "COMPLETED",
+    "aiCallCount": {
+      "SCRIPTED": 2
+    },
+    "steps": [
+      {
+        "index": 0,
+        "status": "COMPLETED",
+        "outputContains": [
+          "Approval denied (continuing): Nein"
+        ],
+        "metadata": {
+          "answeredBy": "shadow",
+          "shadowAnswer": "Ja",
+          "agreed": "false"
+        }
+      }
+    ]
+  }
+}

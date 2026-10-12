@@ -4,6 +4,8 @@ import com.automation.entity.BlockDefinition;
 import com.automation.entity.StepStatus;
 import com.automation.executor.ApprovalRequest;
 import com.automation.executor.ExecutionContext;
+import com.automation.modules.ModuleRegistry;
+import com.automation.service.cli.CommandExecutorService;
 import com.automation.service.workflow.ExecutionBroadcaster;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -29,11 +31,15 @@ class HumanInputBlockExecutorTest {
     @Mock
     private SimpMessagingTemplate messagingTemplate;
 
+    @Mock
+    private CommandExecutorService commandExecutor;
+
     private HumanInputBlockExecutor executor;
 
     @BeforeEach
     void setUp() {
-        executor = new HumanInputBlockExecutor(new ExecutionBroadcaster(messagingTemplate));
+        executor = new HumanInputBlockExecutor(new ExecutionBroadcaster(messagingTemplate),
+                new StepActors(commandExecutor, ModuleRegistry.allEnabled()));
     }
 
     @Test

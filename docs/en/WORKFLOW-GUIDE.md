@@ -214,6 +214,21 @@ Pauses until a person enters a value or fills in a form (`fields`); the answer a
 
 On timeout the block ends COMPLETED with `default_value` if `use_default_on_timeout` applies (default) and a default is set, otherwise FAILED.
 
+### Casting per step: person, AI or shadow (`actor`)
+
+Module `ai-actors` (tier research, off by default: `automation.modules.ai-actors: true` or the switch under Settings → Modules). `approval` and `human-input` take the key `actor`: `human` (default, behaviour as above), `ai` – one AI call in the role answers the step –, `shadow` – the AI proposes, the person still decides and sees the proposal below the question. That simulates the work of one role without rebuilding the workflow.
+
+```json
+{ "type": "approval", "config": { "question": "Take issue {{ issue_key }} into refinement?\n\n{{ previous_output }}",
+  "options": ["Yes", "No"], "actor": "{{ actor_po }}",
+  "actor_prompt": "You are the product owner. Decide by value and risk.", "model": "opus" } }
+```
+
+- The AI's prompt: `actor_prompt` (resolved) + the resolved question or form + the allowed answers. The answer must be one of the `options` (for `human-input`: meet the field format, with `fields` a JSON object with every required field), otherwise the step fails – nobody is asked instead. Provider, model and effort as for every AI block (`provider`, `model`, `effort`; block > workflow > default), the call gets no tools.
+- `actor` may be a placeholder (`{{ actor_po }}` from the `defaultContext`): a run variable casts the role. In a run with foreign input (webhook) it stays unresolved and `human` applies – like `mode`/`auto_answer`. `mode: auto` takes precedence: then `auto_answer` answers, no actor.
+- Step metadata: `answeredBy` (`human`/`ai`/`shadow`), for AI the usual `aiRequest` keys, for shadow also `shadowAnswer` and `agreed`. The run view classifies a step with `answeredBy: ai` as AI and shows who answered.
+- Module off ⇒ `actor: ai|shadow` does not run: analyzer finding `actor-module-disabled` (HIGH, placeholder MEDIUM) and the step fails with a clear message. Never silently behaves like `human`.
+
 ### `sub-workflow` — Nested Workflow
 
 Runs another workflow as a step and waits for it: at most 5 levels, cycles are detected, 30 minutes. If the parent run is cancelled, it cancels the child run too. To run the same workflow per list entry, use `foreach` with `workflow_id`.

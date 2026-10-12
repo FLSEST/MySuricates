@@ -7,6 +7,8 @@ import com.automation.executor.ApprovalRejection;
 import com.automation.executor.ApprovalRequest;
 import com.automation.executor.BlockExecutor;
 import com.automation.executor.ExecutionContext;
+import com.automation.executor.blocks.StepActors.Actor;
+import com.automation.executor.blocks.StepActors.AiAnswer;
 import com.automation.service.workflow.ExecutionBroadcaster;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -27,6 +29,7 @@ import java.util.concurrent.TimeoutException;
 public class ApprovalBlockExecutor implements BlockExecutor {
 
     private final ExecutionBroadcaster broadcaster;
+    private final StepActors actors;
 
     @Override
     public Set<String> supportedTypes() {
@@ -56,7 +59,15 @@ public class ApprovalBlockExecutor implements BlockExecutor {
                 ? ((Number) config.get("timeout_minutes")).intValue()
                 : 30;
 
+        // Who answers (TODO dca0c03e): a person as always, an AI call in the role, or both (shadow)
+        Actor actor = StepActors.resolve(config, context);
+        if (actor != Actor.HUMAN && !actors.enabled()) {
+            return buildResult(stepIndex, start, question, StepActors.disabledMessage("approval", actor),
+                    StepStatus.FAILED, null);
+        }
+
         String answer = presetAnswer(mode, autoAnswer, question, context);
+        Map<String, Object> metadata = null;
         if (answer == null) {
             ApprovalRequest request = ApprovalRequest.builder()
                     .blockId("approval-" + stepIndex)
@@ -66,22 +77,51 @@ public class ApprovalBlockExecutor implements BlockExecutor {
                     .stepIndex(stepIndex)
                     .timeoutMinutes(timeoutMinutes)
                     .build();
-            CompletableFuture<String> pending = ask(request, context);
-            try {
-                answer = context.awaitApproval(pending, timeoutMinutes, TimeUnit.MINUTES);
-            } catch (TimeoutException e) {
-                log.warn("Approval timed out for question: {}", question);
-                return buildResult(stepIndex, start, question, "Timed out waiting for approval",
-                        StepStatus.FAILED);
-            } catch (Exception e) {
-                log.warn("Approval interrupted for question: {}", question);
-                return buildResult(stepIndex, start, question, "Approval cancelled: " + e.getMessage(),
-                        StepStatus.FAILED);
+            AiAnswer proposal = null;
+            String proposalText = null;
+            if (actor != Actor.HUMAN) {
+                proposal = actors.answer(block, context, stepIndex, approvalTask(question, options));
+                if (actor == Actor.AI) {
+                    if (proposal.failed()) {
+                        return buildResult(stepIndex, start, question, StepActors.failedCallOutput(proposal),
+                                StepStatus.FAILED, StepActors.aiMetadata(actor, proposal));
+                    }
+                    try {
+                        answer = request.acceptedAnswer(proposal.text());
+                    } catch (IllegalArgumentException e) {
+                        return buildResult(stepIndex, start, question, "AI actor answered '" + proposal.text()
+                                + "', which is none of the options " + options, StepStatus.FAILED,
+                                StepActors.aiMetadata(actor, proposal));
+                    }
+                    log.info("Approval answered '{}' by the AI actor for question: {}", answer, question);
+                    metadata = StepActors.aiMetadata(actor, proposal);
+                } else {
+                    // Shadow: the proposal is recorded as given, valid or not — the person decides either way
+                    proposalText = proposal.failed() ? "" : proposal.text();
+                    request = request.toBuilder().question(StepActors.withProposal(question, proposalText)).build();
+                }
             }
-            Map<String, Object> resolved = new HashMap<>();
-            resolved.put("stepIndex", stepIndex);
-            resolved.put("answer", answer);
-            broadcaster.broadcastLogMessage(context.getWorkflowRunId(), "approval_resolved", resolved);
+            if (answer == null) {
+                CompletableFuture<String> pending = ask(request, context);
+                try {
+                    answer = context.awaitApproval(pending, timeoutMinutes, TimeUnit.MINUTES);
+                } catch (TimeoutException e) {
+                    log.warn("Approval timed out for question: {}", question);
+                    return buildResult(stepIndex, start, question, "Timed out waiting for approval",
+                            StepStatus.FAILED, null);
+                } catch (Exception e) {
+                    log.warn("Approval interrupted for question: {}", question);
+                    return buildResult(stepIndex, start, question, "Approval cancelled: " + e.getMessage(),
+                            StepStatus.FAILED, null);
+                }
+                Map<String, Object> resolved = new HashMap<>();
+                resolved.put("stepIndex", stepIndex);
+                resolved.put("answer", answer);
+                broadcaster.broadcastLogMessage(context.getWorkflowRunId(), "approval_resolved", resolved);
+                metadata = actor == Actor.SHADOW
+                        ? StepActors.shadowMetadata(proposal, proposalText, sameOption(answer, proposalText))
+                        : Map.of(StepActors.ANSWERED_BY, Actor.HUMAN.key());
+            }
         }
 
         // Handle "Yes always" — remember for future steps in this run
@@ -96,15 +136,28 @@ public class ApprovalBlockExecutor implements BlockExecutor {
         if (ApprovalRejection.isRejection(answer, rejectAnswers)) {
             return switch (onNo) {
                 case "fail" -> buildResult(stepIndex, start, question,
-                        "Approval denied: " + answer, StepStatus.FAILED);
+                        "Approval denied: " + answer, StepStatus.FAILED, metadata);
                 case "skip" -> buildResult(stepIndex, start, question,
-                        "Approval denied, skipping: " + answer, StepStatus.SKIPPED);
+                        "Approval denied, skipping: " + answer, StepStatus.SKIPPED, metadata);
                 default -> buildResult(stepIndex, start, question,
-                        "Approval denied (continuing): " + answer, StepStatus.COMPLETED);
+                        "Approval denied (continuing): " + answer, StepStatus.COMPLETED, metadata);
             };
         }
 
-        return buildResult(stepIndex, start, question, "Approved: " + answer, StepStatus.COMPLETED);
+        return buildResult(stepIndex, start, question, "Approved: " + answer, StepStatus.COMPLETED, metadata);
+    }
+
+    /** The task of the AI actor: the resolved question and the options it may pick from. */
+    static String approvalTask(String question, List<String> options) {
+        StringBuilder task = new StringBuilder("## Question\n\n").append(question).append("\n\n## Allowed answers\n\n");
+        options.forEach(option -> task.append("- ").append(option).append('\n'));
+        return task.append("\nReply with exactly one of the allowed answers, spelled as listed, and nothing else.")
+                .toString();
+    }
+
+    /** Options compare case-insensitively, like {@link ApprovalRequest#acceptedAnswer}. */
+    private static boolean sameOption(String answer, String proposal) {
+        return answer != null && proposal != null && answer.strip().equalsIgnoreCase(proposal.strip());
     }
 
     /**
@@ -136,7 +189,8 @@ public class ApprovalBlockExecutor implements BlockExecutor {
         return pending;
     }
 
-    private StepResult buildResult(int stepIndex, Instant start, String input, String output, StepStatus status) {
+    private StepResult buildResult(int stepIndex, Instant start, String input, String output, StepStatus status,
+                                   Map<String, Object> metadata) {
         Instant end = Instant.now();
         return StepResult.builder()
                 .stepIndex(stepIndex)
@@ -146,6 +200,7 @@ public class ApprovalBlockExecutor implements BlockExecutor {
                 .startedAt(start)
                 .completedAt(end)
                 .durationMs(end.toEpochMilli() - start.toEpochMilli())
+                .metadata(metadata == null ? null : new HashMap<>(metadata))
                 .build();
     }
 
@@ -154,9 +209,10 @@ public class ApprovalBlockExecutor implements BlockExecutor {
      * {@code {{ approval_mode }}} from the defaultContext), so that a workflow switches without manual edit
      * between interactive and unattended (TODO 2a05c365). Exception: if the run carries
      * foreign input, a placeholder stays unresolved - otherwise a webhook payload could grant the
-     * approval itself. Then "ask" or no automatic answer applies.
+     * approval itself. Then "ask" or no automatic answer applies. {@code actor} is read the same way
+     * ({@link StepActors#resolve}).
      */
-    private static String resolveSwitch(Object raw, ExecutionContext context) {
+    static String resolveSwitch(Object raw, ExecutionContext context) {
         if (!(raw instanceof String value)) return null;
         if (value.contains("{{")) {
             if (context.hasUntrustedInput()) return null;

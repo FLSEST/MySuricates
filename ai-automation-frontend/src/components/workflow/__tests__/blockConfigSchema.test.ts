@@ -123,7 +123,9 @@ describe('blockConfigSchema', () => {
   it('offers the AI override keys only where the block makes an AI call', () => {
     expect(knownConfigKeys('simple')).toEqual(expect.arrayContaining(['provider', 'model', 'effort']));
     expect(knownConfigKeys('shell')).not.toContain('effort');
-    expect(knownConfigKeys('approval')).not.toContain('model');
+    expect(knownConfigKeys('document')).not.toContain('model');
+    // approval/human-input call the AI when cast with actor: ai|shadow (module ai-actors), so they take the keys
+    expect(knownConfigKeys('approval')).toEqual(expect.arrayContaining(['actor', 'actor_prompt', 'model']));
   });
 
   it('keeps the legacy execution_mode "claude" valid without suggesting it', () => {

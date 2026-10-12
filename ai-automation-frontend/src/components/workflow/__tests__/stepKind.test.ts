@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { stepBlockType, stepKind } from '../stepMetadata';
+import { shadowFacts, stepAnsweredBy, stepBlockType, stepKind } from '../stepMetadata';
 import type { StepResult } from '../../../types';
 
 function step(overrides: Partial<StepResult>): StepResult {
@@ -84,5 +84,42 @@ describe('stepKind', () => {
   it('classifies compress as deterministic and compress-ai as AI even before AI metadata exists', () => {
     expect(stepKind({ id: 'a', stepIndex: 0, input: '', output: '', status: 'COMPLETED', durationMs: 1, error: null, blockType: 'compress', metadata: {} })).toBe('deterministic');
     expect(stepKind({ id: 'b', stepIndex: 1, input: '', output: '', status: 'RUNNING', durationMs: 1, error: null, blockType: 'compress-ai', metadata: {} })).toBe('ai');
+  });
+});
+
+describe('stepKind of a cast decision step (answeredBy)', () => {
+  it('is human for approval and human-input without casting, as before', () => {
+    expect(stepKind(step({ blockType: 'approval' }))).toBe('human');
+    expect(stepKind(step({ blockType: 'human-input', metadata: { answeredBy: 'human' } }))).toBe('human');
+  });
+
+  it('is ai when an AI actor answered the step', () => {
+    expect(stepKind(step({ blockType: 'approval', metadata: { answeredBy: 'ai', aiRequest: { provider: 'CLAUDE' } } })))
+      .toBe('ai');
+    expect(stepKind(step({ metadata: { blockType: 'human-input', answeredBy: 'ai' } }))).toBe('ai');
+  });
+
+  it('stays human in shadow mode — the person decided, even though an AI call ran', () => {
+    const metadata = { answeredBy: 'shadow', shadowAnswer: 'Ja', agreed: false, aiRequest: { provider: 'CLAUDE' } };
+    expect(stepKind(step({ blockType: 'approval', metadata }))).toBe('human');
+  });
+
+  it('ignores answeredBy on other block types', () => {
+    expect(stepKind(step({ blockType: 'shell', metadata: { answeredBy: 'ai' } }))).toBe('deterministic');
+  });
+});
+
+describe('stepAnsweredBy / shadowFacts', () => {
+  it('reads only the three known actors', () => {
+    expect(stepAnsweredBy(step({ metadata: { answeredBy: 'shadow' } }))).toBe('shadow');
+    expect(stepAnsweredBy(step({ metadata: { answeredBy: 'robot' } }))).toBeNull();
+    expect(stepAnsweredBy(step({}))).toBeNull();
+  });
+
+  it('exposes the proposal and the agreement of a shadow step only', () => {
+    expect(shadowFacts(step({ metadata: { answeredBy: 'shadow', shadowAnswer: 'Ja', agreed: true } })))
+      .toEqual({ proposal: 'Ja', agreed: true });
+    expect(shadowFacts(step({ metadata: { answeredBy: 'shadow' } }))).toEqual({ proposal: '', agreed: false });
+    expect(shadowFacts(step({ metadata: { answeredBy: 'ai', shadowAnswer: 'Ja' } }))).toBeNull();
   });
 });

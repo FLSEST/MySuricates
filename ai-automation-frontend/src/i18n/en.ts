@@ -1082,6 +1082,14 @@ export const en = {
         unknown: 'Unknown',
         unknownHint: 'Cannot tell yet whether AI was involved – the block is still running or the run predates this recording',
       },
+      answeredBy: {
+        human: 'Answered by: person',
+        ai: 'Answered by: AI actor',
+        shadow: 'Answered by: person · AI proposal (shadow): {proposal}',
+        agreed: 'Person and AI agreed',
+        disagreed: 'Person deviated from the AI proposal',
+        noProposal: '(no answer)',
+      },
       container: {
         badge: 'Container · {image}',
         toolHint: 'Ran in the container {image} with its own entrypoint (tool mode)',

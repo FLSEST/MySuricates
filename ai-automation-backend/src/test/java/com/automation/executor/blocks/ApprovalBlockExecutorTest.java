@@ -5,10 +5,16 @@ import com.automation.entity.StepResult;
 import com.automation.entity.StepStatus;
 import com.automation.executor.ApprovalRequest;
 import com.automation.executor.ExecutionContext;
+import com.automation.modules.ModuleRegistry;
+import com.automation.service.ai.AiProvider;
+import com.automation.service.cli.CommandExecutorService;
+import com.automation.service.cli.HostExecutionRequest;
 import com.automation.service.workflow.ExecutionBroadcaster;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
@@ -23,7 +29,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class ApprovalBlockExecutorTest {
@@ -31,13 +39,17 @@ class ApprovalBlockExecutorTest {
     @Mock
     private SimpMessagingTemplate messagingTemplate;
 
+    @Mock
+    private CommandExecutorService commandExecutor;
+
     private ApprovalBlockExecutor executor;
 
     private ExecutionContext context;
 
     @BeforeEach
     void setUp() {
-        executor = new ApprovalBlockExecutor(new ExecutionBroadcaster(messagingTemplate));
+        executor = new ApprovalBlockExecutor(new ExecutionBroadcaster(messagingTemplate),
+                new StepActors(commandExecutor, ModuleRegistry.allEnabled()));
         context = ExecutionContext.builder()
                 .containerId("container-1")
                 .workflowRunId("run-1")
@@ -450,5 +462,194 @@ class ApprovalBlockExecutorTest {
 
         assertThat(result.getStatus()).as("fremde Eingabe darf die Freigabe nicht selbst erteilen")
                 .isEqualTo(StepStatus.FAILED);
+    }
+
+    // --- TODO dca0c03e: casting per step — a person, an AI actor, or both (shadow) ---
+
+    @Nested
+    class AiActors {
+
+        private BlockDefinition block(String actor, String onNo) {
+            Map<String, Object> config = new HashMap<>(Map.of(
+                    "question", "Issue PO-7 ins Refinement nehmen?",
+                    "options", List.of("Ja", "Nein"),
+                    "actor", actor,
+                    "actor_prompt", "Du bist der Product Owner von {{ product }}.",
+                    "on_no", onNo));
+            return BlockDefinition.builder().type("approval").config(config).build();
+        }
+
+        private StepResult aiSays(String text, StepStatus status) {
+            StepResult call = new StepResult();
+            call.setOutput(text);
+            call.setStatus(status);
+            call.setMetadata(new HashMap<>(Map.of("aiRequest", Map.of("provider", "CLAUDE", "model", "opus"),
+                    "provider", "CLAUDE", "model", "claude-opus")));
+            return call;
+        }
+
+        private void personAnswers(String answer, AtomicReference<Map<String, Object>> shown) {
+            doAnswer(invocation -> {
+                Map<String, Object> payload = invocation.getArgument(1);
+                if ("approval_required".equals(payload.get("type"))) {
+                    shown.set(payload);
+                    context.resolveApproval(answer);
+                }
+                return null;
+            }).when(messagingTemplate).convertAndSend(eq("/topic/executions/run-1/logs"), (Object) any(Map.class));
+        }
+
+        @Test
+        void actorAi_answersFromTheOptions_withoutAskingAnyone() {
+            context.setVariable("product", "Shop");
+            when(commandExecutor.executeStepOnHost(any())).thenReturn(aiSays("nein\n", StepStatus.COMPLETED));
+
+            StepResult result = executor.execute(block("ai", "fail"), context);
+
+            assertThat(result.getStatus()).isEqualTo(StepStatus.FAILED);
+            assertThat(result.getOutput()).isEqualTo("Approval denied: Nein");
+            assertThat(context.getVariable("approval_answer")).as("the option's spelling, like /approve").isEqualTo("Nein");
+            assertThat(result.getMetadata())
+                    .containsEntry("answeredBy", "ai")
+                    .containsEntry("aiRequest", Map.of("provider", "CLAUDE", "model", "opus"))
+                    .containsEntry("provider", "CLAUDE");
+            verifyNoInteractions(messagingTemplate);
+            ArgumentCaptor<HostExecutionRequest> sent = ArgumentCaptor.forClass(HostExecutionRequest.class);
+            verify(commandExecutor).executeStepOnHost(sent.capture());
+            String prompt = (String) sent.getValue().block().getConfig().get("command");
+            assertThat(prompt).startsWith("Du bist der Product Owner von Shop.")
+                    .contains("Issue PO-7 ins Refinement nehmen?", "- Ja\n- Nein", "exactly one of the allowed answers");
+            assertThat(sent.getValue().allowedTools()).as("a decision needs no tools").isEqualTo(AiProvider.NO_TOOLS);
+        }
+
+        @Test
+        void actorAi_answerOutsideTheOptions_failsTheStep() {
+            when(commandExecutor.executeStepOnHost(any())).thenReturn(aiSays("Vielleicht später", StepStatus.COMPLETED));
+
+            StepResult result = executor.execute(block("ai", "continue"), context);
+
+            assertThat(result.getStatus()).isEqualTo(StepStatus.FAILED);
+            assertThat(result.getOutput()).contains("Vielleicht später", "none of the options [Ja, Nein]");
+            assertThat(result.getMetadata()).containsEntry("answeredBy", "ai");
+            assertThat(context.getVariable("approval_answer")).isNull();
+            verifyNoInteractions(messagingTemplate);
+        }
+
+        @Test
+        void actorAi_failedCall_failsTheStep_insteadOfAskingAPerson() {
+            when(commandExecutor.executeStepOnHost(any())).thenReturn(aiSays("Error: CLI exited 1", StepStatus.FAILED));
+
+            StepResult result = executor.execute(block("ai", "continue"), context);
+
+            assertThat(result.getStatus()).isEqualTo(StepStatus.FAILED);
+            assertThat(result.getOutput()).isEqualTo("AI actor call failed: Error: CLI exited 1");
+            verifyNoInteractions(messagingTemplate);
+        }
+
+        @Test
+        void actorAi_moduleOff_failsClearly_andCallsNeitherAiNorPerson() {
+            ApprovalBlockExecutor coreExecutor = new ApprovalBlockExecutor(new ExecutionBroadcaster(messagingTemplate),
+                    new StepActors(commandExecutor, ModuleRegistry.of(Map.of(), Map.of())));
+
+            StepResult result = coreExecutor.execute(block("shadow", "continue"), context);
+
+            assertThat(result.getStatus()).isEqualTo(StepStatus.FAILED);
+            assertThat(result.getOutput()).contains("actor: shadow", "approval", "ai-actors", "automation.modules.ai-actors");
+            verifyNoInteractions(messagingTemplate, commandExecutor);
+        }
+
+        @Test
+        void actorShadow_aiProposes_personDecides_bothAnswersRecorded() {
+            when(commandExecutor.executeStepOnHost(any())).thenReturn(aiSays("Ja", StepStatus.COMPLETED));
+            AtomicReference<Map<String, Object>> shown = new AtomicReference<>();
+            personAnswers("Nein", shown);
+
+            StepResult result = executor.execute(block("shadow", "continue"), context);
+
+            assertThat(result.getStatus()).isEqualTo(StepStatus.COMPLETED);
+            assertThat(result.getOutput()).isEqualTo("Approval denied (continuing): Nein");
+            assertThat((String) shown.get().get("question"))
+                    .startsWith("Issue PO-7 ins Refinement nehmen?")
+                    .contains("**AI proposal (shadow):** Ja");
+            assertThat(shown.get()).containsEntry("options", List.of("Ja", "Nein"));
+            assertThat(result.getMetadata())
+                    .containsEntry("answeredBy", "shadow")
+                    .containsEntry("shadowAnswer", "Ja")
+                    .containsEntry("agreed", false)
+                    .containsEntry("provider", "CLAUDE");
+        }
+
+        @Test
+        void actorShadow_sameOptionIgnoringCase_countsAsAgreed() {
+            when(commandExecutor.executeStepOnHost(any())).thenReturn(aiSays("ja", StepStatus.COMPLETED));
+            personAnswers("Ja", new AtomicReference<>());
+
+            StepResult result = executor.execute(block("shadow", "fail"), context);
+
+            assertThat(result.getStatus()).isEqualTo(StepStatus.COMPLETED);
+            assertThat(result.getMetadata()).containsEntry("agreed", true).containsEntry("shadowAnswer", "ja");
+        }
+
+        @Test
+        void actorShadow_failedAiCall_stillAsksThePerson() {
+            when(commandExecutor.executeStepOnHost(any())).thenReturn(aiSays("Error: boom", StepStatus.FAILED));
+            AtomicReference<Map<String, Object>> shown = new AtomicReference<>();
+            personAnswers("Ja", shown);
+
+            StepResult result = executor.execute(block("shadow", "fail"), context);
+
+            assertThat(result.getStatus()).isEqualTo(StepStatus.COMPLETED);
+            assertThat((String) shown.get().get("question")).contains("**AI proposal (shadow):** (no answer)");
+            assertThat(result.getMetadata()).containsEntry("shadowAnswer", "").containsEntry("agreed", false);
+        }
+
+        @Test
+        void actorFromVariable_castsTheAi() {
+            context.setVariable("actor_po", "ai");
+            when(commandExecutor.executeStepOnHost(any())).thenReturn(aiSays("Ja", StepStatus.COMPLETED));
+
+            StepResult result = executor.execute(block("{{ actor_po }}", "fail"), context);
+
+            assertThat(result.getStatus()).isEqualTo(StepStatus.COMPLETED);
+            assertThat(result.getOutput()).isEqualTo("Approved: Ja");
+            assertThat(result.getMetadata()).containsEntry("answeredBy", "ai");
+        }
+
+        @Test
+        void actorFromVariable_untrustedRun_fallsBackToThePerson() {
+            context.setUntrustedVariable("actor_po", "ai");
+            personAnswers("Nein", new AtomicReference<>());
+
+            StepResult result = executor.execute(block("{{ actor_po }}", "fail"), context);
+
+            assertThat(result.getStatus()).as("foreign input must not cast the approver").isEqualTo(StepStatus.FAILED);
+            assertThat(result.getOutput()).isEqualTo("Approval denied: Nein");
+            assertThat(result.getMetadata()).containsEntry("answeredBy", "human");
+            verifyNoInteractions(commandExecutor);
+        }
+
+        @Test
+        void unknownActorValue_asksThePerson() {
+            personAnswers("Ja", new AtomicReference<>());
+
+            StepResult result = executor.execute(block("robot", "fail"), context);
+
+            assertThat(result.getStatus()).isEqualTo(StepStatus.COMPLETED);
+            assertThat(result.getMetadata()).containsEntry("answeredBy", "human");
+            verifyNoInteractions(commandExecutor);
+        }
+
+        @Test
+        void autoMode_wins_overTheActor() {
+            BlockDefinition auto = BlockDefinition.builder().type("approval").config(new HashMap<>(Map.of(
+                    "question", "Deploy?", "mode", "auto", "auto_answer", "Yes", "actor", "ai"))).build();
+
+            StepResult result = executor.execute(auto, context);
+
+            assertThat(result.getStatus()).isEqualTo(StepStatus.COMPLETED);
+            assertThat(result.getMetadata() == null || !result.getMetadata().containsKey("answeredBy"))
+                    .as("nobody answered — no answeredBy").isTrue();
+            verifyNoInteractions(commandExecutor, messagingTemplate);
+        }
     }
 }

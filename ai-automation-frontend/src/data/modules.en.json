@@ -35,6 +35,10 @@
     "name": "BPMN export/import",
     "description": "Exports workflows as BPMN and reads MySuricates BPMN exports back in."
   },
+  "ai-actors": {
+    "name": "AI casting per step",
+    "description": "Casting per step: an approval or human-input block with `actor: \"ai\"` is answered by one AI call in the role, with `\"shadow\"` the AI proposes first and the person still decides (both answers are recorded). Off: such blocks refuse to run instead of silently asking a person."
+  },
   "integrations": {
     "name": "Integrations",
     "description": "External services (GitHub, Jira, Trello, Google, Confluence, Taskwarrior) via OAuth, plus integration blocks, TODO tracker export and calendar."

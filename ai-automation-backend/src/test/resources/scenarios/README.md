@@ -61,6 +61,8 @@ Die ersten zehn Zeilen sind die Startmenge aus fdf79a86, die übrigen stammen au
 | 22 | foreach hört nach drei fehlgeschlagenen Items in Folge auf (`max_consecutive_failures`, Standard 3), auch mit `continue_on_error`; die Lauf-Fehlermeldung nennt den Grund zuerst (a6659a46) | `foreach-stops-after-consecutive-failures` |
 | 23 | foreach mit `workflow_id` startet je Eintrag einen Kind-Lauf: die ID kommt aus einer Kontextvariable, Item-Felder (`{{ current_feature.id }}`), Index und `context`-Zuordnung kommen im Kind an, dessen Marker zählen nur dort (a5c9fbbf) | `foreach-sub-workflow-per-item` |
 | 24 | Lauf-Token: ein Workflow mit `metadata.permissions: ["read"]` gibt seinen Shell-Schritten `MYSURICATES_RUN_TOKEN`, `MYSURICATES_API` (endet auf `/api/v1`) und `no_proxy` für die lokalen Hosts mit; der Token-Wert steht in der gespeicherten Ausgabe nur als `***`; ein Sub-Workflow ohne Anforderung bekommt keinen (cfb5d56b) | `run-token-reaches-shell-and-is-masked` |
+| 25 | Besetzung (dca0c03e): `actor: ai` aus einer Laufvariable beantwortet eine Freigabe aus den Optionen, der Prompt trägt `actor_prompt`, die aufgelöste Frage und die Optionen, Modell und Effort kommen am Aufruf an; `shadow` zeigt den KI-Vorschlag in der Frage, die Person entscheidet, `shadowAnswer`/`agreed` stehen am Schritt | `approval-actor-ai-answers-from-options`, `approval-actor-shadow-records-both-answers` |
+| 26 | Besetzung (dca0c03e): `actor: ai` füllt das Formular eines `human-input`, die Felder kommen als Variablen im nächsten Block an; ein Wert außerhalb der Optionen lässt den Schritt scheitern | `human-input-actor-ai-fills-the-form` (zwei Läufe) |
 
 ### Aus der Historie, noch ohne Szenario
 
@@ -101,7 +103,8 @@ Die ersten zehn Zeilen sind die Startmenge aus fdf79a86, die übrigen stammen au
     "aiCallCount": { "SCRIPTED": 1 },
     "aiCalls": { "SCRIPTED": [ { "model": "sonnet", "timeoutSeconds": 42, "effort": "low",
                                  "promptContains": ["…"], "promptNotContains": ["{{"] } ] },
-    "steps": [ { "index": 0, "status": "COMPLETED", "outputContains": ["…"], "outputNotContains": ["…"] } ],
+    "steps": [ { "index": 0, "status": "COMPLETED", "outputContains": ["…"], "outputNotContains": ["…"],
+                 "metadata": { "answeredBy": "ai" } } ],
     "todos": [ { "titleContains": "…", "priority": "MEDIUM", "tags": ["gate:yellow"], "status": "OPEN", "tagsAbsent": ["…"], "descriptionContains": "…" } ],
     "dashboard": { "status": "RED", "title": "…", "summaryContains": ["…"], "kpis": { "Label": "Wert" },
                    "itemsContain": ["…"] },
@@ -146,6 +149,8 @@ Statt eines Laufs sind auch mehrere Läufe desselben Workflows oder eine Kette m
 - **`answers`:** Der Runner wartet, bis der Lauf eine Freigabe verlangt, prüft die Frage so, wie sie
   angezeigt wird, und antwortet wie `POST /executions/{id}/approve`. Verlangt der Lauf keine
   Freigabe mehr, ist das ein Fehler.
+- **`steps[].metadata`:** Schrittmetadaten als Schlüssel → erwarteter Wert, als Text verglichen
+  (`answeredBy`, `shadowAnswer`, `agreed`; ein fehlender Schlüssel ist `null`).
 - **`markers`:** wie viele `gate_status`- und `todo_item`-Marker der Lauf gezählt hat
   (`gate_summary.items`, `todo_items`). Eine Kopie darf nicht noch einmal zählen. Der Ersatzeintrag
   eines bestellten, aber ausgebliebenen Urteils (`synthetic`) ist kein Marker und zählt nicht mit.

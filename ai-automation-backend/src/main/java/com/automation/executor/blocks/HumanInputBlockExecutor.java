@@ -6,6 +6,8 @@ import com.automation.entity.StepStatus;
 import com.automation.executor.ApprovalRequest;
 import com.automation.executor.BlockExecutor;
 import com.automation.executor.ExecutionContext;
+import com.automation.executor.blocks.StepActors.Actor;
+import com.automation.executor.blocks.StepActors.AiAnswer;
 import com.automation.service.workflow.ExecutionBroadcaster;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -28,6 +30,7 @@ import java.util.concurrent.TimeoutException;
 public class HumanInputBlockExecutor implements BlockExecutor {
 
     private final ExecutionBroadcaster broadcaster;
+    private final StepActors actors;
     private static final ObjectMapper JSON = new ObjectMapper();
 
     @Override
@@ -42,44 +45,82 @@ public class HumanInputBlockExecutor implements BlockExecutor {
         Settings settings = Settings.from(block.getConfig(), context);
         String prompt = settings.prompt();
 
-        ApprovalRequest request = ApprovalRequest.builder()
-                .blockId("human-input-" + stepIndex)
-                .question(prompt)
-                .options(settings.options())
-                .stepIndex(stepIndex)
-                .type("human-input")
-                .inputType(settings.inputType())
-                .defaultValue(settings.defaultValue())
-                .variableName(settings.variableName())
-                .required(settings.required())
-                .validationPattern(settings.validationPattern())
-                .fields(settings.fields())
-                .timeoutMinutes(settings.timeoutMinutes())
-                .build();
-        CompletableFuture<String> pending = ask(request, context);
-
-        String answer;
-        try {
-            answer = context.awaitApproval(pending, settings.timeoutMinutes(), TimeUnit.MINUTES);
-        } catch (TimeoutException e) {
-            log.warn("Human input timed out for prompt: {}", prompt);
-            String defaultValue = settings.defaultValue();
-            if (settings.useDefaultOnTimeout() && defaultValue != null && !defaultValue.isEmpty()) {
-                answer = defaultValue;
-                log.info("Using default value '{}' after timeout for prompt: {}", defaultValue, prompt);
-            } else {
-                return buildResult(stepIndex, start, prompt, "Timed out waiting for human input",
-                        StepStatus.FAILED);
-            }
-        } catch (Exception e) {
-            log.warn("Human input interrupted for prompt: {}", prompt);
-            return buildResult(stepIndex, start, prompt, "Human input cancelled: " + e.getMessage(),
-                    StepStatus.FAILED);
+        // Who answers (TODO dca0c03e): a person as always, an AI call in the role, or both (shadow)
+        Actor actor = StepActors.resolve(block.getConfig(), context);
+        if (actor != Actor.HUMAN && !actors.enabled()) {
+            return buildResult(stepIndex, start, prompt, StepActors.disabledMessage("human-input", actor),
+                    StepStatus.FAILED, null);
         }
-        Map<String, Object> resolved = new HashMap<>();
-        resolved.put("stepIndex", stepIndex);
-        resolved.put("answer", answer);
-        broadcaster.broadcastLogMessage(context.getWorkflowRunId(), "human_input_resolved", resolved);
+        String answer = null;
+        Map<String, Object> metadata = null;
+        AiAnswer proposal = null;
+        String proposalText = null;
+        String shownPrompt = prompt;
+        if (actor != Actor.HUMAN) {
+            proposal = actors.answer(block, context, stepIndex, HumanInputAnswers.task(prompt, settings));
+            if (actor == Actor.AI) {
+                if (proposal.failed()) {
+                    return buildResult(stepIndex, start, prompt, StepActors.failedCallOutput(proposal),
+                            StepStatus.FAILED, StepActors.aiMetadata(actor, proposal));
+                }
+                HumanInputAnswers.Validated checked = HumanInputAnswers.validate(proposal.text(), settings);
+                if (!checked.valid()) {
+                    return buildResult(stepIndex, start, prompt, "AI actor answered '" + proposal.text()
+                            + "' — " + checked.error(), StepStatus.FAILED, StepActors.aiMetadata(actor, proposal));
+                }
+                answer = checked.answer();
+                log.info("Human input answered by the AI actor for prompt: {}", prompt);
+                metadata = StepActors.aiMetadata(actor, proposal);
+            } else {
+                // Shadow: the proposal is recorded as given, valid or not — the person decides either way
+                proposalText = proposal.failed() ? "" : proposal.text();
+                shownPrompt = StepActors.withProposal(prompt, proposalText);
+            }
+        }
+
+        if (answer == null) {
+            ApprovalRequest request = ApprovalRequest.builder()
+                    .blockId("human-input-" + stepIndex)
+                    .question(shownPrompt)
+                    .options(settings.options())
+                    .stepIndex(stepIndex)
+                    .type("human-input")
+                    .inputType(settings.inputType())
+                    .defaultValue(settings.defaultValue())
+                    .variableName(settings.variableName())
+                    .required(settings.required())
+                    .validationPattern(settings.validationPattern())
+                    .fields(settings.fields())
+                    .timeoutMinutes(settings.timeoutMinutes())
+                    .build();
+            CompletableFuture<String> pending = ask(request, context);
+
+            try {
+                answer = context.awaitApproval(pending, settings.timeoutMinutes(), TimeUnit.MINUTES);
+                metadata = actor == Actor.SHADOW
+                        ? StepActors.shadowMetadata(proposal, proposalText,
+                                HumanInputAnswers.same(answer, proposalText, settings))
+                        : Map.of(StepActors.ANSWERED_BY, Actor.HUMAN.key());
+            } catch (TimeoutException e) {
+                log.warn("Human input timed out for prompt: {}", prompt);
+                String defaultValue = settings.defaultValue();
+                if (settings.useDefaultOnTimeout() && defaultValue != null && !defaultValue.isEmpty()) {
+                    answer = defaultValue;
+                    log.info("Using default value '{}' after timeout for prompt: {}", defaultValue, prompt);
+                } else {
+                    return buildResult(stepIndex, start, prompt, "Timed out waiting for human input",
+                            StepStatus.FAILED, null);
+                }
+            } catch (Exception e) {
+                log.warn("Human input interrupted for prompt: {}", prompt);
+                return buildResult(stepIndex, start, prompt, "Human input cancelled: " + e.getMessage(),
+                        StepStatus.FAILED, null);
+            }
+            Map<String, Object> resolved = new HashMap<>();
+            resolved.put("stepIndex", stepIndex);
+            resolved.put("answer", answer);
+            broadcaster.broadcastLogMessage(context.getWorkflowRunId(), "human_input_resolved", resolved);
+        }
 
         String output;
         if (settings.multiField()) {
@@ -89,7 +130,7 @@ public class HumanInputBlockExecutor implements BlockExecutor {
             context.setVariable(settings.variableName(), answer);
             output = answer;
         }
-        return buildResult(stepIndex, start, prompt, output, StepStatus.COMPLETED);
+        return buildResult(stepIndex, start, prompt, output, StepStatus.COMPLETED, metadata);
     }
 
     /**
@@ -98,7 +139,7 @@ public class HumanInputBlockExecutor implements BlockExecutor {
      *
      * @param fields a form with several inputs, {@code null} when the block has none
      */
-    private record Settings(String prompt, String inputType, String variableName, List<String> options,
+    record Settings(String prompt, String inputType, String variableName, List<String> options,
                             String defaultValue, boolean required, String validationPattern, int timeoutMinutes,
                             boolean useDefaultOnTimeout, List<Map<String, Object>> fields) {
 
@@ -166,7 +207,8 @@ public class HumanInputBlockExecutor implements BlockExecutor {
         return answer == null ? "" : answer;
     }
 
-    private StepResult buildResult(int stepIndex, Instant start, String input, String output, StepStatus status) {
+    private StepResult buildResult(int stepIndex, Instant start, String input, String output, StepStatus status,
+                                   Map<String, Object> metadata) {
         Instant end = Instant.now();
         return StepResult.builder()
                 .stepIndex(stepIndex)
@@ -176,6 +218,7 @@ public class HumanInputBlockExecutor implements BlockExecutor {
                 .startedAt(start)
                 .completedAt(end)
                 .durationMs(end.toEpochMilli() - start.toEpochMilli())
+                .metadata(metadata == null ? null : new HashMap<>(metadata))
                 .build();
     }
 }

@@ -30,7 +30,7 @@ Gelten für jeden Block-Typ.
 
 ## KI-Felder
 
-Gelten zusätzlich für `simple`, `agentic`, `skill-capability`, `retry`, `foreach`, `while`, `conditional`, `switch`, `compress-ai`.
+Gelten zusätzlich für `simple`, `agentic`, `skill-capability`, `retry`, `foreach`, `while`, `conditional`, `switch`, `compress-ai`, `approval`, `human-input`.
 
 | Schlüssel | Typ | Pflicht | Standard | Werte | Bedeutung |
 |---|---|---|---|---|---|
@@ -168,7 +168,7 @@ Dazu die [gemeinsamen Felder](#gemeinsame-felder) und die [KI-Felder](#ki-felder
 
 ## `approval`
 
-Dazu die [gemeinsamen Felder](#gemeinsame-felder).
+Dazu die [gemeinsamen Felder](#gemeinsame-felder) und die [KI-Felder](#ki-felder).
 
 | Schlüssel | Typ | Pflicht | Standard | Werte | Bedeutung |
 |---|---|---|---|---|---|
@@ -180,10 +180,12 @@ Dazu die [gemeinsamen Felder](#gemeinsame-felder).
 | `mode` | string |  | `ask` | `ask`: Wartet auf eine Antwort im UI (Standard). · `auto`: Antwortet sofort mit `auto_answer`. | Interaktiv fragen oder automatisch antworten. |
 | `auto_answer` | string \| null |  |  |  | Antwort im Modus `auto`. |
 | `on_no` | string |  | `continue` | `continue`: Weiter, Block COMPLETED (Standard). · `fail`: Block FAILED. · `skip`: Block SKIPPED. | Verhalten bei Ablehnung (siehe `reject_options`). |
+| `actor` | string |  | `human` | `human`: Eine Person antwortet (Standard, Verhalten wie bisher). · `ai`: Ein KI-Aufruf in der Rolle antwortet; die Antwort muss eine der Optionen sein bzw. das Formular füllen, sonst scheitert der Schritt. · `shadow`: Die KI schlägt vor, die Person entscheidet und sieht den Vorschlag; beide Antworten und `agreed` landen in den Schrittmetadaten. | Wer den Schritt beantwortet (Modul `ai-actors`, standardmäßig aus). Platzhalter erlaubt (`{{ actor_po }}`); in einem Lauf mit fremder Eingabe bleibt er unaufgelöst und es gilt `human`. |
+| `actor_prompt` | string |  |  |  | Rollenanweisung für den KI-Akteur (`actor: ai\|shadow`), Platzhalter werden aufgelöst. Steht vor Frage bzw. Formular im Prompt. |
 
 ## `human-input`
 
-Dazu die [gemeinsamen Felder](#gemeinsame-felder).
+Dazu die [gemeinsamen Felder](#gemeinsame-felder) und die [KI-Felder](#ki-felder).
 
 | Schlüssel | Typ | Pflicht | Standard | Werte | Bedeutung |
 |---|---|---|---|---|---|
@@ -197,6 +199,8 @@ Dazu die [gemeinsamen Felder](#gemeinsame-felder).
 | `timeout_minutes` | integer |  | `30` | ≥ 1 | Wartezeit in Minuten. |
 | `use_default_on_timeout` | boolean |  | `true` |  | Bei Timeout `default_value` nehmen statt zu scheitern. |
 | `fields` | array |  |  |  | Formular mit mehreren Feldern (`variable_name`, `label`, `input_type`, `required`, …). |
+| `actor` | string |  | `human` | `human`: Eine Person antwortet (Standard, Verhalten wie bisher). · `ai`: Ein KI-Aufruf in der Rolle antwortet; die Antwort muss eine der Optionen sein bzw. das Formular füllen, sonst scheitert der Schritt. · `shadow`: Die KI schlägt vor, die Person entscheidet und sieht den Vorschlag; beide Antworten und `agreed` landen in den Schrittmetadaten. | Wer den Schritt beantwortet (Modul `ai-actors`, standardmäßig aus). Platzhalter erlaubt (`{{ actor_po }}`); in einem Lauf mit fremder Eingabe bleibt er unaufgelöst und es gilt `human`. |
+| `actor_prompt` | string |  |  |  | Rollenanweisung für den KI-Akteur (`actor: ai\|shadow`), Platzhalter werden aufgelöst. Steht vor Frage bzw. Formular im Prompt. |
 
 ## `sub-workflow`
 

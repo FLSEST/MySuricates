@@ -2,7 +2,10 @@ package com.automation.service.workflow.analyzer;
 
 import com.automation.entity.BlockDefinition;
 import com.automation.entity.Workflow;
+import com.automation.modules.ModuleCatalog;
+import com.automation.modules.ModuleRegistry;
 import com.automation.service.workflow.PlatformAccessCheck;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
@@ -27,9 +30,9 @@ import java.util.Set;
  * Only lock (TODO e7e93fba): {@code RunAdmission} refuses unattended starts on
  * {@link #UNATTENDED_REFUSAL_RULES} with {@code HIGH} — saving and manual starts continue to work.
  *
- * <p><b>What it checks today</b> — seventeen rules, each decidable from the text, one of them from the text plus
- * the definition's metadata, four against the block config schema that the editor also uses — and one that
- * also needs the running instance, which only the live analysis supplies:
+ * <p><b>What it checks today</b> — nineteen rules, each decidable from the text, one of them from the text plus
+ * the definition's metadata, one from the text plus the module state, four against the block config schema that
+ * the editor also uses — and one that also needs the running instance, which only the live analysis supplies:
  * <ul>
  *   <li>{@code unknown-block-reference} — reference to a block that does not exist</li>
  *   <li>{@code chain-only-placeholder} — chain variable in a workflow running on its own</li>
@@ -61,6 +64,9 @@ import java.util.Set;
  *       {@code automation.db} with read access) — HIGH; {@code sqlite3} alone MEDIUM for review</li>
  *   <li>{@code container-without-docker} — block runs in a container, but this instance reaches no Docker
  *       daemon — HIGH; only in the live analysis, which passes {@link InstanceFacts} ({@link InstanceRules})</li>
+ *   <li>{@code actor-module-disabled} — approval/human-input casts an AI actor ({@code actor: ai|shadow}),
+ *       but the module {@code ai-actors} is off: the step fails at run time — HIGH, a placeholder MEDIUM
+ *       ({@link ActorRules}; the only rule that reads the instance's module state)</li>
  * </ul>
  *
  * <p><b>What it deliberately does not check.</b> Three rules of the ticket need more than the text and
@@ -88,6 +94,18 @@ public class WorkflowAnalyzer implements PlatformAccessCheck {
      * TODO e7e93fba): saving stays allowed, the analyzer only reports there.
      */
     public static final Set<String> UNATTENDED_REFUSAL_RULES = Set.of("self-api-call", "direct-db-access");
+
+    private final ModuleRegistry modules;
+
+    /** Every module on — for tests and tools that check definitions without an instance. */
+    public WorkflowAnalyzer() {
+        this(ModuleRegistry.allEnabled());
+    }
+
+    @Autowired
+    public WorkflowAnalyzer(ModuleRegistry modules) {
+        this.modules = modules;
+    }
 
     /**
      * The {@code HIGH} findings of the {@link #UNATTENDED_REFUSAL_RULES}, in block order — only the
@@ -153,6 +171,7 @@ public class WorkflowAnalyzer implements PlatformAccessCheck {
         SelfAccessRules.apply(blocks, findings);
         RunTokenRules.apply(blocks, metadata != null ? metadata : Map.of(), findings);
         InstanceRules.apply(blocks, instance, findings);
+        ActorRules.apply(blocks, modules.isEnabled(ModuleCatalog.AI_ACTORS), findings);
         findings.sort((a, b) -> a.severity() != b.severity()
                 ? a.severity().compareTo(b.severity())
                 : Integer.compare(a.blockIndex(), b.blockIndex()));

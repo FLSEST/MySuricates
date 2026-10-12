@@ -35,6 +35,10 @@
     "name": "BPMN-Export/-Import",
     "description": "Exportiert Workflows als BPMN und liest MySuricates-BPMN-Exporte wieder ein."
   },
+  "ai-actors": {
+    "name": "KI-Besetzung je Schritt",
+    "description": "Besetzung je Schritt: ein Approval- oder Human-Input-Block mit `actor: \"ai\"` wird von einem KI-Aufruf in der Rolle beantwortet, mit `\"shadow\"` schlägt die KI zuerst vor und der Mensch entscheidet trotzdem (beide Antworten werden festgehalten). Aus: solche Blöcke scheitern, statt still einen Menschen zu fragen."
+  },
   "integrations": {
     "name": "Integrationen",
     "description": "Externe Dienste (GitHub, Jira, Trello, Google, Confluence, Taskwarrior) per OAuth, dazu Integrations-Blöcke, TODO-Tracker-Export und Kalender."

@@ -81,13 +81,36 @@ function isIntegrationStep(step: StepResult, blockType: string): boolean {
   return blockType === 'integration' || step.metadata?.executionMode === 'integration';
 }
 
+/** Who answered an approval or human-input step (`metadata.answeredBy`, TODO dca0c03e). */
+export type StepActor = 'human' | 'ai' | 'shadow';
+
+/**
+ * The casting of an approval/human-input step: `ai` when an AI call answered in the role, `shadow` when the AI
+ * proposed and a person decided, `human` when a person answered. Null for every other block and for steps that
+ * nobody answered (auto mode, remembered "Yes always", timeout, runs from before the backend wrote it).
+ */
+export function stepAnsweredBy(step: StepResult): StepActor | null {
+  const raw = step.metadata?.answeredBy;
+  return raw === 'human' || raw === 'ai' || raw === 'shadow' ? raw : null;
+}
+
+/** The shadow proposal and whether the person agreed with it; null unless the step was answered in shadow mode. */
+export function shadowFacts(step: StepResult): { proposal: string; agreed: boolean } | null {
+  if (stepAnsweredBy(step) !== 'shadow') return null;
+  const metadata = step.metadata ?? {};
+  const proposal = typeof metadata.shadowAnswer === 'string' ? metadata.shadowAnswer : '';
+  return { proposal, agreed: metadata.agreed === true };
+}
+
 /**
  * Classifies a step by what actually ran: wrappers (foreach, while, retry, conditional, switch) count as AI only
  * when an inner AI call happened — the backend then carries `aiRequest` (older runs: `provider`) onto the step.
+ * Approval and human-input are a person's step unless an AI actor answered it (`answeredBy: ai`); in shadow mode
+ * the person decided, so the step stays human even though an AI call ran.
  */
 export function stepKind(step: StepResult): StepKind {
   const blockType = stepBlockType(step);
-  if (HUMAN_BLOCK_TYPES.has(blockType)) return 'human';
+  if (HUMAN_BLOCK_TYPES.has(blockType)) return stepAnsweredBy(step) === 'ai' ? 'ai' : 'human';
   const { provider, aiRequest } = stepMetadataSummary(step);
   const legacyAiProvider = provider !== null && !isIntegrationStep(step, blockType);
   if (aiRequest || legacyAiProvider || ALWAYS_AI_BLOCK_TYPES.has(blockType)) return 'ai';
