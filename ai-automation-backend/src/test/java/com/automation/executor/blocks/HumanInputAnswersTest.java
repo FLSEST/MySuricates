@@ -51,4 +51,26 @@ class HumanInputAnswersTest {
         assertThat(HumanInputAnswers.same("Alice", "alice", single("text", Map.of()))).isFalse();
         assertThat(HumanInputAnswers.same(" Alice ", "Alice", single("text", Map.of()))).isTrue();
     }
+
+    @Test
+    void same_normalizesTheProposalFirst() {
+        assertThat(HumanInputAnswers.same("true", "yes", single("checkbox", Map.of()))).isTrue();
+        assertThat(HumanInputAnswers.same("false", "Nein", single("checkbox", Map.of()))).isTrue();
+        assertThat(HumanInputAnswers.same("true", "maybe", single("checkbox", Map.of())))
+                .as("a proposal that fails the checks never agrees").isFalse();
+    }
+
+    @Test
+    void same_formSelectIgnoresCase_likeTheSingleField() {
+        Map<String, Object> config = new HashMap<>(Map.of("prompt", "p", "variable_name", "f", "fields", List.of(
+                Map.of("variable_name", "size", "input_type", "select", "options", List.of("S", "M")),
+                Map.of("variable_name", "done", "input_type", "checkbox"))));
+        var settings = HumanInputBlockExecutor.Settings.from(config,
+                ExecutionContext.builder().containerId("c").workflowRunId("r").build());
+
+        assertThat(HumanInputAnswers.same("{\"size\":\"M\",\"done\":\"true\"}", "{\"size\":\"m\",\"done\":\"ja\"}", settings))
+                .isTrue();
+        assertThat(HumanInputAnswers.same("{\"size\":\"S\",\"done\":\"true\"}", "{\"size\":\"m\",\"done\":\"ja\"}", settings))
+                .isFalse();
+    }
 }

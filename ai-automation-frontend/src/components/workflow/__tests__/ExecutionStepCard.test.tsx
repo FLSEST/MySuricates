@@ -137,4 +137,15 @@ describe('ExecutionStepCard', () => {
     expect(panel).toHaveTextContent('compressed 200 → 250 chars (+25 %)');
     expect(panel.textContent).not.toContain('−-');
   });
+
+  // dca0c03e: a shadow step nobody answered (timeout, default value) shows the proposal but no verdict
+  it('shows agreement only when a person answered the shadow step', () => {
+    const shadow = { blockType: 'approval', answeredBy: 'shadow', shadowAnswer: 'Ja' };
+    const { rerender } = render(<ExecutionStepCard step={step({ metadata: { ...shadow, agreed: false } })} />);
+    expect(screen.getByText('Person deviated from the AI proposal')).toBeInTheDocument();
+
+    rerender(<ExecutionStepCard step={step({ status: 'FAILED', metadata: shadow })} />);
+    expect(screen.queryByText('Person deviated from the AI proposal')).not.toBeInTheDocument();
+    expect(screen.queryByText('Person and AI agreed')).not.toBeInTheDocument();
+  });
 });

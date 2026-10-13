@@ -27,7 +27,9 @@ import java.util.Map;
  * the person is still asked and sees the proposal; both answers go into the step metadata). The key may be a
  * placeholder ({@code {{ actor_po }}}), so a run variable casts the roles; in a run with untrusted input a
  * placeholder is never resolved — exactly like {@code mode}/{@code auto_answer}, otherwise a webhook payload
- * could cast itself as the approver. {@value #ACTOR_PROMPT_KEY} carries the role instructions.
+ * could cast itself as the approver. {@value #ACTOR_PROMPT_KEY} carries the role instructions. A literal
+ * {@code ai} in such a run becomes {@code shadow}: the question or form is resolved with that input, and an
+ * AI deciding alone could be talked into the answer by the payload — the person decides instead.
  *
  * <p>The feature is the module {@link ModuleCatalog#AI_ACTORS} (off in the {@code core} preset). With the
  * module off, {@code ai} and {@code shadow} are refused — the step fails with a clear message and the analyzer
@@ -49,7 +51,10 @@ public class StepActors {
     public static final String ANSWERED_BY = "answeredBy";
     /** Step metadata of a shadow step: the AI's proposal. */
     public static final String SHADOW_ANSWER = "shadowAnswer";
-    /** Step metadata of a shadow step: whether the person's answer equals the AI's proposal. */
+    /**
+     * Step metadata of a shadow step: whether the person's answer equals the AI's proposal. Absent when no
+     * person answered (timeout, cancel, default value) — that is neither agreement nor disagreement.
+     */
     public static final String AGREED = "agreed";
 
     private static final String DEFAULT_ROLE = "You answer this step in place of the person who would normally "
@@ -72,16 +77,22 @@ public class StepActors {
     /**
      * The actor of a block: {@code human} unless the config says {@code ai} or {@code shadow}. A placeholder
      * is resolved only in a run without untrusted input and only to a known value; anything else is
-     * {@code human} ({@link ApprovalBlockExecutor#resolveSwitch}).
+     * {@code human} ({@link ApprovalBlockExecutor#resolveSwitch}). In a run with untrusted input {@code ai}
+     * becomes {@code shadow}, so a person decides a question that the input helped to word.
      */
     public static Actor resolve(Map<String, Object> config, ExecutionContext context) {
         String raw = config == null ? null : ApprovalBlockExecutor.resolveSwitch(config.get(ACTOR_KEY), context);
         if (raw == null) return Actor.HUMAN;
-        return switch (raw.toLowerCase(Locale.ROOT)) {
+        Actor actor = switch (raw.toLowerCase(Locale.ROOT)) {
             case "ai" -> Actor.AI;
             case "shadow" -> Actor.SHADOW;
             default -> Actor.HUMAN;
         };
+        if (actor == Actor.AI && context.hasUntrustedInput()) {
+            log.warn("actor: ai runs as shadow - the run carries untrusted input, a person decides");
+            return Actor.SHADOW;
+        }
+        return actor;
     }
 
     /** True when the literal config value asks for an AI actor — the analyzer's view, no run needed. */
@@ -147,9 +158,18 @@ public class StepActors {
 
     /** Step metadata of a shadow step: the AI keys, the proposal and whether the person agreed. */
     public static Map<String, Object> shadowMetadata(AiAnswer proposal, String proposalText, boolean agreed) {
+        Map<String, Object> metadata = unansweredShadowMetadata(proposal, proposalText);
+        metadata.put(AGREED, agreed);
+        return metadata;
+    }
+
+    /**
+     * Step metadata of a shadow step no person answered (timeout, cancel, default value): the AI call was made
+     * and paid for, so its keys and the proposal stay; {@value #AGREED} is left out.
+     */
+    public static Map<String, Object> unansweredShadowMetadata(AiAnswer proposal, String proposalText) {
         Map<String, Object> metadata = aiMetadata(Actor.SHADOW, proposal);
         metadata.put(SHADOW_ANSWER, proposalText);
-        metadata.put(AGREED, agreed);
         return metadata;
     }
 

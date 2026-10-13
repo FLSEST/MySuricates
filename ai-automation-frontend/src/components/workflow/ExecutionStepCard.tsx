@@ -48,7 +48,7 @@ export function ExecutionStepCard({ step, runActive = true }: { step: StepResult
                   )
                 : t.workflows.execution.answeredBy[answeredBy]}
             </span>
-            {shadow && (
+            {shadow && shadow.agreed !== null && (
               <span className={`px-2 py-0.5 rounded-full text-[11px] ${shadow.agreed ? 'bg-success-subtle text-success' : 'bg-warning-subtle text-warning'}`}>
                 {shadow.agreed ? t.workflows.execution.answeredBy.agreed : t.workflows.execution.answeredBy.disagreed}
               </span>

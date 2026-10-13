@@ -104,17 +104,22 @@ public class HumanInputBlockExecutor implements BlockExecutor {
             } catch (TimeoutException e) {
                 log.warn("Human input timed out for prompt: {}", prompt);
                 String defaultValue = settings.defaultValue();
+                // A shadow step keeps its paid AI call and proposal, but nobody answered: no "agreed"
+                Map<String, Object> unanswered = actor == Actor.SHADOW
+                        ? StepActors.unansweredShadowMetadata(proposal, proposalText) : null;
                 if (settings.useDefaultOnTimeout() && defaultValue != null && !defaultValue.isEmpty()) {
                     answer = defaultValue;
+                    metadata = unanswered;
                     log.info("Using default value '{}' after timeout for prompt: {}", defaultValue, prompt);
                 } else {
                     return buildResult(stepIndex, start, prompt, "Timed out waiting for human input",
-                            StepStatus.FAILED, null);
+                            StepStatus.FAILED, unanswered);
                 }
             } catch (Exception e) {
                 log.warn("Human input interrupted for prompt: {}", prompt);
                 return buildResult(stepIndex, start, prompt, "Human input cancelled: " + e.getMessage(),
-                        StepStatus.FAILED, null);
+                        StepStatus.FAILED, actor == Actor.SHADOW
+                                ? StepActors.unansweredShadowMetadata(proposal, proposalText) : null);
             }
             Map<String, Object> resolved = new HashMap<>();
             resolved.put("stepIndex", stepIndex);

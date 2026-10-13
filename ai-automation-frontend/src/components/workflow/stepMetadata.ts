@@ -94,12 +94,15 @@ export function stepAnsweredBy(step: StepResult): StepActor | null {
   return raw === 'human' || raw === 'ai' || raw === 'shadow' ? raw : null;
 }
 
-/** The shadow proposal and whether the person agreed with it; null unless the step was answered in shadow mode. */
-export function shadowFacts(step: StepResult): { proposal: string; agreed: boolean } | null {
+/**
+ * The shadow proposal and whether the person agreed with it; null unless the step was answered in shadow mode.
+ * `agreed` is null when no person answered (timeout, cancel, default value) — neither agreement nor disagreement.
+ */
+export function shadowFacts(step: StepResult): { proposal: string; agreed: boolean | null } | null {
   if (stepAnsweredBy(step) !== 'shadow') return null;
   const metadata = step.metadata ?? {};
   const proposal = typeof metadata.shadowAnswer === 'string' ? metadata.shadowAnswer : '';
-  return { proposal, agreed: metadata.agreed === true };
+  return { proposal, agreed: typeof metadata.agreed === 'boolean' ? metadata.agreed : null };
 }
 
 /**

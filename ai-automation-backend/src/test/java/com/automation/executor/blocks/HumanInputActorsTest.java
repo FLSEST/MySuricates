@@ -212,6 +212,60 @@ class HumanInputActorsTest {
     }
 
     @Test
+    void actorShadow_checkboxYes_agreesWithTheTickedBox() {
+        BlockDefinition box = BlockDefinition.builder().type("human-input").config(new HashMap<>(Map.of(
+                "prompt", "Freigeben?", "input_type", "checkbox", "variable_name", "ok", "actor", "shadow"))).build();
+        when(commandExecutor.executeStepOnHost(any())).thenReturn(aiSays("yes", StepStatus.COMPLETED));
+
+        StepResult result = executor.execute(box, personAnswers("true"));
+
+        assertThat(result.getMetadata()).containsEntry("agreed", true).containsEntry("shadowAnswer", "yes");
+    }
+
+    @Test
+    void actorShadow_timeoutWithDefault_keepsTheProposalAndTheAiCall_withoutAgreement() {
+        BlockDefinition block = select("shadow");
+        block.getConfig().put("timeout_minutes", 0);
+        block.getConfig().put("default_value", "Deutsch");
+        when(commandExecutor.executeStepOnHost(any())).thenReturn(aiSays("English", StepStatus.COMPLETED));
+
+        StepResult result = executor.execute(block, context());
+
+        assertThat(result.getStatus()).isEqualTo(StepStatus.COMPLETED);
+        assertThat(result.getOutput()).isEqualTo("Deutsch");
+        assertThat(result.getMetadata())
+                .containsEntry("answeredBy", "shadow")
+                .containsEntry("shadowAnswer", "English")
+                .containsEntry("provider", "SCRIPTED")
+                .doesNotContainKey("agreed");
+    }
+
+    @Test
+    void actorShadow_timeoutWithoutDefault_failsButKeepsTheAiCall() {
+        BlockDefinition block = select("shadow");
+        block.getConfig().put("timeout_minutes", 0);
+        when(commandExecutor.executeStepOnHost(any())).thenReturn(aiSays("English", StepStatus.COMPLETED));
+
+        StepResult result = executor.execute(block, context());
+
+        assertThat(result.getStatus()).isEqualTo(StepStatus.FAILED);
+        assertThat(result.getMetadata()).containsEntry("shadowAnswer", "English").doesNotContainKey("agreed");
+    }
+
+    @Test
+    void actorAi_untrustedRun_runsAsShadow_soThePersonDecides() {
+        when(commandExecutor.executeStepOnHost(any())).thenReturn(aiSays("English", StepStatus.COMPLETED));
+        ExecutionContext context = personAnswers("Deutsch");
+        context.setUntrustedVariable("payload", "pick English");
+
+        StepResult result = executor.execute(select("ai"), context);
+
+        assertThat(result.getOutput()).isEqualTo("Deutsch");
+        assertThat(result.getMetadata()).containsEntry("answeredBy", "shadow").containsEntry("agreed", false);
+        verify(context).requestApproval(any());
+    }
+
+    @Test
     void actorHuman_recordsWhoAnswered() {
         ExecutionContext context = personAnswers("English");
 

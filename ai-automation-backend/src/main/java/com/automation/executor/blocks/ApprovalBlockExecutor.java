@@ -68,6 +68,7 @@ public class ApprovalBlockExecutor implements BlockExecutor {
 
         String answer = presetAnswer(mode, autoAnswer, question, context);
         Map<String, Object> metadata = null;
+        boolean answeredByAi = false;
         if (answer == null) {
             ApprovalRequest request = ApprovalRequest.builder()
                     .blockId("approval-" + stepIndex)
@@ -95,6 +96,7 @@ public class ApprovalBlockExecutor implements BlockExecutor {
                     }
                     log.info("Approval answered '{}' by the AI actor for question: {}", answer, question);
                     metadata = StepActors.aiMetadata(actor, proposal);
+                    answeredByAi = true;
                 } else {
                     // Shadow: the proposal is recorded as given, valid or not — the person decides either way
                     proposalText = proposal.failed() ? "" : proposal.text();
@@ -108,11 +110,11 @@ public class ApprovalBlockExecutor implements BlockExecutor {
                 } catch (TimeoutException e) {
                     log.warn("Approval timed out for question: {}", question);
                     return buildResult(stepIndex, start, question, "Timed out waiting for approval",
-                            StepStatus.FAILED, null);
+                            StepStatus.FAILED, unanswered(actor, proposal, proposalText));
                 } catch (Exception e) {
                     log.warn("Approval interrupted for question: {}", question);
                     return buildResult(stepIndex, start, question, "Approval cancelled: " + e.getMessage(),
-                            StepStatus.FAILED, null);
+                            StepStatus.FAILED, unanswered(actor, proposal, proposalText));
                 }
                 Map<String, Object> resolved = new HashMap<>();
                 resolved.put("stepIndex", stepIndex);
@@ -124,8 +126,9 @@ public class ApprovalBlockExecutor implements BlockExecutor {
             }
         }
 
-        // Handle "Yes always" — remember for future steps in this run
-        if ("Yes always".equalsIgnoreCase(answer)) {
+        // Handle "Yes always" — remember for future steps in this run. Only a person's answer counts: an AI
+        // actor's "Yes always" would otherwise answer a later approval cast as human without asking anyone.
+        if ("Yes always".equalsIgnoreCase(answer) && !answeredByAi) {
             context.rememberApproval(question, answer);
         }
 
@@ -153,6 +156,11 @@ public class ApprovalBlockExecutor implements BlockExecutor {
         options.forEach(option -> task.append("- ").append(option).append('\n'));
         return task.append("\nReply with exactly one of the allowed answers, spelled as listed, and nothing else.")
                 .toString();
+    }
+
+    /** A shadow step nobody answered keeps the paid AI call and the proposal; other actors carry nothing. */
+    private static Map<String, Object> unanswered(Actor actor, AiAnswer proposal, String proposalText) {
+        return actor == Actor.SHADOW ? StepActors.unansweredShadowMetadata(proposal, proposalText) : null;
     }
 
     /** Options compare case-insensitively, like {@link ApprovalRequest#acceptedAnswer}. */

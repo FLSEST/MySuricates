@@ -8,7 +8,6 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
-import java.util.Objects;
 import java.util.regex.Pattern;
 import java.util.regex.PatternSyntaxException;
 
@@ -91,25 +90,33 @@ final class HumanInputAnswers {
     }
 
     /**
-     * Whether a person's answer equals the AI's proposal: forms compare field by field, a select ignores case
-     * like the options do, everything else compares the trimmed text.
+     * Whether a person's answer equals the AI's proposal. The proposal is first normalized the way an AI
+     * actor's answer would be ({@link #validate}: checkbox {@code yes} becomes {@code true}, a select takes the
+     * option's spelling); a proposal that fails the checks never agrees. Forms compare field by field; a
+     * select ignores case like the options do, everything else compares the trimmed text.
      */
     static boolean same(String human, String proposal, HumanInputBlockExecutor.Settings settings) {
         if (human == null || proposal == null) return false;
+        Validated normalized = validate(proposal, settings);
+        if (!normalized.valid()) return false;
         if (settings.multiField()) {
             Map<String, Object> a = parseObject(human);
-            Map<String, Object> b = parseObject(proposal);
+            Map<String, Object> b = parseObject(normalized.answer());
             if (a == null || b == null) return false;
             for (Map<String, Object> field : settings.fields()) {
                 String name = string(field.get("variable_name"));
                 if (name == null || name.isBlank()) continue;
-                if (!Objects.equals(text(a.get(name)), text(b.get(name)))) return false;
+                if (!sameValue(text(a.get(name)), text(b.get(name)), string(field.get("input_type")))) return false;
             }
             return true;
         }
-        return "select".equals(settings.inputType())
-                ? human.strip().equalsIgnoreCase(proposal.strip())
-                : human.strip().equals(proposal.strip());
+        return sameValue(human.strip(), normalized.answer(), settings.inputType());
+    }
+
+    private static boolean sameValue(String human, String proposal, String inputType) {
+        return "select".equals(inputType) || "checkbox".equals(inputType)
+                ? human.equalsIgnoreCase(proposal)
+                : human.equals(proposal);
     }
 
     private static Validated validateValue(String value, String inputType, List<String> options, boolean required,

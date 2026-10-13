@@ -119,7 +119,10 @@ describe('stepAnsweredBy / shadowFacts', () => {
   it('exposes the proposal and the agreement of a shadow step only', () => {
     expect(shadowFacts(step({ metadata: { answeredBy: 'shadow', shadowAnswer: 'Ja', agreed: true } })))
       .toEqual({ proposal: 'Ja', agreed: true });
-    expect(shadowFacts(step({ metadata: { answeredBy: 'shadow' } }))).toEqual({ proposal: '', agreed: false });
+    expect(shadowFacts(step({ metadata: { answeredBy: 'shadow', agreed: false } }))).toEqual({ proposal: '', agreed: false });
+    // Nobody answered (timeout, cancel, default value): neither agreement nor disagreement
+    expect(shadowFacts(step({ metadata: { answeredBy: 'shadow', shadowAnswer: 'Ja' } })))
+      .toEqual({ proposal: 'Ja', agreed: null });
     expect(shadowFacts(step({ metadata: { answeredBy: 'ai', shadowAnswer: 'Ja' } }))).toBeNull();
   });
 });
