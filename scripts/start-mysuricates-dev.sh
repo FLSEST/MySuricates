@@ -390,6 +390,8 @@ write_compose_override() {
     *[!0-9a-fA-F.:]*) echo "Ungueltiges MYSURICATES_DEV_CONTAINER_BIND '${MYSURICATES_DEV_CONTAINER_BIND}' (eine IP-Adresse, z. B. 127.0.0.1 oder 0.0.0.0)." >&2
                       return 2 ;;
   esac
+  HOST_MOUNTS_PUBLISHED_BIND="${MYSURICATES_DEV_CONTAINER_BIND:-127.0.0.1}" HOST_MOUNTS_PUBLISHED_PORT="${BACKEND_PORT}" \
+  HOST_MOUNTS_BIND_SWITCH=MYSURICATES_DEV_CONTAINER_BIND \
   host_mounts_yaml backend "" "${MYSURICATES_DEV_DOCKER_SOCKET:-0}" "${MYSURICATES_DEV_AI_FROM_HOST:-login}" \
     "${MYSURICATES_DEV_AI_PROVIDERS:-}" "scripts/start-mysuricates-dev.sh --container" MYSURICATES_DEV_ "" \
     "dev-${COMPOSE_PROJECT}" \
@@ -456,7 +458,9 @@ start_backend() {
   echo "Starte Backend (java -jar) ..."
   (
     cd "${BACKEND_DIR}"   # cwd stays the backend directory: ./data/automation.db, user.dir users
-    nohup java "${BACKEND_JVM_OPTS[@]}" ${MYSURICATES_DEV_JVM_OPTS:-} -jar "${CURRENT_JAR}" \
+    # The switch is only shown on the settings page (Erreichbarkeit, 1af11dcc), never applied by the backend
+    MYSURICATES_BIND_SWITCH=MYSURICATES_DEV_BIND MYSURICATES_SWITCH_SOURCE="scripts/start-mysuricates-dev.sh" \
+      nohup java "${BACKEND_JVM_OPTS[@]}" ${MYSURICATES_DEV_JVM_OPTS:-} -jar "${CURRENT_JAR}" \
       --server.address="${DEV_BIND}" > "${BACKEND_LOG}" 2>&1 &
     echo "$!" > "${BACKEND_PID_FILE}"
   )

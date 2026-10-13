@@ -8,6 +8,7 @@ export default defineConfig({
     __BUILD_TIMESTAMP__: JSON.stringify('2026-01-01T00:00:00.000Z'),
     // With a suffix, as between two releases — the tile has to cut it off.
     __APP_VERSION__: JSON.stringify('1.0.0-SNAPSHOT'),
+    __DEV_BIND__: JSON.stringify('127.0.0.1'),
   },
   test: {
     environment: 'jsdom',

@@ -2,7 +2,7 @@ import { Card, CardHeader } from '../ui';
 import { StatusBadge } from '../shared/StatusBadge';
 import { useI18nStore, useT } from '../../i18n';
 import { formatTimeOfDay } from '../../utils/localeFormat';
-import { useSystemHealth, useSystemInfo } from '../../hooks/useSystem';
+import { useListenAddresses, useSystemHealth, useSystemInfo } from '../../hooks/useSystem';
 import { Server } from 'lucide-react';
 
 export function SystemInfoCard() {
@@ -10,7 +10,10 @@ export function SystemInfoCard() {
   const locale = useI18nStore((s) => s.locale);
   const { data: health } = useSystemHealth();
   const { data: sysInfo } = useSystemInfo();
+  // How the instance runs (host, container, tryout) — from the keyed /system/listen, not the public /info (1af11dcc)
+  const { data: listen } = useListenAddresses();
   const s = t.settings;
+  const runsAs = { host: s.systemRunsOnHost, container: s.systemRunsInContainer, tryout: s.systemRunsInTryout };
   const fieldLabels: Record<string, string> = {
     name: s.systemFieldName, version: s.systemFieldVersion, buildType: s.systemFieldBuildType,
     buildTimestamp: s.systemFieldBuildTimestamp, java: s.systemFieldJava, runtimeMode: s.systemFieldRuntimeMode,
@@ -40,6 +43,12 @@ export function SystemInfoCard() {
                   <span className="text-text font-mono">{String(value)}</span>
                 </div>
               ))}
+            {listen && runsAs[listen.runtime] && (
+              <div className="flex justify-between">
+                <span className="text-text-secondary">{s.systemFieldRunsAs}</span>
+                <span className="text-text">{runsAs[listen.runtime]}</span>
+              </div>
+            )}
           </div>
         )}
         {health && (

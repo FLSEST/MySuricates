@@ -8,12 +8,13 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { act, render, screen } from '@testing-library/react';
 import { SystemInfoCard } from '../SystemInfoCard';
-import { useSystemHealth, useSystemInfo } from '../../../hooks/useSystem';
+import { useListenAddresses, useSystemHealth, useSystemInfo } from '../../../hooks/useSystem';
 import { useI18nStore } from '../../../i18n';
 
 vi.mock('../../../hooks/useSystem', () => ({
   useSystemHealth: vi.fn(),
   useSystemInfo: vi.fn(),
+  useListenAddresses: vi.fn(),
 }));
 
 const info = {
@@ -28,6 +29,7 @@ beforeEach(() => {
   useI18nStore.setState({ locale: 'en' });
   vi.mocked(useSystemHealth).mockReturnValue({ data: undefined } as never);
   vi.mocked(useSystemInfo).mockReturnValue({ data: info } as never);
+  vi.mocked(useListenAddresses).mockReturnValue({ data: undefined } as never);
 });
 
 describe('SystemInfoCard', () => {
@@ -79,5 +81,18 @@ describe('SystemInfoCard', () => {
   it('survives a null field', () => {
     vi.mocked(useSystemInfo).mockReturnValue({ data: { ...info, tailscale: null } } as never);
     expect(() => render(<SystemInfoCard />)).not.toThrow();
+  });
+
+  it('says how the instance runs, from the keyed listen report (1af11dcc)', () => {
+    vi.mocked(useListenAddresses).mockReturnValue({ data: { runtime: 'container' } } as never);
+    const { rerender } = render(<SystemInfoCard />);
+    expect(screen.getByText('Runs')).toBeInTheDocument();
+    expect(screen.getByText('in a container')).toBeInTheDocument();
+
+    vi.mocked(useListenAddresses).mockReturnValue({ data: { runtime: 'host' } } as never);
+    act(() => useI18nStore.setState({ locale: 'de' }));
+    rerender(<SystemInfoCard />);
+    expect(screen.getByText('Läuft')).toBeInTheDocument();
+    expect(screen.getByText('direkt auf dem Rechner')).toBeInTheDocument();
   });
 });

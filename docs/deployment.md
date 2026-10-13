@@ -149,6 +149,16 @@ bekommt er nichts von Claude.
 **Sicher per Standard, auf jedem Docker-Weg:** Der Port ist nur von diesem Rechner aus erreichbar, und
 die Instanz bekommt keinen Docker-Socket. Anders wird es nur durch einen ausdrücklichen Schalter.
 
+**Nachsehen, wer die Instanz erreicht.** Einstellungen → System → **Erreichbarkeit** zeigt Adresse und
+Port von Backend und Frontend, ob das nur dieser Rechner ist oder das Netz, den Schalter, der es ändert,
+und die Adresse, unter der der Browser gerade verbunden ist (`localhost` ist dieser Rechner, wie
+`127.0.0.1`); System Info zeigt, ob die Instanz direkt auf dem Rechner, im Container oder als Tryout läuft.
+Die Daten kommen von `GET /api/v1/system/listen` (nur mit API-Key). Im Container zählt die Adresse, auf
+der Docker den Port veröffentlicht, nicht das `0.0.0.0:9090` innen: Jeder Startweg gibt sie als
+`MYSURICATES_PUBLISHED_BIND`/`MYSURICATES_PUBLISHED_PORT` mit, dazu den Schalter als
+`MYSURICATES_BIND_SWITCH` (`scripts/lib/host-mounts.sh`, `scripts/tryout.sh`). Ein Container von einem
+älteren Startskript zeigt „unbekannt“ bis zum nächsten Start über das Skript.
+
 **Port öffnen.** `…BIND=0.0.0.0` macht die Instanz im lokalen Netz erreichbar (Handy, PWA, andere
 Rechner) — an der Host-Firewall vorbei, denn Docker trägt seine Portfreigaben selbst ein. Eine einzelne
 Adresse, etwa die LAN-IP, geht auch; Stable und Test bleiben dann zusätzlich auf `127.0.0.1`

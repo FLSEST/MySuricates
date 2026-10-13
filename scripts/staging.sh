@@ -92,7 +92,9 @@ write_override() {
     # Only in programs mode the container logs in itself (cmd_login) — the status card then shows
     # the command that does so (fixed text, never executed).
     [ "$(staging_setting "$env" AI_FROM_HOST login)" = programs ] && login_command="scripts/staging.sh login $env"
-    if ! host_mounts_yaml "$service" "" "$(staging_setting "$env" DOCKER_SOCKET 0)" \
+    # The published side of the port mapping, so the settings page can say who reaches the instance (1af11dcc)
+    if ! HOST_MOUNTS_PUBLISHED_BIND="$bind" HOST_MOUNTS_PUBLISHED_PORT="$port" HOST_MOUNTS_BIND_SWITCH="${prefix}BIND" \
+         host_mounts_yaml "$service" "" "$(staging_setting "$env" DOCKER_SOCKET 0)" \
             "$(staging_setting "$env" AI_FROM_HOST login)" "$(staging_setting "$env" AI_PROVIDERS "")" \
             "$STAGING_ENV" "$prefix" "$login_command" "staging-$env" > "$file.tmp"; then
         rm -f "$file.tmp"

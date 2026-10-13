@@ -165,6 +165,12 @@ export const handlers = [
   http.get(`${BASE}/system/info`, () =>
     HttpResponse.json({ version: '0.5.0', uptime: '1h' }),
   ),
+  http.get(`${BASE}/system/listen`, () =>
+    HttpResponse.json({
+      runtime: 'host', servesFrontend: false, bindSwitch: null, switchSource: null,
+      backend: { scheme: 'http', address: '127.0.0.1', port: 9090, scope: 'LOCAL', published: false },
+    }),
+  ),
   http.get(`${BASE}/system/remote-access/status`, () =>
     HttpResponse.json({ enabled: false, url: null }),
   ),

@@ -2,6 +2,7 @@ package com.automation.controller;
 
 import com.automation.security.RateLimitConfig;
 import com.automation.service.project.DockerExpectation;
+import com.automation.service.system.ListenAddresses;
 import com.automation.service.system.SystemIdentityService;
 import com.automation.service.system.TailscaleService;
 import com.automation.util.RuntimeClasspathGuard;
@@ -24,7 +25,7 @@ import java.util.Map;
 import java.util.regex.Pattern;
 
 /**
- * Core information under /api/v1/system: health, platform info, auth status, heap usage and
+ * Core information under /api/v1/system: health, platform info, listen addresses, auth status, heap usage and
  * client error reports. The other /system endpoints are split by concern:
  * {@link SystemAiProviderController}, {@link SystemMaintenanceController},
  * {@link SystemSettingsController}, {@link SystemAccessController}.
@@ -51,6 +52,7 @@ public class SystemController {
     private final TailscaleService tailscaleService;
     private final RateLimitConfig rateLimitConfig;
     private final DockerExpectation dockerExpectation;
+    private final ListenAddresses listenAddresses;
 
     @Value("${automation.security.enabled:true}")
     private boolean securityEnabled;
@@ -193,6 +195,15 @@ public class SystemController {
         result.put("environment", environment);
         result.put("rateLimit", rateLimitInfo());
         return result;
+    }
+
+    /**
+     * Returns where the backend can be reached — address, port, this machine only or the network — and the
+     * switch that changes it; needs the API key, unlike {@code /info}.
+     */
+    @GetMapping("/listen")
+    public ListenAddresses.Report listen() {
+        return listenAddresses.report();
     }
 
     /**

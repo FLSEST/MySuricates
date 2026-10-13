@@ -2,7 +2,7 @@ import { useQuery, useMutation, useQueryClient, type QueryKey } from '@tanstack/
 import { api, apiErrorMessage, applyServerRateLimitConfig } from '../api/client';
 import { useToast } from './useToast';
 import { useT, useI18nStore } from '../i18n';
-import type { SystemHealth, SystemInfo, RemoteAccessStatus, BrowseDirectoryResponse, BackupInfo } from '../types';
+import type { SystemHealth, SystemInfo, ListenReport, RemoteAccessStatus, BrowseDirectoryResponse, BackupInfo } from '../types';
 import { useModuleEnabled } from './useModules';
 
 export function useSystemHealth() {
@@ -26,6 +26,14 @@ export function useSystemInfo() {
       applyServerRateLimitConfig(info?.rateLimit);
       return info;
     },
+  });
+}
+
+/** Where backend (and, when it serves it, the UI) can be reached; needs the API key, unlike /system/info (1af11dcc). */
+export function useListenAddresses() {
+  return useQuery({
+    queryKey: ['system', 'listen'],
+    queryFn: () => api.get<ListenReport>('/system/listen'),
   });
 }
 

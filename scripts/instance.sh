@@ -243,6 +243,7 @@ container_cmd() {
       # command that does it (fixed text, never executed).
       login_command=""
       [ "${MYSURICATES_AI_FROM_HOST:-login}" = programs ] && login_command="scripts/instance.sh login"
+      HOST_MOUNTS_PUBLISHED_BIND="$BIND" HOST_MOUNTS_PUBLISHED_PORT="$PORT" HOST_MOUNTS_BIND_SWITCH=MYSURICATES_BIND \
       host_mounts_yaml app "${MYSURICATES_PROJECTS:-$(cd "$REPO_ROOT/.." && pwd)}" "${MYSURICATES_DOCKER_SOCKET:-0}" \
         "${MYSURICATES_AI_FROM_HOST:-login}" "${MYSURICATES_AI_PROVIDERS:-}" "$ENV_FILE" MYSURICATES_ "$login_command" "instance-$CONTAINER" > "$override" \
         || die "Ungültige KI-Schalter in $ENV_FILE (MYSURICATES_AI_FROM_HOST=programs|login|all, MYSURICATES_AI_PROVIDERS=claude,codex,pi)"
@@ -390,6 +391,7 @@ EOF
           AUTOMATION_ENVIRONMENT="${MYSURICATES_ENVIRONMENT:-}" \
           AUTOMATION_CORS_ORIGINS="http://localhost:$PORT,http://127.0.0.1:$PORT" \
           AUTOMATION_INSTANCE_URL="http://localhost:$PORT" \
+          MYSURICATES_BIND_SWITCH=MYSURICATES_BIND MYSURICATES_SWITCH_SOURCE="$ENV_FILE" \
           AUTOMATION_HARDENING_SEALING="${MYSURICATES_HARDENING_SEALING:-false}" \
           AUTOMATION_HARDENING_REQUIRESEALEDFORUNATTENDED="${MYSURICATES_HARDENING_REQUIRE_SEALED:-false}"
         for kv in ${AUTOMATION_ENV[@]+"${AUTOMATION_ENV[@]}"}; do export "$kv"; done

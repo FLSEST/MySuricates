@@ -203,6 +203,14 @@ check "no socket by default"            '! has "docker.sock" && has "\"MYSURICAT
 check "missing projects dir is skipped" '! grep -q "/nope" <<<"$(run Linux svc "$TMP/nope" 0)"'
 check "whole HOME is refused"           '! grep -qF -- "\"$TMP/home:$TMP/home\"" <<<"$(run Linux svc "$TMP/home" 0)"'
 
+echo "10b) published address for the settings page (1af11dcc)"
+OUT="$(HOST_MOUNTS_PUBLISHED_BIND=0.0.0.0 HOST_MOUNTS_PUBLISHED_PORT=8090 HOST_MOUNTS_BIND_SWITCH=TEST_BIND run Linux svc "" 0)"
+check "published bind passed"           'line "      - \"MYSURICATES_PUBLISHED_BIND=0.0.0.0\""'
+check "published port passed"           'line "      - \"MYSURICATES_PUBLISHED_PORT=8090\""'
+check "bind switch named"               'line "      - \"MYSURICATES_BIND_SWITCH=TEST_BIND\""'
+OUT="$(run Linux svc "" 0)"
+check "caller without them: left out"   '! has "MYSURICATES_PUBLISHED_" && ! has "MYSURICATES_BIND_SWITCH"'
+
 echo "11) bash 3.2 hygiene"
 check "no bash-4-only syntax"           '! grep -nE "declare -g?A|mapfile|readarray|\\$\\{[A-Za-z_]+(,,|\\^\\^)\\}" "$HERE/../lib/host-mounts.sh"'
 

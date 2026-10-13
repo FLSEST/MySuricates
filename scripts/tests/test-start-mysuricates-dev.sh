@@ -151,12 +151,15 @@ check "override names the backend service"  'grep -q "^  backend:" <<<"$OUT"'
 check "default login: no login directory"   '! grep -q "/.claude:" <<<"$OUT" && grep -q "MYSURICATES_AI_FROM_HOST=login" <<<"$OUT"'
 check "socket off by default"               '! grep -q "docker.sock" <<<"$OUT" && grep -q "MYSURICATES_DOCKER_SOCKET=0" <<<"$OUT"'
 check "switches named for the settings"     'grep -q "MYSURICATES_SWITCH_PREFIX=MYSURICATES_DEV_" <<<"$OUT"'
+check "published address for the settings"  'grep -q "MYSURICATES_PUBLISHED_BIND=127.0.0.1" <<<"$OUT" && grep -q "MYSURICATES_PUBLISHED_PORT=" <<<"$OUT" && grep -q "MYSURICATES_BIND_SWITCH=MYSURICATES_DEV_CONTAINER_BIND" <<<"$OUT"'
 OUT="$(run_in_script "$OVR"'; MYSURICATES_DEV_DOCKER_SOCKET=1 MYSURICATES_DEV_AI_FROM_HOST=all write_compose_override >/dev/null 2>&1; cat "$COMPOSE_OVERRIDE"')"
 check "all + socket on purpose are honored" 'grep -q "/.claude:" <<<"$OUT" && grep -q "/var/run/docker.sock:/var/run/docker.sock" <<<"$OUT"'
 mkdir -p "$TMP/config/mysuricates" "$TMP/nm/@openai/codex"; printf 'OPENAI_API_KEY=test-openai\n' > "$TMP/config/mysuricates/ai.env"
 OUT="$(run_in_script "$OVR"'; MYSURICATES_DEV_AI_PROVIDERS=codex write_compose_override >/dev/null 2>&1; cat "$COMPOSE_OVERRIDE"')"
 check "login variable: the dev container's own copy" 'grep -qF "\"$TMP/config/mysuricates/container-env/dev-mysuricates-dev.env\"" <<<"$OUT" && ! grep -q 4711 <<<"$OUT"'
 rm -rf "$TMP/config" "$TMP/nm/@openai"
+OUT="$(run_in_script "$OVR"'; MYSURICATES_DEV_CONTAINER_BIND=0.0.0.0 BACKEND_PORT=9123 write_compose_override >/dev/null 2>&1; cat "$COMPOSE_OVERRIDE"')"
+check "an opened bind is what the settings show" 'grep -q "MYSURICATES_PUBLISHED_BIND=0.0.0.0" <<<"$OUT" && grep -q "MYSURICATES_PUBLISHED_PORT=9123" <<<"$OUT"'
 RC="$(run_in_script "$OVR"'; MYSURICATES_DEV_CONTAINER_BIND="0.0.0.0 x" write_compose_override >/dev/null 2>&1; echo $?')"
 check "a bind that is no address refuses the start" '[ "$RC" = 2 ]'
 DCY="$HERE/../../ai-automation-backend/docker-compose.dev-container.yml"
@@ -308,6 +311,7 @@ echo "13) the dev start from source listens on 127.0.0.1 unless MYSURICATES_DEV_
 mkdir -p "$TMP/bbin" "$TMP/frontend"
 cat > "$TMP/bbin/java" <<'STUB'
 #!/usr/bin/env bash
+printf '%s\n' "${MYSURICATES_BIND_SWITCH-unset} ${MYSURICATES_SWITCH_SOURCE-unset}" > "$JAVA_ARGS.switch"
 printf '%s\n' "$*" > "$JAVA_ARGS"
 STUB
 cat > "$TMP/bbin/npm" <<'STUB'
@@ -334,6 +338,7 @@ RC="$(bind_start)"; await "$TMP/java.args"; await "$TMP/npm.bind"
 check "default: both starts succeed"                       '[ "$RC" = "0 0" ]'
 check "default: java gets --server.address=127.0.0.1"       'grep -F -- "-jar $TMP/state/mysuricates-dev/runtime/current.jar --server.address=127.0.0.1" "$TMP/java.args" >/dev/null'
 check "default: Vite is started with MYSURICATES_DEV_BIND=127.0.0.1" '[ "$(cat "$TMP/npm.bind")" = 127.0.0.1 ]'
+check "java learns the bind switch for the settings page (1af11dcc)" '[ "$(cat "$TMP/java.args.switch")" = "MYSURICATES_DEV_BIND scripts/start-mysuricates-dev.sh" ]'
 RC="$(MYSURICATES_DEV_BIND=0.0.0.0 bind_start)"; await "$TMP/java.args"; await "$TMP/npm.bind"
 check "switch 0.0.0.0: java gets --server.address=0.0.0.0"  '[ "$RC" = "0 0" ] && grep -F -- "--server.address=0.0.0.0" "$TMP/java.args" >/dev/null'
 check "switch 0.0.0.0: Vite gets the same address"         '[ "$(cat "$TMP/npm.bind")" = 0.0.0.0 ]'

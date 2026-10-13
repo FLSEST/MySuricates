@@ -1139,6 +1139,30 @@ export interface SystemInfo {
   };
 }
 
+/** Reach of an address (`GET /system/listen`, 1af11dcc): this machine only, the network, or not known. */
+export type ListenScope = 'LOCAL' | 'NETWORK' | 'UNKNOWN';
+
+export interface ListenEndpoint {
+  scheme: 'http' | 'https';
+  /** Bound or published address; null = every interface (or unknown, see scope). */
+  address: string | null;
+  port: number | null;
+  scope: ListenScope;
+  /** The address Docker publishes on the host, not the backend's own bind inside the container. */
+  published: boolean;
+}
+
+export interface ListenReport {
+  runtime: 'host' | 'container' | 'tryout';
+  backend: ListenEndpoint;
+  /** The backend delivers the UI itself — then the frontend has the backend's address. */
+  servesFrontend: boolean;
+  /** Switch that changes the bind (e.g. TEST_BIND); null when there is none. */
+  bindSwitch: string | null;
+  /** Where that switch is set; null when unknown. */
+  switchSource: string | null;
+}
+
 export interface RemoteAccessStatus {
   enabled: boolean;
   ip: string | null;

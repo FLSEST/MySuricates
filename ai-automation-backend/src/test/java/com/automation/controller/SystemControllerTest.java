@@ -8,6 +8,7 @@ import com.automation.exception.GlobalExceptionHandler;
 import com.automation.security.RateLimitConfig;
 import com.automation.service.activitylog.ActivityLogService;
 import com.automation.service.system.ApiKeyService;
+import com.automation.service.system.ListenAddresses;
 import com.automation.service.project.DockerExpectation;
 import com.automation.service.system.SystemIdentityService;
 import com.automation.service.system.TailscaleService;
@@ -66,6 +67,9 @@ class SystemControllerTest {
 
     @MockitoBean
     private DockerExpectation dockerExpectation;
+
+    @MockitoBean
+    private ListenAddresses listenAddresses;
 
     private void mockDbHealthy() throws Exception {
         Connection conn = mock(Connection.class);
@@ -335,5 +339,22 @@ class SystemControllerTest {
         mockMvc.perform(get("/api/v1/system/info"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.tailscale").value("CONFIGURED"));
+    }
+
+    @Test
+    void listen_returnsTheReport() throws Exception {
+        when(listenAddresses.report()).thenReturn(new ListenAddresses.Report("host",
+                new ListenAddresses.Endpoint("http", "127.0.0.1", 9090, ListenAddresses.Scope.LOCAL, false),
+                false, "MYSURICATES_DEV_BIND", "scripts/start-mysuricates-dev.sh"));
+
+        mockMvc.perform(get("/api/v1/system/listen"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.runtime").value("host"))
+                .andExpect(jsonPath("$.backend.address").value("127.0.0.1"))
+                .andExpect(jsonPath("$.backend.port").value(9090))
+                .andExpect(jsonPath("$.backend.scope").value("LOCAL"))
+                .andExpect(jsonPath("$.backend.published").value(false))
+                .andExpect(jsonPath("$.servesFrontend").value(false))
+                .andExpect(jsonPath("$.bindSwitch").value("MYSURICATES_DEV_BIND"));
     }
 }

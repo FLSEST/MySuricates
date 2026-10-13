@@ -13,6 +13,7 @@ import { TodoSettingsCard } from '../components/settings/TodoSettingsCard';
 import { RemoteAccessCard } from '../components/settings/RemoteAccessCard';
 import { BackupCard } from '../components/settings/BackupCard';
 import { SystemInfoCard } from '../components/settings/SystemInfoCard';
+import { ListenAddressesCard } from '../components/settings/ListenAddressesCard';
 import { StagingCard } from '../components/settings/StagingCard';
 import { TestingCard } from '../components/settings/TestingCard';
 import { StagedTargetsCard } from '../components/settings/StagedTargetsCard';
@@ -201,6 +202,7 @@ export function Settings() {
 
           <SettingsSection id="system" title={t.settings.settingsNavSystem} collapsible open={!!openSections['system']} onToggle={() => toggleSection('system')}>
             <SystemInfoCard />
+            <ListenAddressesCard />
             <ApiLatencyCard data={requestMetrics} />
           </SettingsSection>
         </div>

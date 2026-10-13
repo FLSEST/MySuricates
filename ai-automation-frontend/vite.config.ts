@@ -44,7 +44,7 @@ function localHostFor(bind: string): string {
   return bind.includes(':') ? `[${bind}]` : bind;
 }
 
-export default defineConfig(() => {
+export default defineConfig(({ command }) => {
   const devBind = devBindAddress();
   const devBackendHost = localHostFor(devBind);
   const e2eTarget = process.env.CYPRESS_TARGET === 'test' ? 'test' : 'dev';
@@ -71,6 +71,9 @@ export default defineConfig(() => {
       __APP_VERSION__: JSON.stringify(
         JSON.parse(fs.readFileSync(path.resolve(import.meta.dirname, 'package.json'), 'utf-8')).version,
       ),
+      // Where the dev server listens, for the Reachability card in Settings → System (1af11dcc). Only for
+      // `vite` itself: a production build is served by the backend, which reports its own address.
+      __DEV_BIND__: JSON.stringify(command === 'serve' ? devBind : ''),
       // Shim for sockjs-client, which references bare `global` (see node_modules/sockjs-client/lib/*.js).
       // Replaces the former inline <script>var global = globalThis;</script> in index.html (CSP violation).
       global: 'globalThis',

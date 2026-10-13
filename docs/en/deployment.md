@@ -149,6 +149,16 @@ nothing of Claude.
 **Secure by default, on every Docker way:** the port is reachable from this machine only, and the
 instance gets no Docker socket. Only an explicit switch changes that.
 
+**Checking who reaches the instance.** Settings → System → **Reachability** shows address and port of
+backend and frontend, whether that is this machine only or the network, the switch that changes it, and
+the address the browser is connected under right now (`localhost` is this machine, like `127.0.0.1`);
+System Info shows whether the instance runs directly on the machine, in a container or as the tryout.
+The data comes from `GET /api/v1/system/listen` (API key only). In a container the address Docker
+publishes the port on counts, not the `0.0.0.0:9090` inside: every start path passes it as
+`MYSURICATES_PUBLISHED_BIND`/`MYSURICATES_PUBLISHED_PORT`, plus the switch as `MYSURICATES_BIND_SWITCH`
+(`scripts/lib/host-mounts.sh`, `scripts/tryout.sh`). A container from an older start script shows
+"unknown" until it is next started through the script.
+
 **Opening the port.** `…BIND=0.0.0.0` makes the instance reachable from the local network (phone, PWA,
 other machines) — bypassing the host firewall, because Docker adds its port forwards itself. A single
 address, such as the LAN IP, works too; Stable and Test then stay reachable on `127.0.0.1` as well, so

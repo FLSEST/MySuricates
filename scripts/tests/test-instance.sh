@@ -46,6 +46,7 @@ check "uses deploy/compose.yml + override"    'grep -q "deploy/compose.yml" "$DO
 check "override was written"                  '[ -f "$TMP/inst/demo.override.yml" ] && grep -q "^  app:" "$TMP/inst/demo.override.yml"'
 check "default: login, switches named"        'grep -q "MYSURICATES_AI_FROM_HOST=login" "$TMP/inst/demo.override.yml" && grep -q "MYSURICATES_SWITCH_PREFIX=MYSURICATES_" "$TMP/inst/demo.override.yml" && grep -q "MYSURICATES_SWITCH_SOURCE=$TMP/inst/demo.env" "$TMP/inst/demo.override.yml"'
 check "login mode: no fixed login command"    '! grep -q "MYSURICATES_LOGIN_COMMAND" "$TMP/inst/demo.override.yml"'
+check "published address for the settings page" 'grep -q "MYSURICATES_PUBLISHED_BIND=127.0.0.1" "$TMP/inst/demo.override.yml" && grep -q "MYSURICATES_PUBLISHED_PORT=19400" "$TMP/inst/demo.override.yml" && grep -q "MYSURICATES_BIND_SWITCH=MYSURICATES_BIND" "$TMP/inst/demo.override.yml"'
 printf 'MYSURICATES_PORT=19403\nMYSURICATES_AI_FROM_HOST=programs\nMYSURICATES_AI_PROVIDERS=codex\n' > "$TMP/inst/prog.env"
 INSTANCE_HEALTH_TIMEOUT=0 bash "$SCRIPT" up --name prog --no-wait >/dev/null 2>&1
 check "switches come from the instance file"  'grep -q "MYSURICATES_AI_FROM_HOST=programs" "$TMP/inst/prog.override.yml" && grep -q "MYSURICATES_AI_PROVIDERS=codex" "$TMP/inst/prog.override.yml"'
@@ -136,6 +137,7 @@ check "host up reports the address"           'grep "localhost:19401" "$TMP/host
 check "java started with the port"            'grep -x "AUTOMATION_PORT=19401" "$JAVA_ENV_OUT" >/dev/null'
 check "backend serves the built frontend"     'grep -x "AUTOMATION_SERVEFRONTEND=true" "$JAVA_ENV_OUT" >/dev/null && grep -x "AUTOMATION_FRONTENDPATH=$STATE/frontend" "$JAVA_ENV_OUT" >/dev/null'
 check "bound to 127.0.0.1 by default"         'grep -x "SERVER_ADDRESS=127.0.0.1" "$JAVA_ENV_OUT" >/dev/null'
+check "the bind switch is named for the page"  'grep -x "MYSURICATES_BIND_SWITCH=MYSURICATES_BIND" "$JAVA_ENV_OUT" >/dev/null && grep -x "MYSURICATES_SWITCH_SOURCE=$TMP/inst/hostdemo.env" "$JAVA_ENV_OUT" >/dev/null'
 check "data stays in the instance state dir"  'grep -x "AUTOMATION_DB_PATH=$STATE/data/automation.db" "$JAVA_ENV_OUT" >/dev/null'
 check "AUTOMATION_* from the file reach java"  'grep -x "AUTOMATION_MODULES_WEBHOOKS=true" "$JAVA_ENV_OUT" >/dev/null && grep -x "AUTOMATION_AI_DEFAULT_PROVIDER=PI" "$JAVA_ENV_OUT" >/dev/null'
 check "preset from MYSURICATES_PRESET"        'grep -x "AUTOMATION_MODULES_PRESET=research" "$JAVA_ENV_OUT" >/dev/null'

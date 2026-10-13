@@ -51,6 +51,7 @@ class PublicPathsTest {
             "/actuator/metrics/jvm.memory.used",
             "/actuator/health/liveness",
             "/api/v1/system/capabilities",
+            "/api/v1/system/listen",           // names addresses of this machine (1af11dcc)
             "/api/v1/workflows",
             "/api"})
     void should_requireKey_forProtectedPathsThatAreNotExactProbes(String path) {

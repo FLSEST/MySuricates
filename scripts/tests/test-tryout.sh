@@ -67,6 +67,7 @@ check "binds to localhost only"                'printf "%s" "$RUN" | grep -- "-p
 check "only the two tryout volumes"            '[ "$(printf "%s" "$RUN" | grep -o -- "-v [^ ]*" | tr "\n" " ")" = "-v mysuricates-tryout-data:/app/data -v mysuricates-tryout-secrets:/app/secrets " ]'
 check "no docker socket, no host paths"        '! printf "%s" "$RUN" | grep "docker.sock\|/home/\|/seed" >/dev/null'
 check "CORS matches the chosen port"           'printf "%s" "$RUN" | grep "AUTOMATION_CORS_ORIGINS=http://localhost:9123" >/dev/null'
+check "published address for the settings page" 'printf "%s" "$RUN" | grep -- "-e MYSURICATES_PUBLISHED_BIND=127.0.0.1 -e MYSURICATES_PUBLISHED_PORT=9123" >/dev/null'
 check "login command for the status card"      'printf "%s" "$RUN" | grep -- "-e MYSURICATES_LOGIN_COMMAND=scripts/tryout.sh login \[claude|codex|pi\]" >/dev/null'
 rm -f "$DOCKER_RAN"; OUT="$(NO_IMAGE=1 bash "$SCRIPT" start 2>&1)"; RC=$?
 check "missing image: clear hint"              '[ "$RC" = 2 ] && printf "%s" "$OUT" | grep "build" >/dev/null'

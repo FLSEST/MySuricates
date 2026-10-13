@@ -738,7 +738,7 @@ Sources:
 
 - `SystemAccessController` – Access endpoints under /api/v1/system: remote access (Tailscale) and the local file system.
 - `SystemAiProviderController` – AI providers and capabilities under /api/v1/system.
-- `SystemController` – Core information under /api/v1/system: health, platform info, auth status, heap usage and client error reports.
+- `SystemController` – Core information under /api/v1/system: health, platform info, listen addresses, auth status, heap usage and client error reports.
 - `SystemMaintenanceController` – Maintenance under /api/v1/system: auto-repair, VACUUM, database backups.
 - `SystemModulesController` – Runtime module switches for the settings UI.
 - `SystemRequestMetricsController` – Request costs per route: the live window from memory and the stored daily history.
@@ -766,6 +766,7 @@ Sources:
 | `GET /api/v1/system/info` | Returns name, version, build, Java version, runtime mode, environment and the rate-limit figures; reachable without a key. | core |
 | `GET /api/v1/system/integration-snippet` | Renders the base onboarding text as a Markdown snippet to paste into a project, e.g. into an `AGENTS.md`. | `onboarding-profiles` |
 | `GET /api/v1/system/jvm-memory` | Returns the heap usage as exactly three numbers, without an API key. | core |
+| `GET /api/v1/system/listen` | Returns where the backend can be reached — address, port, this machine only or the network — and the switch that changes it; needs the API key, unlike `/info`. | core |
 | `PUT /api/v1/system/modules/{name}` | Switches a feature module on or off (`enabled`) with immediate effect and returns the state of all modules. | core |
 | `DELETE /api/v1/system/modules/{name}/override` | Drops the settings override of a module so it follows the startup configuration again; returns the state of all modules. | core |
 | `POST /api/v1/system/open-path` | Opens a file or directory (`path`) in the desktop's file manager on the host. | core |

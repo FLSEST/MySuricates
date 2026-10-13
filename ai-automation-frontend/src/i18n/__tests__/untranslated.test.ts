@@ -26,11 +26,11 @@ const SHARED_TERMS = new Set([
   // Values shown as they stand in a definition (pool scope badge, see PoolBrowser.test.tsx)
   'external', 'portable',
   // Words German uses as they are
-  'api', 'business', 'code', 'container', 'definition', 'deployment', 'details', 'dev', 'devops', 'diagnose',
-  'emoji', 'format', 'horizontal', 'icon', 'id', 'import', 'info', 'integration', 'iteration', 'name',
+  'api', 'backend', 'business', 'code', 'container', 'definition', 'deployment', 'details', 'dev', 'devops', 'diagnose',
+  'emoji', 'format', 'frontend', 'horizontal', 'icon', 'id', 'import', 'info', 'integration', 'iteration', 'name',
   'offline', 'optional', 'pause', 'person', 'phase', 'plugin', 'repo', 'stable', 'standard', 'start',
   'status', 'step', 'sync', 'system', 'team', 'teams', 'template', 'terminal', 'test', 'trend', 'update',
-  'version',
+  'version', 'vite',
 ]);
 
 /** Words of a value that need a translation; empty when only paths, placeholders or symbols remain. */
