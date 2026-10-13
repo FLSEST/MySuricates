@@ -63,8 +63,8 @@ public class McpBuildTools implements McpToolset {
                                 .enumeration("effort", "Reasoning effort", List.of("low", "medium", "high", "xhigh"), false)
                                 .objectProperty("defaultContext", "Default values of the variables the blocks use", false)
                                 .build(),
-                        false, this::createWorkflow),
-                McpTool.writing("update_workflow", "Update workflow",
+                        this::createWorkflow),
+                McpTool.destructive("update_workflow", "Update workflow",
                         "Changes a workflow: only the fields passed, the rest stays. 'blocks' replaces all "
                                 + "blocks — send the complete list (get_workflow returns it). Every change is a "
                                 + "new version that can be restored in the UI. Returns the build check's findings.",
@@ -80,7 +80,7 @@ public class McpBuildTools implements McpToolset {
                                 .objectProperty("defaultContext", "New default context", false)
                                 .string("changeMessage", "Why it changed (shown in the version history)", false)
                                 .build(),
-                        true, this::updateWorkflow),
+                        this::updateWorkflow),
                 McpTool.reading("analyze_workflow", "Analyze workflow",
                         "Checks a workflow definition deterministically for build mistakes (unknown config keys, "
                                 + "missing required keys, timeouts, platform access from shell steps, ...). Reports "

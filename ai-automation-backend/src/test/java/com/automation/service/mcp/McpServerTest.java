@@ -2,8 +2,23 @@ package com.automation.service.mcp;
 
 import com.automation.entity.ActivityLog.LogCategory;
 import com.automation.exception.ResourceNotFoundException;
+import com.automation.mapper.ProjectMapper;
+import com.automation.mapper.WorkflowMapper;
+import com.automation.mapper.WorkflowTemplateMapper;
 import com.automation.service.activitylog.ActivityLogService;
+import com.automation.service.execution.ExecutionQueryService;
+import com.automation.service.execution.PendingInputService;
+import com.automation.service.pool.WorkflowPoolService;
+import com.automation.service.project.ProjectService;
 import com.automation.service.system.SystemIdentityService;
+import com.automation.service.todo.TodoService;
+import com.automation.service.workflow.RunControlService;
+import com.automation.service.workflow.TemplatePackageInstaller;
+import com.automation.service.workflow.WorkflowExecutor;
+import com.automation.service.workflow.WorkflowService;
+import com.automation.service.workflow.WorkflowTemplateService;
+import com.automation.service.workflow.analyzer.GeneratedWorkflowCheck;
+import com.automation.service.workflow.analyzer.WorkflowAnalyzer;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
@@ -12,6 +27,8 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
+import java.util.Map;
+import java.util.TreeMap;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -38,10 +55,10 @@ class McpServerTest {
                 McpTool.reading("echo", "Echo", "Returns its text",
                         McpSchema.object().string("text", "Text", true).build(),
                         args -> McpToolResult.ok(JsonNodeFactory.instance.objectNode().put("text", args.string("text")))),
-                McpTool.writing("explode", "Explode", "Always fails", McpSchema.none(), true, args -> {
+                McpTool.destructive("explode", "Explode", "Always fails", McpSchema.none(), args -> {
                     throw new IllegalStateException("Workflow is sealed");
                 }),
-                McpTool.writing("missing", "Missing", "Unknown id", McpSchema.none(), false, args -> {
+                McpTool.writing("missing", "Missing", "Unknown id", McpSchema.none(), args -> {
                     throw new ResourceNotFoundException("Workflow", "abc");
                 }));
         server = new McpServer(List.of(toolset), resources, new McpPrompts(), identity, activityLog);
@@ -114,6 +131,63 @@ class McpServerTest {
         assertThat(echo.at("/annotations/readOnlyHint").asBoolean()).isTrue();
         assertThat(echo.at("/annotations/destructiveHint").isMissingNode()).isTrue();
         assertThat(tools.get(1).at("/annotations/destructiveHint").asBoolean()).isTrue();
+    }
+
+    /**
+     * Pins the hints of every shipped tool. A client asks the user before a destructive tool, so a changed
+     * hint is a behaviour change of its own, never the side effect of a refactoring.
+     */
+    @Test
+    void everyShippedToolAnnouncesItsHints() throws Exception {
+        WorkflowService workflows = mock(WorkflowService.class);
+        List<McpToolset> shipped = List.of(
+                new McpGuideTools(mock(McpGuides.class), json),
+                new McpCatalogTools(mock(ProjectService.class), mock(ProjectMapper.class), workflows,
+                        mock(WorkflowMapper.class), mock(WorkflowTemplateService.class),
+                        mock(WorkflowTemplateMapper.class), mock(TemplatePackageInstaller.class),
+                        mock(WorkflowPoolService.class), json),
+                new McpBuildTools(workflows, mock(WorkflowAnalyzer.class), mock(GeneratedWorkflowCheck.class), json),
+                new McpRunTools(workflows, mock(WorkflowExecutor.class), mock(ExecutionQueryService.class),
+                        mock(RunControlService.class), mock(PendingInputService.class), json),
+                new McpTodoTools(mock(TodoService.class), json));
+        McpServer shippedServer = new McpServer(shipped, resources, new McpPrompts(),
+                mock(SystemIdentityService.class), activityLog);
+
+        Map<String, String> hints = new TreeMap<>();
+        shippedServer.handle(request("tools/list", "{}")).orElseThrow().at("/result/tools").forEach(tool -> {
+            JsonNode readOnly = tool.at("/annotations/readOnlyHint");
+            JsonNode destructive = tool.at("/annotations/destructiveHint");
+            String kind;
+            if (readOnly.asBoolean() && destructive.isMissingNode()) {
+                kind = "read-only";
+            } else if (!readOnly.asBoolean() && destructive.isBoolean()) {
+                kind = destructive.asBoolean() ? "destructive" : "writing";
+            } else {
+                kind = "inconsistent: " + tool.get("annotations");
+            }
+            hints.put(tool.get("name").asText(), kind);
+        });
+
+        assertThat(hints).containsExactlyInAnyOrderEntriesOf(Map.ofEntries(
+                Map.entry("read_guide", "read-only"),
+                Map.entry("list_projects", "read-only"),
+                Map.entry("list_workflows", "read-only"),
+                Map.entry("get_workflow", "read-only"),
+                Map.entry("list_templates", "read-only"),
+                Map.entry("analyze_workflow", "read-only"),
+                Map.entry("get_run", "read-only"),
+                Map.entry("list_runs", "read-only"),
+                Map.entry("list_pending_inputs", "read-only"),
+                Map.entry("list_todos", "read-only"),
+                Map.entry("install_template", "writing"),
+                Map.entry("create_workflow", "writing"),
+                Map.entry("answer_input", "writing"),
+                Map.entry("create_todo", "writing"),
+                Map.entry("update_todo_status", "writing"),
+                // overwrites the definition, starts arbitrary work, ends a run
+                Map.entry("update_workflow", "destructive"),
+                Map.entry("run_workflow", "destructive"),
+                Map.entry("cancel_run", "destructive")));
     }
 
     @Test

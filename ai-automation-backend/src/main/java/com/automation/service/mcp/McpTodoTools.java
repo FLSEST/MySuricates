@@ -52,14 +52,14 @@ public class McpTodoTools implements McpToolset {
                                 .string("projectId", "Project id", false)
                                 .string("linkedWorkflowId", "Workflow that can resolve it", false)
                                 .build(),
-                        false, this::createTodo),
+                        this::createTodo),
                 McpTool.writing("update_todo_status", "Set TODO status",
                         "Sets the status of a TODO, e.g. IN_PROGRESS when work starts and DONE when it is finished.",
                         McpSchema.object()
                                 .string("id", "TODO id", true)
                                 .enumeration("status", "New status", STATUSES, true)
                                 .build(),
-                        false, this::updateStatus));
+                        this::updateStatus));
     }
 
     private McpToolResult listTodos(McpArgs args) {

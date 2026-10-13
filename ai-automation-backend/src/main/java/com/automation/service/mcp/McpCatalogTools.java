@@ -95,7 +95,7 @@ public class McpCatalogTools implements McpToolset {
                                 .enumeration("locale", "Language of the created steps (default en)",
                                         List.of("de", "en"), false)
                                 .build(),
-                        false, this::installTemplate));
+                        this::installTemplate));
     }
 
     private McpToolResult listProjects() {

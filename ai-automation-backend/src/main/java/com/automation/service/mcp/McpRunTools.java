@@ -51,7 +51,7 @@ public class McpRunTools implements McpToolset {
     public List<McpTool> tools() {
         return List.of(
                 // Destructive: a workflow can run shell commands and AI agents with write access in its project.
-                McpTool.writing("run_workflow", "Run workflow",
+                McpTool.destructive("run_workflow", "Run workflow",
                         "Starts a workflow run. It runs in the background on the instance; with 'waitSeconds' "
                                 + "the call waits up to that long for the run to finish or to stop at a question "
                                 + "(approval / human input — answer it with answer_input). Returns the run as "
@@ -64,7 +64,7 @@ public class McpRunTools implements McpToolset {
                                 .integer("waitSeconds", "Seconds to wait for the end or a question (default 20)",
                                         0, MAX_WAIT_SECONDS)
                                 .build(),
-                        true, this::runWorkflow),
+                        this::runWorkflow),
                 McpTool.reading("get_run", "Get run",
                         "Returns a run: status, error, the open question if it waits for an answer, and every "
                                 + "step with a preview of its output. With 'step' the full output (and input) of "
@@ -84,9 +84,9 @@ public class McpRunTools implements McpToolset {
                                 .integer("limit", "Maximum number of entries (default 20)", 1, 100)
                                 .build(),
                         this::listRuns),
-                McpTool.writing("cancel_run", "Cancel run", "Cancels a running run.",
+                McpTool.destructive("cancel_run", "Cancel run", "Cancels a running run.",
                         McpSchema.object().string("runId", "Run id", true).build(),
-                        true, args -> {
+                        args -> {
                             runControlService.cancelExecution(args.string("runId"));
                             return McpToolResult.ok(objectMapper.createObjectNode().put("cancelled", true));
                         }),
@@ -105,7 +105,7 @@ public class McpRunTools implements McpToolset {
                                 .string("runId", "Run id", true)
                                 .string("answer", "The answer", true)
                                 .build(),
-                        false, args -> {
+                        args -> {
                             runControlService.resolveApproval(args.string("runId"), args.string("answer"));
                             return McpToolResult.ok(objectMapper.createObjectNode().put("answered", true));
                         }));
