@@ -11,7 +11,7 @@ useDefault = true
 [[allowlists]]
 description = "Invented test tokens and API keys in tests (no real credentials)"
 condition = "AND"
-paths = ['''^ai-automation-backend/src/test/''', '''^scripts/tests/''', '''^ai-automation-frontend/cypress/''']
+paths = ['''^ai-automation-backend/src/test/''', '''^scripts/tests/''', '''^ai-automation-frontend/cypress/support/target\.ts$''']
 regexTarget = "secret"
 regexes = [
   '''^test-api-key-12345$''',
