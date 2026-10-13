@@ -177,6 +177,10 @@ daemon:
 | `scripts/instance.sh`, Stable, Test, dev container | only with the switch | `…DOCKER_SOCKET=1` (table above), then restart |
 | Tryout | never | — a socket would not help here: the projects live on the volume `mysuricates-tryout-data`, and the path `/app/data/…` is unknown to the machine's Docker that starts the block (TODO 72a06c0f) |
 
+Reachable means: the instance's ping answers or, if it does not, `docker version` through the docker CLI
+that container blocks start with. So a `docker context` (rootless Docker, Docker Desktop for Linux, Colima)
+without `DOCKER_HOST` counts too (`DockerCliProbe`, answer kept for 30 s).
+
 In the container instances the project folders are mounted under the same path as on the machine; with
 the socket, container blocks therefore work there as they do on the machine. The tryout lacks exactly
 that: a container block mounts its project path with `docker run -v <path>:/workspace`, and the Docker

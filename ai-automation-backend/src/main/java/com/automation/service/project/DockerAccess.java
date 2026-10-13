@@ -25,6 +25,9 @@ import java.util.function.UnaryOperator;
  * its projects live on a Docker volume, and a container block mounts the project path through the host's
  * Docker, which cannot see that path. A socket alone would hand the block an empty {@code /workspace}.
  *
+ * <p>The ping only knows {@code docker.host}; when it fails, the docker CLI is asked as well
+ * ({@link DockerCliProbe}): container blocks start through it, and it also follows a {@code docker context}.
+ *
  * <p>The texts end up in step outputs, analyzer findings and the container page; they name switches and
  * a config file path, never a secret.
  */
@@ -105,20 +108,28 @@ public class DockerAccess {
     private final DockerExpectation docker;
     private final UnaryOperator<String> env;
     private final BooleanSupplier containerMarker;
+    private final BooleanSupplier cliReachable;
 
     @Autowired
-    public DockerAccess(DockerExpectation docker) {
+    public DockerAccess(DockerExpectation docker, DockerCliProbe cli) {
         this(docker, System::getenv,
-                () -> Files.exists(Path.of("/.dockerenv")) || Files.exists(Path.of("/run/.containerenv")));
+                () -> Files.exists(Path.of("/.dockerenv")) || Files.exists(Path.of("/run/.containerenv")),
+                cli::reachable);
     }
 
     DockerAccess(DockerExpectation docker, UnaryOperator<String> env, BooleanSupplier containerMarker) {
+        this(docker, env, containerMarker, () -> false);
+    }
+
+    DockerAccess(DockerExpectation docker, UnaryOperator<String> env, BooleanSupplier containerMarker,
+                 BooleanSupplier cliReachable) {
         this.docker = docker;
         this.env = env;
         this.containerMarker = containerMarker;
+        this.cliReachable = cliReachable;
     }
 
-    /** Probes Docker once (one ping, or a file check when no socket is configured). */
+    /** Probes Docker once (one ping; when that fails, the docker CLI, see {@link DockerCliProbe}). */
     public Status status() {
         String runtime = env.apply("MYSURICATES_RUNTIME");
         boolean tryout = "tryout".equals(runtime);
@@ -127,7 +138,11 @@ public class DockerAccess {
                 : "container".equals(runtime) || tryout;
         boolean hasSwitch = inContainer && !tryout;
         String prefix = hasSwitch ? blankToNull(env.apply("MYSURICATES_SWITCH_PREFIX")) : null;
-        return new Status(docker.probe(), inContainer,
+        DockerExpectation.State state = docker.probe();
+        if (state != DockerExpectation.State.UP && cliReachable.getAsBoolean()) {
+            state = DockerExpectation.State.UP;
+        }
+        return new Status(state, inContainer,
                 prefix == null ? null : prefix + "DOCKER_SOCKET",
                 hasSwitch ? blankToNull(env.apply("MYSURICATES_SWITCH_SOURCE")) : null, tryout);
     }

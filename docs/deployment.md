@@ -177,6 +177,10 @@ Docker-Daemon erreicht:
 | `scripts/instance.sh`, Stable, Test, Dev-Container | nur mit Schalter | `…DOCKER_SOCKET=1` (Tabelle oben), dann neu starten |
 | Tryout | nie | — ein Socket hülfe hier nicht: Die Projekte liegen auf dem Volume `mysuricates-tryout-data`, und den Pfad `/app/data/…` kennt der Docker des Rechners nicht, der den Block startet (TODO 72a06c0f) |
 
+Erreichbar heißt: Der Ping der Instanz antwortet, oder – wenn nicht – `docker version` über die
+docker-CLI, mit der Container-Blöcke ja starten. So zählt auch ein `docker context` (rootless Docker,
+Docker Desktop für Linux, Colima) ohne `DOCKER_HOST` (`DockerCliProbe`, Antwort 30 s gemerkt).
+
 Die Projektordner sind in den Container-Instanzen unter demselben Pfad eingebunden wie auf dem
 Rechner; mit Socket funktionieren Container-Blöcke dort also wie auf dem Rechner. Im Tryout fehlt genau
 das: Ein Container-Block bindet seinen Projektpfad mit `docker run -v <pfad>:/workspace` ein, und

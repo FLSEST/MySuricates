@@ -18,6 +18,32 @@ class DockerAccessTest {
     }
 
     @Test
+    @DisplayName("a failed ping is not the last word: a docker CLI that reaches a daemon (docker context) counts")
+    void cliReachesDockerThroughAContext() {
+        DockerExpectation expectation = mock(DockerExpectation.class);
+        when(expectation.probe()).thenReturn(DockerExpectation.State.NOT_CONFIGURED);
+
+        DockerAccess.Status status = new DockerAccess(expectation, Map.<String, String>of()::get, () -> false, () -> true)
+                .status();
+
+        assertThat(status.reachable()).isTrue();
+        assertThat(status.hint()).isEmpty();
+    }
+
+    @Test
+    @DisplayName("the CLI is only asked when the ping fails")
+    void cliNotAskedWhenThePingAnswers() {
+        DockerExpectation expectation = mock(DockerExpectation.class);
+        when(expectation.probe()).thenReturn(DockerExpectation.State.UP);
+        java.util.concurrent.atomic.AtomicInteger asked = new java.util.concurrent.atomic.AtomicInteger();
+
+        new DockerAccess(expectation, Map.<String, String>of()::get, () -> false, () -> asked.incrementAndGet() > 0)
+                .status();
+
+        assertThat(asked).hasValue(0);
+    }
+
+    @Test
     @DisplayName("a responding Docker needs no hint")
     void reachable() {
         DockerAccess.Status status = access(DockerExpectation.State.UP, Map.of(), false).status();
