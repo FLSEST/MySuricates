@@ -252,6 +252,25 @@ class StagingServiceTest {
     }
 
     @Test
+    void promote_anErrorInThePipelineEndsInErrorSoANewPromoteIsAccepted() throws InterruptedException {
+        // An Error is no Exception: it used to end in the never-read future, the phase stayed at STOPPING and
+        // every later promote was refused as "already in progress" until the backend restarted.
+        pointAtMissingProjectDirs();
+        when(compose.command(any(), any(), eq("stable"), eq("down")))
+                .thenThrow(new NoClassDefFoundError("com/example/Missing"));
+
+        service.promote();
+
+        StagingStatusResponse status = awaitPromoteSettled();
+        assertThat(status.promotePhase()).isEqualTo("ERROR");
+        assertThat(status.error()).contains("NoClassDefFoundError").contains("com/example/Missing");
+
+        reset(compose);
+        assertThatCode(() -> service.promote()).doesNotThrowAnyException();
+        assertThat(awaitPromoteSettled().promotePhase()).isEqualTo("ERROR");
+    }
+
+    @Test
     void promote_runsThePipelineOnTheInjectedExecutor_notTheCommonPool() throws InterruptedException {
         pointAtMissingProjectDirs();
         AtomicReference<Thread> pipelineThread = new AtomicReference<>();

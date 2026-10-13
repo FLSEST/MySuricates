@@ -209,6 +209,11 @@ public class StagingService {
             } catch (Exception e) {
                 log.error("Promote failed: {}", e.getMessage(), e);
                 promoteState.set(PromoteState.error(e.getMessage()));
+            } catch (Error e) {
+                // The future is never read: reset first (logging may fail too), else every later promote is refused.
+                promoteState.set(PromoteState.error(e.toString()));
+                log.error("Promote failed with an error: {}", e, e);
+                throw e;
             } finally {
                 currentProcess = null;
             }
