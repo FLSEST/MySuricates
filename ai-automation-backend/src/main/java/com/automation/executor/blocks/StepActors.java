@@ -56,6 +56,11 @@ public class StepActors {
      * person answered (timeout, cancel, default value) — that is neither agreement nor disagreement.
      */
     public static final String AGREED = "agreed";
+    /**
+     * Step metadata of a shadow step whose AI call failed: there was no proposal to agree with, so
+     * {@value #AGREED} is left out (java.review b2e91516).
+     */
+    public static final String SHADOW_CALL_FAILED = "shadowCallFailed";
 
     private static final String DEFAULT_ROLE = "You answer this step in place of the person who would normally "
             + "decide it. Decide on the basis given below; do not ask questions back.";
@@ -156,10 +161,15 @@ public class StepActors {
         return metadata;
     }
 
-    /** Step metadata of a shadow step: the AI keys, the proposal and whether the person agreed. */
+    /**
+     * Step metadata of a shadow step: the AI keys, the proposal and whether the person agreed — unless the AI
+     * call failed: without a proposal there is nothing to agree with, so {@value #AGREED} is left out.
+     */
     public static Map<String, Object> shadowMetadata(AiAnswer proposal, String proposalText, boolean agreed) {
         Map<String, Object> metadata = unansweredShadowMetadata(proposal, proposalText);
-        metadata.put(AGREED, agreed);
+        if (proposal == null || !proposal.failed()) {
+            metadata.put(AGREED, agreed);
+        }
         return metadata;
     }
 
@@ -170,6 +180,9 @@ public class StepActors {
     public static Map<String, Object> unansweredShadowMetadata(AiAnswer proposal, String proposalText) {
         Map<String, Object> metadata = aiMetadata(Actor.SHADOW, proposal);
         metadata.put(SHADOW_ANSWER, proposalText);
+        if (proposal != null && proposal.failed()) {
+            metadata.put(SHADOW_CALL_FAILED, true);
+        }
         return metadata;
     }
 

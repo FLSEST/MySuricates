@@ -266,6 +266,20 @@ class HumanInputActorsTest {
     }
 
     @Test
+    void actorShadow_failedAiCall_neverCountsAsAgreement() {
+        BlockDefinition optional = BlockDefinition.builder().type("human-input").config(new HashMap<>(Map.of(
+                "prompt", "Anmerkung?", "variable_name", "note", "required", false, "actor", "shadow"))).build();
+        when(commandExecutor.executeStepOnHost(any())).thenReturn(aiSays("Error: CLI exited 1", StepStatus.FAILED));
+
+        StepResult result = executor.execute(optional, personAnswers(""));
+
+        assertThat(result.getStatus()).isEqualTo(StepStatus.COMPLETED);
+        assertThat(result.getMetadata())
+                .containsEntry("shadowCallFailed", true)
+                .as("an empty answer must not 'agree' with a failed call (b2e91516)").doesNotContainKey("agreed");
+    }
+
+    @Test
     void actorHuman_recordsWhoAnswered() {
         ExecutionContext context = personAnswers("English");
 

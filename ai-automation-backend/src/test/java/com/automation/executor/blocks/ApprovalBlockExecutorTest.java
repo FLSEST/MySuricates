@@ -600,7 +600,8 @@ class ApprovalBlockExecutorTest {
 
             assertThat(result.getStatus()).isEqualTo(StepStatus.COMPLETED);
             assertThat((String) shown.get().get("question")).contains("**AI proposal (shadow):** (no answer)");
-            assertThat(result.getMetadata()).containsEntry("shadowAnswer", "").containsEntry("agreed", false);
+            assertThat(result.getMetadata()).containsEntry("shadowAnswer", "").containsEntry("shadowCallFailed", true)
+                    .as("no proposal, nothing to agree or disagree with (b2e91516)").doesNotContainKey("agreed");
         }
 
         @Test
