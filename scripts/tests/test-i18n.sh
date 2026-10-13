@@ -52,9 +52,16 @@ check "unknown key prints the key"             '[ "$(run "i18n_load de; msg no_s
 check "printf arguments are filled in"         '[ "$(run "i18n_load; msg step_of 2 8")" = "Step 2 of 8" ]'
 
 echo "3) every key the scripts use exists in English"
-USED="$(grep -ohE "msg [a-z0-9_]+" "$HERE/../setup.sh" "$LIB"/*.sh 2>/dev/null | awk "{print \$2}" | sort -u)"
+# Calls are "msg <key>" and "_tui_msg <key>"; comment lines and words like "commit-msg hook" are no
+# call (that comment in hygiene-rules.sh kept this check red from 2026-10-09 on).
+used_keys() { grep -hvE '^[[:space:]]*#' "$@" 2>/dev/null | grep -oE '(^|[^[:alnum:]-])msg [a-z0-9_]+' | awk '{print $NF}' | sort -u; }
+USED="$(used_keys "$HERE/../setup.sh" "$LIB"/*.sh)"
 MISSING="$(comm -23 <(printf "%s\n" "$USED" | grep .) <(keys "$DIR/en.sh" | sed "s/^M_//"))"
 check "no used key is missing (${MISSING:-none})" '[ -z "$MISSING" ]'
+T="$(mktemp -d)"
+printf '# the commit-msg hook\nx="$(msg real_key)"; y="$(_tui_msg tui_key x)"\n# msg only_comment\n' > "$T/s.sh"
+check "comments are no calls, msg and _tui_msg are" '[ "$(used_keys "$T/s.sh" | tr "\n" " ")" = "real_key tui_key " ]'
+rm -rf "$T"
 
 echo "4) bash 3.2 hygiene"
 check "no bash-4-only syntax"                  '! grep -nE "declare -g?A|mapfile|readarray" "$LIB/i18n.sh" "$DIR"/*.sh'
