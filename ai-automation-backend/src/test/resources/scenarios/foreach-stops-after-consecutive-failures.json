@@ -5,7 +5,7 @@
     "spec": "WORKFLOW-GUIDE foreach: max_consecutive_failures (Standard 3, 0 = aus) bricht nach N fehlgeschlagenen Items in Folge ab, auch mit continue_on_error; der Block scheitert und die Lauf-Fehlermeldung nennt den Grund",
     "incidents": [
       "a6659a46 (foreach nach wiederholten Kontingentfehlern abbrechen (max_failures) – Produktentscheidung)",
-      "Hunt Quality Rebuild: 37 bzw. 42 Items scheiterten an 'You've hit your session limit', foreach rief die übrigen trotzdem auf"
+      "Page Quality Rebuild: 37 bzw. 42 Items scheiterten an 'You've hit your session limit', foreach rief die übrigen trotzdem auf"
     ]
   },
   "workflow": {
@@ -25,7 +25,7 @@
           ],
           "variable_name": "slug",
           "continue_on_error": true,
-          "command": "Ort: {{ slug }}. Baue den Hunt neu."
+          "command": "Ort: {{ slug }}. Baue die Seite neu."
         }
       }
     ]

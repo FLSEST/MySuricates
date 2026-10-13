@@ -730,7 +730,7 @@ export const en = {
       removeKpi: 'Remove KPI',
       items: 'Items',
       item: 'Item',
-      itemPlaceholder: '3 hunts without a route',
+      itemPlaceholder: '3 orders without a shipping date',
       addItem: 'Add item',
       removeItem: 'Remove item',
       placeholderNote: 'Placeholders are resolved at run time. One that stays unresolved fails the block.',

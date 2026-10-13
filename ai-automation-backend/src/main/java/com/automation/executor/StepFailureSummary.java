@@ -9,7 +9,7 @@ import com.automation.util.TruncationUtil;
  * <p>By default its detail is cut from the step output, tail-biased, because the error of a single
  * call (HTTP status, exception, timeout) sits at the end of it. A foreach breaks that assumption: it
  * runs every item even after one failed, so the failed item can sit anywhere in a long transcript of
- * successful ones. Four "Hunt Quality Rebuild" runs reported {@code failed: [oberwesel]: GATE PASS …}
+ * successful ones. Four runs of a foreach quality rebuild reported {@code failed: [item-3]: GATE PASS …}
  * while the item that did fail (session limit, dropped API connection, timeout) was cut out of the
  * message. A block that knows where it failed writes that under {@link #KEY} into the step metadata,
  * and the run error starts with it.

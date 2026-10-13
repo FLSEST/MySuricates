@@ -14,8 +14,8 @@ import {
 const VALID = {
   title: 'Nightly QA',
   status: 'YELLOW',
-  kpis: [{ label: 'Hunts', value: '1361', trend: 'UP' }, { label: 'Fehler', value: '12' }],
-  items: ['3 Hunts ohne Route'],
+  kpis: [{ label: 'Orders', value: '1361', trend: 'UP' }, { label: 'Fehler', value: '12' }],
+  items: ['3 Bestellungen ohne Versanddatum'],
   summary: 'Zwei Befunde.',
 };
 
@@ -29,8 +29,8 @@ describe('workflow widget contract', () => {
     expect(parseWorkflowResult(VALID)).toEqual({
       title: 'Nightly QA',
       status: 'YELLOW',
-      kpis: [{ label: 'Hunts', value: '1361', trend: 'UP' }, { label: 'Fehler', value: '12' }],
-      items: ['3 Hunts ohne Route'],
+      kpis: [{ label: 'Orders', value: '1361', trend: 'UP' }, { label: 'Fehler', value: '12' }],
+      items: ['3 Bestellungen ohne Versanddatum'],
       summary: 'Zwei Befunde.',
     });
     expect(parseWorkflowResult({ status: 'GREEN' })).toEqual({ status: 'GREEN', kpis: [], items: [] });

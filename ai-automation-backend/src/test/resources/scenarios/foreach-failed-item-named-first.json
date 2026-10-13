@@ -4,8 +4,8 @@
   "derivedFrom": {
     "spec": "WORKFLOW-GUIDE foreach: ohne continue_on_error lässt ein fehlgeschlagenes Item den Block scheitern; der Lauf meldet 'Step N (typ) failed: …'",
     "incidents": [
-      "4a8cabc4 (foreach-Iterationen scheitern trotz „GATE PASS“ in der Ausgabe (Hunt Quality Rebuild))",
-      "Hunt Quality Rebuild 6927f023: Meldung 'failed: [bad-zwischenahn]: GATE PASS …', gescheitert war erkner (API Error: Connection closed mid-response)"
+      "4a8cabc4 (foreach-Iterationen scheitern trotz „GATE PASS“ in der Ausgabe (Page Quality Rebuild))",
+      "Page Quality Rebuild 6927f023: Meldung 'failed: [bad-zwischenahn]: GATE PASS …', gescheitert war erkner (API Error: Connection closed mid-response)"
     ]
   },
   "workflow": {
@@ -21,7 +21,7 @@
             "etzenrot"
           ],
           "variable_name": "slug",
-          "command": "Ort: {{ slug }}. Baue den Hunt neu und melde am Ende GATE PASS: {{ slug }}."
+          "command": "Ort: {{ slug }}. Baue die Seite neu und melde am Ende GATE PASS: {{ slug }}."
         }
       }
     ]
@@ -34,7 +34,7 @@
         "exitCode": 1
       },
       {
-        "respond": "**GATE PASS** — Hunt komplett neu geschrieben und beim ersten Versuch bestanden.\n\nZusammenfassung:\n- **Story-Guide**: fiktive Bahnwärterin mit lokalem Bezug\n- **Titel**: ortsspezifisch statt Vorlagentitel\n- **4 Lösungstypen**: multipleChoice (3), geoLocation (4), flexible (2), exact (1)\n- **4 verschiedene GPS-Punkte**: alle aus den verifizierten Daten, der letzte am Bahnhof\n- Füllfragen durch ortsspezifische Wissensfragen ersetzt, keine Duplikate, keine Spoiler in den Hinweisen."
+        "respond": "**GATE PASS** — Seite komplett neu geschrieben und beim ersten Versuch bestanden.\n\nZusammenfassung:\n- **Story-Guide**: fiktive Bahnwärterin mit lokalem Bezug\n- **Titel**: ortsspezifisch statt Vorlagentitel\n- **4 Lösungstypen**: multipleChoice (3), geoLocation (4), flexible (2), exact (1)\n- **4 verschiedene GPS-Punkte**: alle aus den verifizierten Daten, der letzte am Bahnhof\n- Füllfragen durch ortsspezifische Wissensfragen ersetzt, keine Duplikate, keine Spoiler in den Hinweisen."
       }
     ]
   },

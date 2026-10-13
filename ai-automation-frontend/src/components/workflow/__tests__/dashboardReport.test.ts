@@ -11,16 +11,16 @@ describe('dashboardReport form model', () => {
       status: '{{ gate_status }}',
       title: 'Nightly QA',
       summary: 'Zwei Befunde.',
-      kpis: [{ label: 'Hunts', value: '1361', trend: 'UP' }, { label: 'Fehler', value: '12' }],
-      items: ['3 Hunts ohne Route'],
+      kpis: [{ label: 'Orders', value: '1361', trend: 'UP' }, { label: 'Fehler', value: '12' }],
+      items: ['3 Bestellungen ohne Versanddatum'],
     }));
 
     expect(form).toEqual({
       status: '{{ gate_status }}',
       title: 'Nightly QA',
       summary: 'Zwei Befunde.',
-      kpis: [{ label: 'Hunts', value: '1361', trend: 'UP' }, { label: 'Fehler', value: '12', trend: '' }],
-      items: ['3 Hunts ohne Route'],
+      kpis: [{ label: 'Orders', value: '1361', trend: 'UP' }, { label: 'Fehler', value: '12', trend: '' }],
+      items: ['3 Bestellungen ohne Versanddatum'],
     });
   });
 
@@ -119,12 +119,12 @@ describe('dashboardReport form model', () => {
   it('turns a validated proposal into a form', () => {
     expect(formFromProposal({
       title: 'Nightly QA', status: 'YELLOW',
-      kpis: [{ label: 'Hunts', value: '1361', trend: 'UP' }, { label: 'Fehler', value: '12' }],
-      items: ['3 Hunts ohne Route'], summary: 'Zwei Befunde.',
+      kpis: [{ label: 'Orders', value: '1361', trend: 'UP' }, { label: 'Fehler', value: '12' }],
+      items: ['3 Bestellungen ohne Versanddatum'], summary: 'Zwei Befunde.',
     })).toEqual({
       status: 'YELLOW', title: 'Nightly QA', summary: 'Zwei Befunde.',
-      kpis: [{ label: 'Hunts', value: '1361', trend: 'UP' }, { label: 'Fehler', value: '12', trend: '' }],
-      items: ['3 Hunts ohne Route'],
+      kpis: [{ label: 'Orders', value: '1361', trend: 'UP' }, { label: 'Fehler', value: '12', trend: '' }],
+      items: ['3 Bestellungen ohne Versanddatum'],
     });
   });
 

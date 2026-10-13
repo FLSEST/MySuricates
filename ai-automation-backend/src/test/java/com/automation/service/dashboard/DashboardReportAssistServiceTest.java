@@ -71,21 +71,21 @@ class DashboardReportAssistServiceTest {
         when(runRepository.findLatestRunPerWorkflow(List.of("wf-a1")))
                 .thenReturn(List.<Object[]>of(runRow("run-1")));
         when(stepRepository.findOutputsByRunIdNewestFirst(anyString(), any(Pageable.class)))
-                .thenReturn(List.of("Report: 3 hunts without a route.", "Earlier step output."));
+                .thenReturn(List.of("Report: 3 orders without a shipping date.", "Earlier step output."));
     }
 
     @Test
     void returns_the_validated_proposal_of_the_latest_run() {
         when(commandExecutor.executeStepOnHost(any())).thenReturn(aiAnswer(
                 "dashboard_widget: {\"title\":\"Nightly QA\",\"status\":\"YELLOW\","
-                        + "\"items\":[\"3 Hunts ohne Route\"],\"summary\":\"Ein Befund.\"}"));
+                        + "\"items\":[\"3 Bestellungen ohne Versanddatum\"],\"summary\":\"Ein Befund.\"}"));
 
         var response = service.propose("wf-a1");
 
         assertThat(response.runId()).isEqualTo("run-1");
         assertThat(response.provider()).isEqualTo("CLAUDE");
         assertThat(response.proposal()).isEqualTo(new Result("Nightly QA", Result.Status.YELLOW,
-                List.of(), List.of("3 Hunts ohne Route"), "Ein Befund."));
+                List.of(), List.of("3 Bestellungen ohne Versanddatum"), "Ein Befund."));
     }
 
     @Test
@@ -105,7 +105,7 @@ class DashboardReportAssistServiceTest {
         assertThat(request.getValue().projectPath()).isNotBlank();
         // The run's own text travels as data inside the prompt, never as an instruction.
         assertThat(request.getValue().block().getConfig().get("command").toString())
-                .contains("Report: 3 hunts without a route.");
+                .contains("Report: 3 orders without a shipping date.");
     }
 
     @Test

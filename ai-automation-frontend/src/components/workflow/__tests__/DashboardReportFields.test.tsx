@@ -31,8 +31,8 @@ describe('DashboardReportFields', () => {
         blockType="dashboard-report"
         configJson={config({
           status: 'YELLOW', title: 'Nightly QA', summary: 'Zwei Befunde.',
-          kpis: [{ label: 'Hunts', value: '1361', trend: 'UP' }],
-          items: ['3 Hunts ohne Route'],
+          kpis: [{ label: 'Orders', value: '1361', trend: 'UP' }],
+          items: ['3 Bestellungen ohne Versanddatum'],
         })}
         onConfigChange={() => {}}
       />,
@@ -40,9 +40,9 @@ describe('DashboardReportFields', () => {
 
     expect(screen.getByTestId('dashboard-report-title')).toHaveValue('Nightly QA');
     expect(screen.getByTestId('dashboard-report-summary')).toHaveValue('Zwei Befunde.');
-    expect(screen.getByTestId('dashboard-report-kpi-label-0')).toHaveValue('Hunts');
+    expect(screen.getByTestId('dashboard-report-kpi-label-0')).toHaveValue('Orders');
     expect(screen.getByTestId('dashboard-report-kpi-value-0')).toHaveValue('1361');
-    expect(screen.getByTestId('dashboard-report-item-0')).toHaveValue('3 Hunts ohne Route');
+    expect(screen.getByTestId('dashboard-report-item-0')).toHaveValue('3 Bestellungen ohne Versanddatum');
   });
 
   it('writes a changed field back into the config JSON', () => {
@@ -86,10 +86,10 @@ describe('DashboardReportFields', () => {
     expect(JSON.parse(onChange.mock.calls.at(-1)?.[0] as string).kpis)
       .toEqual([{ label: '', value: '' }]);
 
-    fireEvent.change(screen.getByTestId('dashboard-report-kpi-label-0'), { target: { value: 'Hunts' } });
+    fireEvent.change(screen.getByTestId('dashboard-report-kpi-label-0'), { target: { value: 'Orders' } });
     fireEvent.change(screen.getByTestId('dashboard-report-kpi-value-0'), { target: { value: '1361' } });
     expect(JSON.parse(onChange.mock.calls.at(-1)?.[0] as string).kpis)
-      .toEqual([{ label: 'Hunts', value: '1361' }]);
+      .toEqual([{ label: 'Orders', value: '1361' }]);
 
     fireEvent.click(screen.getByTestId('dashboard-report-add-item'));
     fireEvent.change(screen.getByTestId('dashboard-report-item-0'), { target: { value: 'finding' } });
@@ -138,7 +138,7 @@ describe('DashboardReportFields', () => {
     render(
       <DashboardReportFields
         blockType="dashboard-report"
-        configJson={config({ status: 'GREEN', kpis: [{ label: 'Hunts', value: '1361' }], items: ['x'] })}
+        configJson={config({ status: 'GREEN', kpis: [{ label: 'Orders', value: '1361' }], items: ['x'] })}
         onConfigChange={() => {}}
       />,
     );

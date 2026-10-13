@@ -48,7 +48,7 @@ class DashboardWorkflowControllerTest {
                                 Instant.parse("2026-09-18T08:02:00Z"), 120_000L, GateStatus.GREEN),
                         ResultState.VALID,
                         new Result("Nightly", Result.Status.GREEN,
-                                List.of(new Result.Kpi("Hunts", "1361", Result.Trend.UP)), List.of("ok"), "fine")),
+                                List.of(new Result.Kpi("Orders", "1361", Result.Trend.UP)), List.of("ok"), "fine")),
                 new DashboardWorkflowResultResponse("wf-b1", null, false, null, ResultState.MISSING, null)));
 
         mockMvc.perform(get("/api/v1/dashboard/workflow-results?workflowIds=wf-a1&workflowIds=wf-b1"))

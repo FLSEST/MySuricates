@@ -16,7 +16,7 @@ const PROPOSAL = {
   proposal: {
     title: 'Nightly QA',
     status: 'YELLOW' as const,
-    kpis: [{ label: 'Hunts', value: '1361', trend: 'UP' as const }],
+    kpis: [{ label: 'Orders', value: '1361', trend: 'UP' as const }],
     items: ['<script>alert(1)</script>'],
     summary: 'Ein Befund.',
   },
@@ -73,7 +73,7 @@ describe('DashboardReportAssist', () => {
       status: 'YELLOW',
       title: 'Nightly QA',
       summary: 'Ein Befund.',
-      kpis: [{ label: 'Hunts', value: '1361', trend: 'UP' }],
+      kpis: [{ label: 'Orders', value: '1361', trend: 'UP' }],
       items: ['<script>alert(1)</script>'],
     });
   });

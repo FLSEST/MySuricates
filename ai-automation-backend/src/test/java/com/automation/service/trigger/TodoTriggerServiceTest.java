@@ -261,17 +261,17 @@ class TodoTriggerServiceTest {
 
         @Test
         void processBacklog_usesTriggerScopedQuery_andFires() {
-            Workflow targetWf = Workflow.builder().id("wf-fix").name("Hunt Quality Rebuild").build();
+            Workflow targetWf = Workflow.builder().id("wf-fix").name("Page Quality Rebuild").build();
             TodoTrigger trigger = TodoTrigger.builder()
-                    .id("trig-1").tagPattern("hunt-rebuild")
+                    .id("trig-1").tagPattern("page-rebuild")
                     .projectId("proj-1").sourceFilter("WORKFLOW")
                     .targetWorkflow(targetWf).maxAttempts(2)
                     .enabled(true).processBacklog(true).build();
             when(repository.findByEnabledTrue()).thenReturn(List.of(trigger));
 
             Todo todo = Todo.builder()
-                    .id("todo-hd").title("Hunt rebuild: heidelberg").status(Todo.Status.OPEN)
-                    .tags(TodoMapper.listToJson(List.of("hunt-rebuild", "auto:workflow")))
+                    .id("todo-hd").title("Page rebuild: pricing").status(Todo.Status.OPEN)
+                    .tags(TodoMapper.listToJson(List.of("page-rebuild", "auto:workflow")))
                     .projectId("proj-1")
                     .priority(Todo.Priority.MEDIUM).source(Todo.Source.WORKFLOW)
                     .fixAttempts(1).build();
@@ -298,7 +298,7 @@ class TodoTriggerServiceTest {
         @Test
         void processBacklog_noBacklogTriggers_doesNothing() {
             TodoTrigger trigger = TodoTrigger.builder()
-                    .id("trig-1").tagPattern("hunt-rebuild")
+                    .id("trig-1").tagPattern("page-rebuild")
                     .targetWorkflow(Workflow.builder().id("wf-1").build())
                     .maxAttempts(2).enabled(true).processBacklog(false).build();
             when(repository.findByEnabledTrue()).thenReturn(List.of(trigger));

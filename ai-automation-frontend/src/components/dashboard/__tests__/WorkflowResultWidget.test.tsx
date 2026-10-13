@@ -36,8 +36,8 @@ const ENTRY: WorkflowWidgetEntry = {
   result: {
     title: 'Nightly QA report',
     status: 'YELLOW',
-    kpis: [{ label: 'Hunts', value: '1361', trend: 'UP' }, { label: 'Fehler', value: '12' }],
-    items: ['3 Hunts ohne Route'],
+    kpis: [{ label: 'Orders', value: '1361', trend: 'UP' }, { label: 'Fehler', value: '12' }],
+    items: ['3 Bestellungen ohne Versanddatum'],
     summary: 'Zwei Befunde, keiner blockierend.',
   },
 };
@@ -66,9 +66,9 @@ describe('WorkflowResultWidget', () => {
     render(ENTRY);
 
     expect(screen.getByText('Nightly QA report')).toBeInTheDocument();
-    expect(screen.getByText('Hunts')).toBeInTheDocument();
+    expect(screen.getByText('Orders')).toBeInTheDocument();
     expect(screen.getByText('1361')).toBeInTheDocument();
-    expect(screen.getByText('3 Hunts ohne Route')).toBeInTheDocument();
+    expect(screen.getByText('3 Bestellungen ohne Versanddatum')).toBeInTheDocument();
     expect(screen.getByText('Zwei Befunde, keiner blockierend.')).toBeInTheDocument();
     expect(screen.getByLabelText('rising')).toBeInTheDocument();
   });

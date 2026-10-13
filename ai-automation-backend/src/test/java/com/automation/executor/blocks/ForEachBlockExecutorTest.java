@@ -131,7 +131,7 @@ class ForEachBlockExecutorTest {
 
     @Test
     void execute_itemFailsBetweenPassingOnes_summaryNamesItFirst() {
-        // 4a8cabc4: "Hunt Quality Rebuild" reported "failed: [oberwesel]: GATE PASS …" — the failed
+        // 4a8cabc4: "Page Quality Rebuild" reported "failed: [item-3]: GATE PASS …" — the failed
         // item sat between successful ones and was cut out of the run error
         StepResult pass = StepResult.builder().stepIndex(0).status(StepStatus.COMPLETED).output("GATE PASS").build();
         StepResult broken = StepResult.builder().stepIndex(1).status(StepStatus.FAILED)

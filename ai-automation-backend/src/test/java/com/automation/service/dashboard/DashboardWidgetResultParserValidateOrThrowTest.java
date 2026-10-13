@@ -44,15 +44,15 @@ class DashboardWidgetResultParserValidateOrThrowTest {
         Map<String, Object> candidate = new LinkedHashMap<>();
         candidate.put("title", "Nightly QA");
         candidate.put("status", "yellow");
-        candidate.put("kpis", List.of(kpi("Hunts", "1361", "UP"), kpi("Fehler", "12", null)));
-        candidate.put("items", List.of("3 Hunts ohne Route", "1 Blocklist-Treffer"));
+        candidate.put("kpis", List.of(kpi("Orders", "1361", "UP"), kpi("Fehler", "12", null)));
+        candidate.put("items", List.of("3 Bestellungen ohne Versanddatum", "1 Blocklist-Treffer"));
         candidate.put("summary", "Zwei Befunde, keiner blockierend.");
 
         Result viaFields = DashboardWidgetResultParser.validateOrThrow(candidate);
         Result viaMarker = DashboardWidgetResultParser.parse("""
                 dashboard_widget: {"title": "Nightly QA", "status": "yellow",
-                  "kpis": [{"label": "Hunts", "value": "1361", "trend": "UP"}, {"label": "Fehler", "value": "12"}],
-                  "items": ["3 Hunts ohne Route", "1 Blocklist-Treffer"],
+                  "kpis": [{"label": "Orders", "value": "1361", "trend": "UP"}, {"label": "Fehler", "value": "12"}],
+                  "items": ["3 Bestellungen ohne Versanddatum", "1 Blocklist-Treffer"],
                   "summary": "Zwei Befunde, keiner blockierend."}
                 """).result();
 

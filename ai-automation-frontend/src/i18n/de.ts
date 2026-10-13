@@ -732,7 +732,7 @@ export const de: TranslationKeys = {
       removeKpi: 'Kennzahl entfernen',
       items: 'Einträge',
       item: 'Eintrag',
-      itemPlaceholder: '3 Hunts ohne Route',
+      itemPlaceholder: '3 Bestellungen ohne Versanddatum',
       addItem: 'Eintrag hinzufügen',
       removeItem: 'Eintrag entfernen',
       placeholderNote: 'Platzhalter werden erst beim Run aufgelöst. Bleibt einer unaufgelöst, scheitert der Block.',

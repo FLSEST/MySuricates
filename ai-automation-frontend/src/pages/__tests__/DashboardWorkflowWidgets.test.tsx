@@ -15,7 +15,7 @@ const RESULT = {
   workflowId: 'w1', workflowName: 'Test Workflow', available: true,
   run: { runId: 'run-1', status: 'COMPLETED', startedAt: '2026-09-18T08:00:00Z', completedAt: '2026-09-18T08:02:00Z', durationMs: 120_000, gateStatus: 'GREEN' },
   resultState: 'VALID',
-  result: { title: 'Nightly report', status: 'GREEN', kpis: [{ label: 'Hunts', value: '1361' }], items: ['<script>alert(1)</script>'], summary: 'All good.' },
+  result: { title: 'Nightly report', status: 'GREEN', kpis: [{ label: 'Orders', value: '1361' }], items: ['<script>alert(1)</script>'], summary: 'All good.' },
 };
 
 // Renders the whole page; see Dashboard.test.tsx for the timeout.

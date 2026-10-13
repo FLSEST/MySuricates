@@ -14,7 +14,7 @@ describe('CatchUpQueueBanner', () => {
     render(
       <CatchUpQueueBanner
         queue={{
-          active: { scheduleId: 's1', targetName: 'Hunt QA Monitor', runId: 'r1', startedAt: '2026-09-14T08:00:00Z' },
+          active: { scheduleId: 's1', targetName: 'Nightly QA Monitor', runId: 'r1', startedAt: '2026-09-14T08:00:00Z' },
           pending: [
             { scheduleId: 's2', targetName: 'Backend Quality Gate', missedAt: '2026-09-14T04:30:00Z' },
             { scheduleId: 's3', targetName: 'Lebens-Radar', missedAt: '2026-09-14T05:30:00Z' },
@@ -23,7 +23,7 @@ describe('CatchUpQueueBanner', () => {
       />,
     );
     const banner = screen.getByTestId('catch-up-queue-banner');
-    expect(banner).toHaveTextContent('Hunt QA Monitor');
+    expect(banner).toHaveTextContent('Nightly QA Monitor');
     expect(banner).toHaveTextContent('(2)');
     expect(banner).toHaveTextContent('Backend Quality Gate → Lebens-Radar');
   });

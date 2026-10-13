@@ -48,14 +48,14 @@ class DashboardReportCandidateTest {
         config.put("status", "{{ gate }}");
         config.put("title", "QA {{ count }}");
         config.put("summary", "Zwei Befunde.");
-        config.put("kpis", List.of(kpi("Hunts", "{{ count }}", "UP")));
-        config.put("items", List.of("{{ count }} Hunts geprüft"));
+        config.put("kpis", List.of(kpi("Orders", "{{ count }}", "UP")));
+        config.put("items", List.of("{{ count }} Bestellungen geprüft"));
 
         Map<String, Object> candidate = DashboardReportCandidate.build(context(), config);
 
         assertThat(candidate).containsEntry("status", "YELLOW").containsEntry("title", "QA 1361");
-        assertThat(candidate).containsEntry("items", List.of("1361 Hunts geprüft"));
-        assertThat(candidate.get("kpis")).isEqualTo(List.of(kpi("Hunts", "1361", "UP")));
+        assertThat(candidate).containsEntry("items", List.of("1361 Bestellungen geprüft"));
+        assertThat(candidate.get("kpis")).isEqualTo(List.of(kpi("Orders", "1361", "UP")));
     }
 
     @Test
@@ -194,7 +194,7 @@ class DashboardReportCandidateTest {
     @Test
     void a_value_that_itself_contains_placeholder_syntax_after_resolving_does_not_fail() {
         ExecutionContext ctx = context();
-        ctx.setVariable("finding", "Platzhalter {{ hunt_count }} fehlt in der Vorlage");
+        ctx.setVariable("finding", "Platzhalter {{ order_count }} fehlt in der Vorlage");
         Map<String, Object> config = new LinkedHashMap<>();
         config.put("status", "GREEN");
         config.put("items", List.of("{{ finding }}"));
@@ -202,7 +202,7 @@ class DashboardReportCandidateTest {
         Map<String, Object> candidate = DashboardReportCandidate.build(ctx, config);
 
         assertThat(candidate.get("items"))
-                .isEqualTo(List.of("Platzhalter {{ hunt_count }} fehlt in der Vorlage"));
+                .isEqualTo(List.of("Platzhalter {{ order_count }} fehlt in der Vorlage"));
     }
 
     /**

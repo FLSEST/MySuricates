@@ -59,8 +59,8 @@ class DashboardReportBlockExecutorTest {
         Map<String, Object> config = new LinkedHashMap<>();
         config.put("status", "{{ gate }}");
         config.put("title", "Nightly QA");
-        config.put("kpis", List.of(Map.of("label", "Hunts", "value", "1361", "trend", "UP")));
-        config.put("items", List.of("3 Hunts ohne Route"));
+        config.put("kpis", List.of(Map.of("label", "Orders", "value", "1361", "trend", "UP")));
+        config.put("items", List.of("3 Bestellungen ohne Versanddatum"));
         config.put("summary", "Zwei Befunde.");
 
         StepResult step = executor.execute(block(config), ctx);
@@ -69,8 +69,8 @@ class DashboardReportBlockExecutorTest {
         Object stored = ctx.getRunMetadata().get(DashboardWidgetResultParser.METADATA_KEY);
         assertThat(DashboardWidgetResultParser.fromMetadata(stored).result()).isEqualTo(new Result(
                 "Nightly QA", Result.Status.YELLOW,
-                List.of(new Result.Kpi("Hunts", "1361", Result.Trend.UP)),
-                List.of("3 Hunts ohne Route"), "Zwei Befunde."));
+                List.of(new Result.Kpi("Orders", "1361", Result.Trend.UP)),
+                List.of("3 Bestellungen ohne Versanddatum"), "Zwei Befunde."));
     }
 
     @Test
@@ -95,7 +95,7 @@ class DashboardReportBlockExecutorTest {
         Map<String, Object> full = new LinkedHashMap<>();
         full.put("status", "GREEN");
         full.put("title", "Nightly QA");
-        full.put("kpis", List.of(Map.of("label", "Hunts", "value", "1361")));
+        full.put("kpis", List.of(Map.of("label", "Orders", "value", "1361")));
         full.put("items", List.of("one finding"));
         full.put("summary", "All good.");
 

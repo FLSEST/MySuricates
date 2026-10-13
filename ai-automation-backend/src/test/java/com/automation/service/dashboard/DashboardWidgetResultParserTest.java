@@ -21,8 +21,8 @@ class DashboardWidgetResultParserTest {
             Report of the run.
 
             dashboard_widget: {"title": "Nightly QA", "status": "YELLOW",
-              "kpis": [{"label": "Hunts", "value": "1361", "trend": "UP"}, {"label": "Fehler", "value": "12"}],
-              "items": ["3 Hunts ohne Route", "1 Blocklist-Treffer"],
+              "kpis": [{"label": "Orders", "value": "1361", "trend": "UP"}, {"label": "Fehler", "value": "12"}],
+              "items": ["3 Bestellungen ohne Versanddatum", "1 Blocklist-Treffer"],
               "summary": "Zwei Befunde, keiner blockierend."}
 
             Done.
@@ -34,8 +34,8 @@ class DashboardWidgetResultParserTest {
 
         assertThat(parsed.state()).isEqualTo(ResultState.VALID);
         assertThat(parsed.result()).isEqualTo(new Result("Nightly QA", Result.Status.YELLOW,
-                List.of(new Result.Kpi("Hunts", "1361", Result.Trend.UP), new Result.Kpi("Fehler", "12", null)),
-                List.of("3 Hunts ohne Route", "1 Blocklist-Treffer"),
+                List.of(new Result.Kpi("Orders", "1361", Result.Trend.UP), new Result.Kpi("Fehler", "12", null)),
+                List.of("3 Bestellungen ohne Versanddatum", "1 Blocklist-Treffer"),
                 "Zwei Befunde, keiner blockierend."));
     }
 

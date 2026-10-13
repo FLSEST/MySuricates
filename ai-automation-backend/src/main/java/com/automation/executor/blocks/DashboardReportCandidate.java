@@ -33,7 +33,7 @@ import java.util.regex.Pattern;
  *
  * <p><b>An unresolved placeholder is fatal, decided on the template, asked of the context — never
  * rebuilt.</b> {@code TemplateResolver} leaves an unknown placeholder literally in place, so without
- * this check the dashboard would show {@code {{ hunt_count }}} as a KPI. Which keys the raw text
+ * this check the dashboard would show {@code {{ item_count }}} as a KPI. Which keys the raw text
  * contains comes from {@link PlaceholderSyntax#keysIn} — the one shared definition of the
  * {@code {{ … }}} form; whether a key would actually resolve is answered by
  * {@link ExecutionContext#resolvesPlaceholder}, not re-derived here — a hand copy of that lookup

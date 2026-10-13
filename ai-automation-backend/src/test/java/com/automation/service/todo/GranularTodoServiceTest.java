@@ -190,19 +190,19 @@ class GranularTodoServiceTest {
         // similarity check flags items 2+3 as SAME to item 1 — all three
         // must still become their own todos.
         List<Map<String, Object>> items = List.of(
-                Map.of("title", "Hunt rebuild: hornberg", "priority", "HIGH", "tags", List.of("hunt-rebuild")),
-                Map.of("title", "Hunt rebuild: wesel", "priority", "HIGH", "tags", List.of("hunt-rebuild")),
-                Map.of("title", "Hunt rebuild: bad-windsheim", "priority", "HIGH", "tags", List.of("hunt-rebuild")));
+                Map.of("title", "Page rebuild: pricing", "priority", "HIGH", "tags", List.of("page-rebuild")),
+                Map.of("title", "Page rebuild: contact", "priority", "HIGH", "tags", List.of("page-rebuild")),
+                Map.of("title", "Page rebuild: bad-windsheim", "priority", "HIGH", "tags", List.of("page-rebuild")));
 
         WorkflowRunCompletedEvent event = event(items);
-        GateResult gate = new GateResult(GateStatus.RED, "hunt-quality", "Issues");
+        GateResult gate = new GateResult(GateStatus.RED, "page-quality", "Issues");
 
         when(todoRepository.findOpenByCompositeKey(anyString(), anyString(), anyString(), anyString()))
                 .thenReturn(Optional.empty());
 
-        Todo first = Todo.builder().id("first-1").title("Hunt rebuild: hornberg").build();
-        when(similarityService.findSimilar(eq("p-1"), startsWith("Hunt rebuild:"), any()))
-                .thenAnswer(inv -> "Hunt rebuild: hornberg".equals(inv.getArgument(1))
+        Todo first = Todo.builder().id("first-1").title("Page rebuild: pricing").build();
+        when(similarityService.findSimilar(eq("p-1"), startsWith("Page rebuild:"), any()))
+                .thenAnswer(inv -> "Page rebuild: pricing".equals(inv.getArgument(1))
                         ? List.of()
                         : List.of(new TodoSimilarityService.SimilarTodo(
                                 first, 0.9, TodoSimilarityService.Similarity.SAME)));
@@ -217,9 +217,9 @@ class GranularTodoServiceTest {
         ArgumentCaptor<Todo> captor = ArgumentCaptor.forClass(Todo.class);
         verify(todoRepository, atLeastOnce()).save(captor.capture());
         List<String> createdTitles = captor.getAllValues().stream()
-                .map(Todo::getTitle).filter(t -> t != null && t.startsWith("Hunt rebuild:")).toList();
+                .map(Todo::getTitle).filter(t -> t != null && t.startsWith("Page rebuild:")).toList();
         assertThat(createdTitles).contains(
-                "Hunt rebuild: hornberg", "Hunt rebuild: wesel", "Hunt rebuild: bad-windsheim");
+                "Page rebuild: pricing", "Page rebuild: contact", "Page rebuild: bad-windsheim");
         // 3 granular creations. The aggregate gate todo (upsertTodo) is a
         // separate concern of AutoTodoService, not exercised here.
         verify(eventPublisher, times(3)).publishEvent(any(TodoCreatedEvent.class));
@@ -337,12 +337,12 @@ class GranularTodoServiceTest {
     @Test
     void granularTodos_differentTitles_stayTwoTodos() {
         List<Map<String, Object>> items = List.of(
-                Map.of("title", "Hunt rebuild: hornberg", "priority", "HIGH", "tags", List.of("hunt")),
-                Map.of("title", "Hunt rebuild: wesel", "priority", "HIGH", "tags", List.of("hunt")));
+                Map.of("title", "Page rebuild: pricing", "priority", "HIGH", "tags", List.of("page")),
+                Map.of("title", "Page rebuild: contact", "priority", "HIGH", "tags", List.of("page")));
 
         List<String> created = createdTitles(items);
 
-        assertThat(created).containsExactlyInAnyOrder("Hunt rebuild: hornberg", "Hunt rebuild: wesel");
+        assertThat(created).containsExactlyInAnyOrder("Page rebuild: pricing", "Page rebuild: contact");
     }
 
     /** @return the titles of the granular TODOs newly created in this run */
