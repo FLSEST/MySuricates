@@ -593,10 +593,13 @@ pre{{white-space:pre-wrap;margin:0;font-size:12px}}tr.rejected td:first-child{{c
             reasons[key] = reasons.get(key, 0) + 1
     for key, n in sorted(reasons.items(), key=lambda kv: -kv[1]):
         print(f'- rejected because of {key}: {n}')
-    ok = total and len(accepted) == total
+    # Nothing to translate is the usual catch-up run before a cut (English commits go straight into the
+    # map); a broken extract already fails the step before the report.
+    ok = len(accepted) == total
     print('gate_status: ' + ('GREEN' if ok else 'YELLOW' if accepted else 'RED'))
     print('gate_category: history-rewrite')
-    print(f'gate_description: {len(accepted)} of {total} messages accepted, {len(rejected)} rejected')
+    print('gate_description: ' + (f'{len(accepted)} of {total} messages accepted, {len(rejected)} rejected' if total
+                                  else 'nothing to translate - every new message went straight into the map'))
     return 0
 
 

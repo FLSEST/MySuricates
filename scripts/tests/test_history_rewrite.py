@@ -328,8 +328,9 @@ class EndToEnd(unittest.TestCase):
         report = self.run_cli("report", "--state", str(self.state), "--run", "r1")
         self.assertIn("gate_status: GREEN", report)
         self.assertTrue((self.state / "runs/r1/review.html").exists())
-        # Second extract: nothing left - the map is the cache.
+        # Second extract: nothing left - the map is the cache, and an empty run is no alarm.
         self.assertIn("0 messages to translate", self.run_cli("extract", "--repo", self.repo, "--state", str(self.state), "--run", "r2"))
+        self.assertIn("gate_status: GREEN", self.run_cli("report", "--state", str(self.state), "--run", "r2"))
         # The callback rewrites by original hash.
         code = self.run_cli("callback", "--map", str(self.state / "map.jsonl"))
 
