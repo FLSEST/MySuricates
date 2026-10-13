@@ -32,9 +32,14 @@ describe('BLOCK_TYPES', () => {
     for (const type of AI_BLOCK_TYPES) {
       expect(BLOCK_TYPES).toContain(type);
     }
-    for (const nonAi of ['shell', 'integration', 'document', 'approval', 'human-input', 'sub-workflow', 'todo-create', 'todo-update', 'todo-close', 'compress', 'dashboard-report']) {
+    for (const nonAi of ['shell', 'integration', 'document', 'sub-workflow', 'todo-create', 'todo-update', 'todo-close', 'compress', 'dashboard-report']) {
       expect(AI_BLOCK_TYPES).not.toContain(nonAi);
     }
+  });
+
+  it('approval and human-input take provider/model for their AI actor (dca0c03e)', () => {
+    expect(AI_BLOCK_TYPES).toContain('approval');
+    expect(AI_BLOCK_TYPES).toContain('human-input');
   });
 
   it('compress-ai honours block provider/model, compress does not', () => {
