@@ -21,8 +21,10 @@
 #   --source REPO   working repo to clone (default: the repo of this script)
 #   --work DIR      work clone (default <state>/work); "run" refuses an existing one
 #   --branch NAME   branch that goes public (default main); other branches are not cloned
-#   --tag NAME      release tag that must end up on the rewritten branch tip (e.g. v0.8.0); if it does
-#                   not exist in the source, --create-tag sets it on the tip of the work clone. With a
+#   --tag NAME      release tag the public branch ends at (e.g. v0.8.0): it must lie on the branch,
+#                   but not necessarily at its tip - scripts/release.sh commits the next -SNAPSHOT
+#                   after the tag, and that commit stays in the archive. If the tag does not exist in
+#                   the source, --create-tag sets it on the tip of the work clone. With a
 #                   tag, it is the only tag that stays - the first public state carries one version
 #                   (decided 2026-10-12); without one, all v* tags stay
 #   --create-tag    see --tag (for trial runs before the real tag exists)
@@ -102,11 +104,11 @@ verify() {
     || finding "$private_terms Ersetzungsmuster kommen noch in Nachrichten vor"
   n="$(python3 -I "$HERE/messages.py" german-left --repo "$w")"
   ok "Nachrichten mit deutschem Text (Hinweis, kein Fehler): $n"
-  # 4. Content of the public tip is unchanged: same tree as the source branch.
-  if [ "$(git -C "$w" rev-parse "$BRANCH^{tree}")" = "$(git -C "$SOURCE" rev-parse "$BRANCH^{tree}")" ]; then
-    ok "Baum der Spitze gleicht $BRANCH der Quelle"
+  # 4. Content of the public tip is unchanged: same tree as the source at the cut.
+  if [ "$(git -C "$w" rev-parse "$BRANCH^{tree}")" = "$(git -C "$SOURCE" rev-parse "$CUT^{tree}")" ]; then
+    ok "Baum der Spitze gleicht $CUT_NAME der Quelle"
   else
-    finding "Baum der Spitze weicht von $BRANCH der Quelle ab"
+    finding "Baum der Spitze weicht von $CUT_NAME der Quelle ab"
   fi
   # 5. Only the public branch; with --tag only that tag (on the tip), otherwise only v* tags.
   n="$(git -C "$w" for-each-ref --format='%(refname)' refs/heads | grep -vxF "refs/heads/$BRANCH" | wc -l | tr -d ' ')"
@@ -135,10 +137,18 @@ verify() {
       && ok "README-Sync-Marke loest auf" || finding "README-Sync-Marke loest nicht auf"
   fi
   echo
-  echo "Commits: Quelle $(git -C "$SOURCE" rev-list --count "$BRANCH"), neu $(git -C "$w" rev-list --count "$BRANCH")"
+  echo "Commits: Quelle $(git -C "$SOURCE" rev-list --count "$CUT") bis $CUT_NAME, neu $(git -C "$w" rev-list --count "$BRANCH")"
   [ "$FINDINGS" = 0 ] && { log "Gegenprobe ohne Befund"; return 0; }
   log "Gegenprobe: $FINDINGS Befund(e)"; return 1
 }
+
+# Where the public branch ends in the source: at the tag if the source has it (it must lie on the
+# branch), otherwise at the branch tip (no tag, or --create-tag for a trial run).
+CUT="$BRANCH"; CUT_NAME="$BRANCH"
+if [ -n "$TAG" ] && git -C "$SOURCE" rev-parse -q --verify "refs/tags/$TAG" >/dev/null; then
+  git -C "$SOURCE" merge-base --is-ancestor "$TAG" "$BRANCH" || die "Tag $TAG liegt nicht auf $BRANCH der Quelle"
+  CUT="$TAG^{commit}"; CUT_NAME="Tag $TAG"
+fi
 
 if [ "$CMD" = verify ]; then
   [ -d "$WORK/.git" ] || die "kein Arbeitsklon in $WORK"
@@ -166,6 +176,12 @@ fi
 # The first public state carries one version: with --tag, every other tag goes.
 if [ -n "$TAG" ]; then
   git -C "$WORK" tag -l | grep -vxF "$TAG" | while IFS= read -r t; do git -C "$WORK" tag -d "$t" >/dev/null; done
+  # The public branch ends at the tag; what came after it (the next -SNAPSHOT) stays in the archive.
+  AFTER="$(git -C "$WORK" rev-list --count "$TAG..$BRANCH")"
+  if [ "$AFTER" != 0 ]; then
+    git -C "$WORK" reset --quiet --hard "$TAG" || die "reset auf $TAG gescheitert"
+    log "$BRANCH endet am Tag $TAG - $AFTER Commit(s) nach dem Tag bleiben im Archiv"
+  fi
 fi
 
 MISSING="$(python3 -I "$HERE/messages.py" map-missing --repo "$WORK" --map "$MAP")"

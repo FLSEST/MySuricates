@@ -901,6 +901,12 @@ be played through beforehand. `live` takes the working repo (`archive_repo`) and
 and that the target (`public_remote`) is empty. The paths per mode are in
 `scripts/lib/release-paths.sh`.
 
+The first cut takes `main` up to the release tag: the tag must lie on `main`, but not necessarily at its tip.
+`release.sh` commits the next `-SNAPSHOT` version after the tag; that commit stays in the archive and
+goes out with the next handover (`rewrite.sh --tag` resets the work clone to the tag, the tree
+comparison and the commit count apply up to the tag). In the probe, the context `main_rev` of
+"Release: Probe zurücksetzen" sets up this state (`release-probe.sh advance` without a tag).
+
 **Test:** `python3 -m unittest discover -s scripts/tests -p 'test_release_overview.py'` (check lines of
 the three scripts, event log, page and status, paths per mode, `release-probe.sh` with throwaway
 repos).

@@ -916,6 +916,12 @@ Klon (`public_clone`); der Erstschnitt verlangt dort, dass `origin` schon auf `M
 zeigt und das Ziel (`public_remote`) leer ist. Die Pfade je Modus stehen in
 `scripts/lib/release-paths.sh`.
 
+Der Erstschnitt nimmt `main` bis zum Release-Tag: Das Tag muss auf `main` liegen, aber nicht
+an der Spitze. `release.sh` legt nach dem Tag den Commit mit der nächsten `-SNAPSHOT`-Version an; der bleibt
+im Archiv und kommt mit der nächsten Übergabe hinaus (`rewrite.sh --tag` setzt den Arbeitsklon auf das
+Tag zurück, Baumvergleich und Commit-Zahl gelten bis zum Tag). In der Probe stellt der Kontext
+`main_rev` von „Release: Probe zurücksetzen“ diesen Zustand her (`release-probe.sh advance` ohne Tag).
+
 **Test:** `python3 -m unittest discover -s scripts/tests -p 'test_release_overview.py'` (Prüfzeilen
 der drei Skripte, Ereignisprotokoll, Seite und Ampel, Pfade je Modus, `release-probe.sh` mit
 Wegwerf-Repos).

@@ -87,6 +87,24 @@ echo "regex:application for==>X" >> "$S/message-replacements.txt"
 OUT="$(bash "$REWRITE" verify --state "$S" --source "$SRC" 2>&1)"; RC=$?
 check "verify reports a replacement pattern still in a message" 'grep -F "Ersetzungsmuster kommen noch" <<<"$OUT" >/dev/null'
 
+echo "5) tag behind the tip, as after scripts/release.sh"
+S3="$TMP/state3"; mkdir -p "$S3"; cp "$S/map.jsonl" "$S2/mailmap.txt" "$S3/"
+echo "secret/personal.txt" > "$S3/remove-paths.txt"
+g tag v0.3.0
+g commit -q --allow-empty -m "chore: start development of v0.3.1"
+python3 -I "$MESSAGES" extract --repo "$SRC" --state "$S3" --run r2 --rev main >/dev/null   # English: straight into the map
+W3="$TMP/work3"
+OUT="$(bash "$REWRITE" run --state "$S3" --source "$SRC" --work "$W3" --tag v0.3.0 2>&1)"; RC=$?
+check "run ends without a finding (rc=$RC)" '[ "$RC" = 0 ]'
+check "the log names the commit that stays in the archive" 'grep -F "1 Commit(s) nach dem Tag bleiben im Archiv" <<<"$OUT" >/dev/null'
+check "main of the work clone ends at the tag" '[ "$(git -C "$W3" rev-parse "v0.3.0^{commit}")" = "$(git -C "$W3" rev-parse main)" ]'
+check "the commit after the tag is not public" '! git -C "$W3" log --all --format=%s | grep -F "start development" >/dev/null'
+check "tip tree equals the tag of the source" '[ "$(git -C "$W3" rev-parse "main^{tree}")" = "$(g rev-parse "v0.3.0^{tree}")" ]'
+check "commit count is the one up to the tag" 'grep -F "Commits: Quelle 3 bis Tag v0.3.0, neu 3" <<<"$OUT" >/dev/null'
+g checkout -q side; g commit -q --allow-empty -m "docs: side note"; g tag v9.0.0; g checkout -q main
+OUT="$(bash "$REWRITE" run --state "$S3" --source "$SRC" --work "$TMP/work4" --tag v9.0.0 2>&1)"; RC=$?
+check "a tag that is not on main is refused" '[ "$RC" = 1 ] && grep -F "liegt nicht auf main der Quelle" <<<"$OUT" >/dev/null && [ ! -e "$TMP/work4" ]'
+
 echo
 echo "passed=$PASS failed=$FAIL"
 [ "$FAIL" = 0 ]
