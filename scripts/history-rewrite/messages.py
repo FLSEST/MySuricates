@@ -9,7 +9,8 @@ translation itself happens here, so it is testable and costs no tokens:
                                              hand, never from a workflow block (no API access there)
   extract     --repo R --state S --run ID    collect the messages still missing from the map, apply
               [--sample N] [--batch-size B]  the trailer step, put English-only ones straight into the
-                                             map and write the German ones as translation batches
+              [--redo-german]                map and write the German ones as translation batches;
+                                             --redo-german also takes map entries that still read German
   check       --state S --run ID --batch NN  verify one batch answer (stdin or --answer FILE) against
               [--answer FILE] [--stored]     its source; accepted messages go into the map, the rest
                                              into rejects.jsonl with the reason. The raw answer is
@@ -165,10 +166,18 @@ TRANSLITERATED = re.compile(r'\b(?:fuer|ueber|koennen|muessen|muesste|aender\w*|
 
 
 FILE_OR_PATH = re.compile(r'\S*[/.]\S*')
+# Names that stay German in an English message and must not count as German text: protocol words
+# in capitals ("NICHT GEMESSEN", "FAKT"), TODO references with their German title
+# ("cc0eb3ba (Batch-Kette bauen)", as in the trailers) and the scope of the subject prefix
+# ("docs(entwicklung): ", the doc's file name).
+CAPS_TOKEN = re.compile(r'(?<![\w-])[A-ZÄÖÜ]{2,}(?:[- ][A-ZÄÖÜ]{2,})*(?![\w-])')
+TODO_REFERENCE = re.compile(r'\b[0-9a-f]{8}(?:-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})?\b:? '
+                            r'\((?:[^()]|\([^()]*\))*\)')
+SUBJECT_PREFIX = re.compile(r'^(\w+(?:\([^)]*\))?!?: |Merge \S+: |Merge )')
 
 
 def is_german_text(text):
-    text = FILE_OR_PATH.sub(' ', QUOTED.sub(' ', text))
+    text = FILE_OR_PATH.sub(' ', QUOTED.sub(' ', CAPS_TOKEN.sub(' ', TODO_REFERENCE.sub(' ', text))))
     if UMLAUT.search(text) or TRANSLITERATED.search(text):
         return True
     words = {w.lower() for w in WORD.findall(text)}
@@ -177,9 +186,14 @@ def is_german_text(text):
     return bool(GERMAN_ENDING.search(text))
 
 
+def subject_text(subject):
+    """The subject without its prefix ("fix(staging): ", "Merge <branch>: "), which stays as it is."""
+    return SUBJECT_PREFIX.sub('', subject, count=1)
+
+
 def needs_translation(msg):
     subject, body, _ = split_message(msg)
-    return is_german_text(subject + '\n' + body)
+    return is_german_text(subject_text(subject) + '\n' + body)
 
 
 TOKEN_PATTERNS = [
@@ -353,9 +367,14 @@ def cmd_extract(args):
     index = load_index(state)
     pairs = i18n_pairs(args.repo)
     pending, direct = [], []
+    redo = 0
     for sha, msg in git_messages(args.repo, args.rev):
         if sha in done:
-            continue
+            # --redo-german: a map entry that still reads German goes to translation again; until
+            # a new answer passes the check, the old entry stays the one the rewrite uses
+            if not (args.redo_german and needs_translation(done[sha]['message'])):
+                continue
+            redo += 1
         moved = drop_private_trailers(move_todo_bracket(msg, index))
         if needs_translation(moved):
             pending.append({'hash': sha, 'source': msg, 'message': moved})
@@ -384,7 +403,8 @@ def cmd_extract(args):
     print(f'run {args.run}: {len(pending)} messages to translate in {len(names)} batches'
           f' of up to {args.batch_size}; {len(direct)} without German text'
           + (' (probe: not written to the map)' if args.sample else ' went straight into the map')
-          + f'; {len(done)} already in the map')
+          + f'; {len(done)} already in the map'
+          + (f', {redo} of them sent again because they still read German' if args.redo_german else ''))
     return 0
 
 
@@ -460,9 +480,13 @@ def problems(source, translated, terms):
     missing = sorted(t for t in preserved_tokens(src_text) if not survives(t, out_text))
     if missing:
         errors.append('lost: ' + ', '.join(missing[:6]))
-    prefix = re.match(r'^(\w+(?:\([^)]*\))?!?: |Merge \S+: |Merge )', s_subj)
+    prefix = SUBJECT_PREFIX.match(s_subj)
     if prefix and not t_subj.startswith(prefix.group(1)):
         errors.append('prefix changed')
+    # The model translated the body but handed back the German subject (about 100 messages of the
+    # full run on 2026-10-08) - only a warning then, so they went into the map unchanged.
+    if is_german_text(subject_text(s_subj)) and subject_text(t_subj).strip() == subject_text(s_subj).strip():
+        errors.append('subject not translated')
     ratio = len(out_text) / max(len(src_text), 1)
     if not 0.45 <= ratio <= 1.9:
         errors.append(f'length ratio {ratio:.2f}')
@@ -658,6 +682,8 @@ def main(argv=None):
     p.add_argument('--rev', default='main')
     p.add_argument('--sample', type=int, default=0, help='probe: N German messages spread over the history')
     p.add_argument('--batch-size', type=int, default=10)
+    p.add_argument('--redo-german', action='store_true',
+                   help='translate map entries again whose message still reads German')
     p = sub.add_parser('check')
     p.add_argument('--state', required=True)
     p.add_argument('--run', required=True)

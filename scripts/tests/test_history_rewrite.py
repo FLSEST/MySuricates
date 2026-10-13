@@ -130,6 +130,15 @@ class Checks(unittest.TestCase):
                 f"Todo: {UUID_A} (Projekt umbenennen)\n{CO}\n"
         self.assertTrue(any(e.startswith("length ratio") for e in hm.problems(self.SRC * 3, short, [])[0]))
 
+    def test_german_subject_handed_back_unchanged_is_an_error(self):
+        # Seen about 100 times in the full run: the body translated, the subject left German.
+        bad = self.GOOD.replace("fix(staging): hint for", "fix(staging): Hinweis für")
+        self.assertIn("subject not translated", hm.problems(self.SRC, bad, [])[0])
+
+    def test_english_subject_handed_back_unchanged_passes(self):
+        src = self.SRC.replace("fix(staging): Hinweis für", "fix(staging): hint for")
+        self.assertEqual(hm.problems(src, self.GOOD, [])[0], [])
+
     def test_german_left_and_long_subject_are_warnings_only(self):
         mixed = self.GOOD.replace("now answers the question", "beantwortet jetzt die Frage, weil der Lauf sonst abbricht")
         errors, warnings = hm.problems(self.SRC, mixed, [])
@@ -246,6 +255,17 @@ class NeedsTranslation(unittest.TestCase):
         self.assertTrue(hm.needs_translation("fix: x\n\nDer Lauf bricht ab, weil die Datei fehlt.\n"))
         self.assertFalse(hm.needs_translation("fix(ui): label reads „Mit Fehlern abgeschlossen“\n"))
 
+    def test_scope_protocol_words_and_todo_references_are_no_german_text(self):
+        for msg in ("docs(entwicklung): name the installer's Docker path\n",
+                    "feat(werkzeug): SARIF becomes a fact sheet with FAKT, TREFFER and NICHT-GEMESSEN lines\n",
+                    "fix(health): monitor set-up instances only\n\n3e146321 (Health-Monitor: nie gesehene "
+                    "Instanzen nicht als ausgefallen melden):\nThe first fix was a heuristic.\n",
+                    f"fix: x\n\nFollows {UUID_A} (Akzeptiertes Risiko wieder öffnen, wenn eine neue CVE auftaucht).\n"):
+            self.assertFalse(hm.needs_translation(msg), msg)
+
+    def test_german_scope_does_not_hide_a_german_subject(self):
+        self.assertTrue(hm.needs_translation("docs(entwicklung): Abschnitt über Releases ergänzt\n"))
+
 
 class ShortGermanSubjects(unittest.TestCase):
     """Real subjects from the history that a two-word rule missed (they would stay German in public)."""
@@ -319,6 +339,26 @@ class EndToEnd(unittest.TestCase):
         scope = {"commit": Commit}
         exec(code, scope)  # noqa: S102 - generated callback body, as git filter-repo runs it
         self.assertEqual(Commit.message.decode(), "fix: saving aborts because the file is missing\n\nTodo: deadbee1 (Titel)\n")
+
+    def test_redo_german_takes_map_entries_that_still_read_german(self):
+        self.run_cli("extract", "--repo", self.repo, "--state", str(self.state), "--run", "r1")
+        sha = json.loads((self.state / "runs/r1/batches/001.json").read_text())["messages"][0]["hash"]
+        german = "fix: Speichern bricht ab, weil die Datei fehlt\n\nTodo: deadbee1 (Titel)\n"
+        # An entry from before the subject check: the German message went into the map.
+        with open(self.state / "map.jsonl", "a", encoding="utf-8") as f:
+            f.write(json.dumps({"hash": sha, "message": german, "translated": True}) + "\n")
+        extract = ("extract", "--repo", self.repo, "--state", str(self.state))
+        self.assertIn("0 messages to translate", self.run_cli(*extract, "--run", "r2"))
+        out = self.run_cli(*extract, "--run", "r3", "--redo-german")
+        self.assertIn("1 messages to translate", out)
+        self.assertIn("1 of them sent again because they still read German", out)
+        check = ("check", "--state", str(self.state), "--run", "r3", "--batch", "001")
+        same = json.dumps({"messages": [{"hash": sha, "message": german}]})
+        self.assertIn("subject not translated", self.run_cli(*check, stdin=same))
+        good = json.dumps({"messages": [{"hash": sha, "message": german.replace(
+            "Speichern bricht ab, weil die Datei fehlt", "saving aborts because the file is missing")}]})
+        self.assertIn("1 accepted, 0 rejected", self.run_cli(*check, stdin=good))
+        self.assertIn("0 messages to translate", self.run_cli(*extract, "--run", "r4", "--redo-german"))
 
     def test_probe_keeps_the_map_untouched(self):
         self.run_cli("extract", "--repo", self.repo, "--state", str(self.state), "--run", "p", "--sample", "1")
