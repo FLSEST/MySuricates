@@ -165,15 +165,19 @@ daemon:
 |---|---|---|
 | Directly on the machine (dev from source, installer with "One instance — on this machine") | yes, once Docker runs | Docker installed; the instance's user may use it (group `docker`) |
 | `scripts/instance.sh`, Stable, Test, dev container | only with the switch | `…DOCKER_SOCKET=1` (table above), then restart |
-| Tryout | never | — the quick start deliberately gets no socket |
+| Tryout | never | — a socket would not help here: the projects live on the volume `mysuricates-tryout-data`, and the path `/app/data/…` is unknown to the machine's Docker that starts the block (TODO 72a06c0f) |
 
 In the container instances the project folders are mounted under the same path as on the machine; with
-the socket, container blocks therefore work there as they do on the machine.
+the socket, container blocks therefore work there as they do on the machine. The tryout lacks exactly
+that: a container block mounts its project path with `docker run -v <path>:/workspace`, and the Docker
+daemon on the machine resolves that path. With the socket the block would get an empty `/workspace`, and
+Docker would create `/app/data/…` as root on the machine.
 
 **How the instance reports it.** If it reaches no Docker daemon, it says so in three places and, in a
 container instance, names the switch and the file it is set in (`MYSURICATES_SWITCH_PREFIX` and
 `MYSURICATES_SWITCH_SOURCE` from `scripts/lib/host-mounts.sh`; without them it recognises the container by
-`/.dockerenv`):
+`/.dockerenv`; the tryout image sets `MYSURICATES_RUNTIME=tryout` and names the reason above instead of
+a switch):
 
 - **Run:** a container block fails right away with exit code 125 and this explanation, instead of the
   raw connection message of `docker run` (`ContainerShellService`, TODO 0ad8853b).
@@ -230,7 +234,8 @@ stays) and `start`. `MYSURICATES_APT_REFRESH=$(date +%Y-%m) scripts/tryout.sh bu
 NodeSource and Docker repos afresh instead of from the layer cache — and with them the AI CLIs.
 
 The container mounts nothing from the machine (no project folder, no Docker socket, no login) — a
-shell block or `--dangerously-skip-permissions` only affects the container. The instance name
+shell block or `--dangerously-skip-permissions` only affects the container. That is why no container
+blocks run there ([Where container blocks run](#ai-providers-in-the-container)). The instance name
 `tryout` is reserved in `instance.sh` so containers and volumes never overlap. A registry image is
 a separate step (4c992a25). Tests without Docker: `bash scripts/tests/test-tryout.sh`.
 

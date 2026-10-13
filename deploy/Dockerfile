@@ -130,4 +130,5 @@ ENV JAVA_HOME=/opt/java/jdk \
     HOST_HOME=/app/data/home \
     AUTOMATION_MODULES_PRESET=research \
     AUTOMATION_ENVIRONMENT=Tryout \
+    MYSURICATES_RUNTIME=tryout \
     DISABLE_AUTOUPDATER=1

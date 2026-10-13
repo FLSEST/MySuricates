@@ -165,15 +165,19 @@ Docker-Daemon erreicht:
 |---|---|---|
 | Direkt auf dem Rechner (Dev aus dem Quellcode, Installer mit „Eine Instanz — auf diesem Rechner“) | ja, sobald Docker läuft | Docker installiert; der Benutzer der Instanz darf es nutzen (Gruppe `docker`) |
 | `scripts/instance.sh`, Stable, Test, Dev-Container | nur mit Schalter | `…DOCKER_SOCKET=1` (Tabelle oben), dann neu starten |
-| Tryout | nie | — der Schnellstart bekommt bewusst keinen Socket |
+| Tryout | nie | — ein Socket hülfe hier nicht: Die Projekte liegen auf dem Volume `mysuricates-tryout-data`, und den Pfad `/app/data/…` kennt der Docker des Rechners nicht, der den Block startet (TODO 72a06c0f) |
 
 Die Projektordner sind in den Container-Instanzen unter demselben Pfad eingebunden wie auf dem
-Rechner; mit Socket funktionieren Container-Blöcke dort also wie auf dem Rechner.
+Rechner; mit Socket funktionieren Container-Blöcke dort also wie auf dem Rechner. Im Tryout fehlt genau
+das: Ein Container-Block bindet seinen Projektpfad mit `docker run -v <pfad>:/workspace` ein, und
+diesen Pfad löst der Docker-Daemon auf dem Rechner auf. Mit Socket bekäme der Block ein leeres
+`/workspace`, und Docker legte `/app/data/…` als root auf dem Rechner an.
 
 **Wie die Instanz es meldet.** Erreicht sie keinen Docker-Daemon, sagt sie das an drei Stellen und
 nennt in einer Container-Instanz den Schalter und die Datei, in der er steht (`MYSURICATES_SWITCH_PREFIX`
 und `MYSURICATES_SWITCH_SOURCE` aus `scripts/lib/host-mounts.sh`; ohne sie erkennt sie den Container an
-`/.dockerenv`):
+`/.dockerenv`; das Tryout-Image setzt `MYSURICATES_RUNTIME=tryout` und nennt statt eines Schalters den
+Grund oben):
 
 - **Lauf:** Ein Container-Block scheitert sofort mit Exit-Code 125 und dieser Erklärung, statt mit der
   rohen Verbindungsmeldung von `docker run` (`ContainerShellService`, TODO 0ad8853b).
@@ -232,7 +236,8 @@ wird `mysuricates:<version>-tryout` und `mysuricates:tryout` (zuletzt gebaut), m
 holt NodeSource- und Docker-Repo frisch statt aus dem Schichten-Cache — und damit auch die KI-CLIs.
 
 Der Container bindet nichts vom Rechner ein (kein Projektordner, kein Docker-Socket, keine
-Anmeldung) — ein Shell-Block oder `--dangerously-skip-permissions` wirkt nur im Container. Der
+Anmeldung) — ein Shell-Block oder `--dangerously-skip-permissions` wirkt nur im Container. Deshalb
+laufen dort keine Container-Blöcke ([Wo Container-Blöcke laufen](#ki-anbieter-im-container)). Der
 Instanzname `tryout` ist für `instance.sh` reserviert, damit sich Container und Volumes nicht
 überschneiden. Ein Registry-Image ist ein eigener Schritt (4c992a25). Tests ohne Docker:
 `bash scripts/tests/test-tryout.sh`.

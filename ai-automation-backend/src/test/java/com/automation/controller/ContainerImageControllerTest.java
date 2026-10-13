@@ -54,7 +54,7 @@ class ContainerImageControllerTest {
                 Status.OUTDATED, "2026-09-23T08:00:00Z", true, "scripts/build-agent-images.sh agent-devops",
                 List.of(new ContainerImageUsage.WorkflowUse("w1", "Security", "trivy", ContainerImageUsage.Mode.TOOL)),
                 List.of());
-        when(overviewService.overview()).thenReturn(new Overview("CONNECTED", false, List.of(devops), false, null, null));
+        when(overviewService.overview()).thenReturn(new Overview("CONNECTED", false, List.of(devops), false, null, null, false));
 
         mockMvc.perform(get("/api/v1/container-images"))
                 .andExpect(status().isOk())

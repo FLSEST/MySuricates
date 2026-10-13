@@ -55,9 +55,10 @@ public class ContainerImageOverviewService {
      * {@code docker}: CONNECTED, UNAVAILABLE or NOT_CONFIGURED, as in the system health. {@code inContainer},
      * {@code socketSwitch} and {@code switchSource} let the page say why Docker is missing in an instance that
      * itself runs in a container and which switch mounts the socket (TODO 0ad8853b); both strings may be null.
+     * {@code tryout}: the tryout image, which has no switch because a socket would not help there (TODO 29d6a133).
      */
     public record Overview(String docker, boolean allowlistActive, List<ImageView> images, boolean inContainer,
-                           String socketSwitch, String switchSource) {}
+                           String socketSwitch, String switchSource, boolean tryout) {}
 
     static final String BUILD_SCRIPT = "scripts/build-agent-images.sh";
 
@@ -88,7 +89,7 @@ public class ContainerImageOverviewService {
                     allowlist.isAllowed(reference), null, workflows, List.of()));
         });
         return new Overview(docker, !allowlist.getEntries().isEmpty(), images, access.inContainer(),
-                access.socketSwitch(), access.switchSource());
+                access.socketSwitch(), access.switchSource(), access.tryout());
     }
 
     private record State(Status status, String builtAt) {}

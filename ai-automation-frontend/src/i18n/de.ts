@@ -2400,6 +2400,7 @@ export const de: TranslationKeys = {
     socketSwitch: 'Einschalten in der Startkonfiguration der Instanz, dann neu starten:',
     socketRestart: 'Dafür die Instanz mit eingebundenem Socket neu starten.',
     socketSwitchLabel: 'Schalter',
+    dockerTryout: 'Das Tryout bindet nichts vom Rechner ein, auch keinen Docker-Socket. Deshalb lässt sich kein Image prüfen, und Shell-Blöcke mit container_image scheitern: Die Projekte liegen auf einem Docker-Volume, das ein Container-Block nicht einbinden kann. Für Container-Blöcke MySuricates direkt auf dem Rechner einrichten (scripts/setup.sh) oder scripts/instance.sh mit MYSURICATES_DOCKER_SOCKET=1 nutzen.',
     staleSummary: '{count} mitgelieferte(s) Image(s) passen nicht zu dieser Version. Auf dem Host neu bauen:',
     rebuildAll: 'Alle Agent-Images neu bauen',
     rebuild: 'Dieses Image neu bauen',

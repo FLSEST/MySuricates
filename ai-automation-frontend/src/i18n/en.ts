@@ -2403,6 +2403,7 @@ export const en = {
     socketSwitch: 'Switch it on in the instance\'s startup configuration, then restart it:',
     socketRestart: 'To use them, restart the instance with the socket mounted.',
     socketSwitchLabel: 'Switch',
+    dockerTryout: 'The tryout mounts nothing from the host, no Docker socket either. So no image can be checked, and shell blocks with container_image fail: the projects live on a Docker volume that a container block cannot mount. For container blocks, set MySuricates up directly on the machine (scripts/setup.sh) or use scripts/instance.sh with MYSURICATES_DOCKER_SOCKET=1.',
     staleSummary: '{count} shipped image(s) do not match this version. Rebuild them on the host:',
     rebuildAll: 'Rebuild all agent images',
     rebuild: 'Rebuild this image',

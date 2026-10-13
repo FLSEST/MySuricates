@@ -44,6 +44,8 @@ export interface ContainerImagesOverview {
   socketSwitch: string | null;
   /** Where that switch is set, e.g. the staging.env path; null when unknown. */
   switchSource: string | null;
+  /** The tryout image: no switch, because its projects live on a volume the host's Docker cannot mount. Missing before v0.7.8. */
+  tryout?: boolean;
 }
 
 /** Container images workflows can run in, with build state and usage (TODO 244e5de5). */

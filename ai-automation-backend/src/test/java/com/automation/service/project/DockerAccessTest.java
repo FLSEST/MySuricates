@@ -46,13 +46,39 @@ class DockerAccessTest {
     }
 
     @Test
-    @DisplayName("tryout and deploy/ set no runtime variable, the marker file tells it is a container")
+    @DisplayName("deploy/ sets no runtime variable, the marker file tells it is a container")
     void containerByMarkerFile() {
         DockerAccess.Status status = access(DockerExpectation.State.NOT_CONFIGURED, Map.of(), true).status();
 
         assertThat(status.inContainer()).isTrue();
         assertThat(status.socketSwitch()).isNull();
         assertThat(status.hintEn()).contains("restarted with the socket mounted").doesNotContain("install");
+    }
+
+    @Test
+    @DisplayName("the tryout names the real reason instead of a switch, even if switch variables leak in")
+    void tryoutHasNoSwitch() {
+        DockerAccess.Status status = access(DockerExpectation.State.NOT_CONFIGURED, Map.of(
+                "MYSURICATES_RUNTIME", "tryout",
+                "MYSURICATES_SWITCH_PREFIX", "TEST_",
+                "MYSURICATES_SWITCH_SOURCE", "/somewhere/staging.env"), false).status();
+
+        assertThat(status.inContainer()).isTrue();
+        assertThat(status.tryout()).isTrue();
+        assertThat(status.socketSwitch()).isNull();
+        assertThat(status.switchSource()).isNull();
+        assertThat(status.hintEn()).contains("Docker volume").contains("scripts/instance.sh")
+                .doesNotContain("restarted with the socket");
+        assertThat(status.hint()).contains("Docker-Volume").contains("scripts/setup.sh");
+    }
+
+    @Test
+    @DisplayName("a responding Docker in the tryout needs no hint either")
+    void tryoutReachable() {
+        DockerAccess.Status status = access(DockerExpectation.State.UP,
+                Map.of("MYSURICATES_RUNTIME", "tryout"), true).status();
+
+        assertThat(status.hint()).isEmpty();
     }
 
     @Test

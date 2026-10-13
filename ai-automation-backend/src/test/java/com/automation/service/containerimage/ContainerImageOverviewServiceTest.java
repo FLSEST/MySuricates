@@ -108,6 +108,19 @@ class ContainerImageOverviewServiceTest {
         assertThat(overview.inContainer()).isTrue();
         assertThat(overview.socketSwitch()).isEqualTo("TEST_DOCKER_SOCKET");
         assertThat(overview.switchSource()).isEqualTo("/home/user/.config/mysuricates/staging.env");
+        assertThat(overview.tryout()).isFalse();
+    }
+
+    @Test
+    void theTryoutIsReportedWithoutASwitch() {
+        when(docker.status()).thenReturn(new DockerAccess.Status(DockerExpectation.State.NOT_CONFIGURED, true,
+                null, null, true));
+
+        Overview overview = service.overview();
+
+        assertThat(overview.inContainer()).isTrue();
+        assertThat(overview.tryout()).isTrue();
+        assertThat(overview.socketSwitch()).isNull();
     }
 
     @Test

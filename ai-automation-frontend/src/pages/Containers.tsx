@@ -84,6 +84,13 @@ function DockerMissing({ overview }: { overview: ContainerImagesOverview }) {
       </p>
     );
   }
+  if (overview.tryout) {
+    return (
+      <p className="rounded-lg border border-warning/30 bg-warning-subtle px-4 py-3 text-sm text-warning">
+        {t.containers.dockerTryout}
+      </p>
+    );
+  }
   return (
     <div className="rounded-lg border border-warning/30 bg-warning-subtle px-4 py-3 space-y-2">
       <p className="text-sm text-warning">{t.containers.dockerInContainer}</p>

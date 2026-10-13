@@ -154,6 +154,22 @@ describe('Containers', () => {
     expect(await screen.findByText('To use them, restart the instance with the socket mounted.')).toBeInTheDocument();
   });
 
+  it('gives the tryout its own reason instead of a switch', async () => {
+    server.use(http.get('/api/v1/container-images', () => HttpResponse.json({
+      ...overview,
+      docker: 'NOT_CONFIGURED',
+      inContainer: true,
+      tryout: true,
+      images: overview.images.map((image) => ({ ...image, status: 'UNKNOWN', builtAt: null })),
+    })));
+
+    renderWithProviders(<Containers />);
+
+    expect(await screen.findByText(/The tryout mounts nothing from the host/)).toBeInTheDocument();
+    expect(screen.queryByText(/restart the instance with the socket mounted/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/secure default/)).not.toBeInTheDocument();
+  });
+
   it('uses the German purpose and labels in German', async () => {
     useI18nStore.setState({ locale: 'de' });
     server.use(http.get('/api/v1/container-images', () => HttpResponse.json(overview)));

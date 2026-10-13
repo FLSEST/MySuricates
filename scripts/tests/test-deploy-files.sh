@@ -34,6 +34,7 @@ check "tryout pins pi like the installer catalog (c3a4cbf6)" 'grep -qx "ARG PI_V
 check "tryout brings pip/venv, JDK, Maven"     'grep -q "python3-venv" "$DF" && grep -q "JAVA_HOME=/opt/java/jdk" "$DF" && grep -q "/usr/local/bin/mvn" "$DF"'
 check "tryout home lives on the data volume"   'grep -q "HOST_HOME=/app/data/home" "$DF" && grep -q "TRYOUT_HOME=\"/app/data/home\"" "$R/scripts/tryout.sh"'
 check "tryout names itself in the UI"          'grep -q "AUTOMATION_ENVIRONMENT=Tryout" "$DF"'
+check "tryout tells the backend it has no socket switch (29d6a133)" 'grep -q "MYSURICATES_RUNTIME=tryout" "$DF"'
 check "no host mounts in the tryout"           '! grep -q "docker.sock\|/seed/\|\$HOME:" "$R/scripts/tryout.sh"'
 
 echo "3) entrypoint"
