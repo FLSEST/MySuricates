@@ -14,10 +14,10 @@
     "saas-factory",
     "feature"
   ],
-  "version": "1.1.0",
+  "version": "1.2.0",
   "author": "MySuricates",
   "model": null,
-  "instructions": "Arbeitet die geplanten Features in Reihenfolge ab, je Feature ein eigener Lauf von saas-feature-implement. Nach drei fehlgeschlagenen Features in Folge hört die Schleife auf (max_consecutive_failures) – TodoTrigger nimmt dann manuelle Auflösung an.",
+  "instructions": "Works through the planned features in order, one separate run of saas-feature-implement per feature. After three failed features in a row the loop stops (max_consecutive_failures) – the TodoTrigger then assumes manual resolution.",
   "defaultContext": {
     "feature_order_json": "",
     "slug": "",
@@ -42,5 +42,5 @@
       "requiredCapabilities": []
     }
   ],
-  "integrity": "sha256:81ae8eeaaf2d324e5364fce425e67963e5a6c6ef9d0a5d1a167e8d68dc04bf5f"
+  "integrity": "sha256:b25fa35d76c39f2a7913454f7f172caf587a3d900f2390aa2fb43247922f0c85"
 }

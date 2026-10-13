@@ -18,13 +18,13 @@
     "frontend"
   ],
   "model": "opus",
-  "instructions": "Du arbeitest an den i18n-Dateien des MySuricates-Frontends. de.ts ist die primaere Sprache, en.ts die Uebersetzung. Beide muessen exakt die gleiche Key-Struktur haben. Aenderungen muessen TypeScript-kompatibel sein (export default Objekt-Literal).\n\nRun-Isolation: Arbeite ausschliesslich in {{ execution_path }}. Der Originalpfad {{ project_path }} identifiziert das Projekt und darf nicht beschrieben werden. Keine automatischen Merges, Pushes oder Wechsel auf main/master. Aenderungen bleiben auf dem Run-Branch zur expliziten Uebernahme. Bei einem fehlgeschlagenen technischen Check darf ein Report keinen Erfolg behaupten. Gepruefter Commit: {{ workspace_source_sha }}; Logs: {{ workspace_logs }}.",
+  "instructions": "You work on the i18n files of the MySuricates frontend. de.ts is the primary language, en.ts the translation. Both must have exactly the same key structure. Changes must be TypeScript-compatible (export default object literal).\n\nRun isolation: work only in {{ execution_path }}. The original path {{ project_path }} identifies the project and must not be written to. No automatic merges, pushes or switches to main/master. Changes stay on the run branch for explicit adoption. If a technical check failed, a report must not claim success. Checked commit: {{ workspace_source_sha }}; logs: {{ workspace_logs }}.",
   "blocks": [
     {
       "type": "shell",
       "config": {
-        "label": "i18n Keys extrahieren und vergleichen",
-        "command": "DE_FILE={{ execution_path }}/ai-automation-frontend/src/i18n/de.ts\nEN_FILE={{ execution_path }}/ai-automation-frontend/src/i18n/en.ts\n\necho '=== Dateigroessen ==='\nwc -l \"$DE_FILE\" \"$EN_FILE\"\n\necho ''\necho '=== Top-Level Keys DE ==='\ngrep -E '^  [a-zA-Z_]+:' \"$DE_FILE\" | sed 's/:.*//' | tr -d ' ' | sort > {{ workspace_logs }}/de_keys.txt\ncat {{ workspace_logs }}/de_keys.txt\n\necho ''\necho '=== Top-Level Keys EN ==='\ngrep -E '^  [a-zA-Z_]+:' \"$EN_FILE\" | sed 's/:.*//' | tr -d ' ' | sort > {{ workspace_logs }}/en_keys.txt\ncat {{ workspace_logs }}/en_keys.txt\n\necho ''\necho '=== Keys nur in DE (fehlen in EN) ==='\ncomm -23 {{ workspace_logs }}/de_keys.txt {{ workspace_logs }}/en_keys.txt\n\necho ''\necho '=== Keys nur in EN (fehlen in DE) ==='\ncomm -13 {{ workspace_logs }}/de_keys.txt {{ workspace_logs }}/en_keys.txt\n\necho ''\necho '=== Verschachtelte Key-Anzahl pro Top-Level ==='\nfor key in $(cat {{ workspace_logs }}/de_keys.txt); do\n  DE_COUNT=$(grep -c \"^    \" \"$DE_FILE\" 2>/dev/null | head -1 || echo '?')\n  echo \"$key: DE hat Top-Level-Key\"\ndone\n\necho ''\necho '=== Gesamtstatistik ==='\nDE_TOTAL=$(grep -cE '^    [a-zA-Z_]+:' \"$DE_FILE\"); DE_TOTAL=${DE_TOTAL:-0}\nEN_TOTAL=$(grep -cE '^    [a-zA-Z_]+:' \"$EN_FILE\"); EN_TOTAL=${EN_TOTAL:-0}\necho \"DE nested keys: $DE_TOTAL\"\necho \"EN nested keys: $EN_TOTAL\"\necho \"Differenz: $((DE_TOTAL - EN_TOTAL))\"",
+        "label": "Extract and compare i18n keys",
+        "command": "DE_FILE={{ execution_path }}/ai-automation-frontend/src/i18n/de.ts\nEN_FILE={{ execution_path }}/ai-automation-frontend/src/i18n/en.ts\n\necho '=== File sizes ==='\nwc -l \"$DE_FILE\" \"$EN_FILE\"\n\necho ''\necho '=== Top-level keys DE ==='\ngrep -E '^  [a-zA-Z_]+:' \"$DE_FILE\" | sed 's/:.*//' | tr -d ' ' | sort > {{ workspace_logs }}/de_keys.txt\ncat {{ workspace_logs }}/de_keys.txt\n\necho ''\necho '=== Top-level keys EN ==='\ngrep -E '^  [a-zA-Z_]+:' \"$EN_FILE\" | sed 's/:.*//' | tr -d ' ' | sort > {{ workspace_logs }}/en_keys.txt\ncat {{ workspace_logs }}/en_keys.txt\n\necho ''\necho '=== Keys only in DE (missing in EN) ==='\ncomm -23 {{ workspace_logs }}/de_keys.txt {{ workspace_logs }}/en_keys.txt\n\necho ''\necho '=== Keys only in EN (missing in DE) ==='\ncomm -13 {{ workspace_logs }}/de_keys.txt {{ workspace_logs }}/en_keys.txt\n\necho ''\necho '=== Nested key count per top level ==='\nfor key in $(cat {{ workspace_logs }}/de_keys.txt); do\n  DE_COUNT=$(grep -c \"^    \" \"$DE_FILE\" 2>/dev/null | head -1 || echo '?')\n  echo \"$key: DE has a top-level key\"\ndone\n\necho ''\necho '=== Overall statistics ==='\nDE_TOTAL=$(grep -cE '^    [a-zA-Z_]+:' \"$DE_FILE\"); DE_TOTAL=${DE_TOTAL:-0}\nEN_TOTAL=$(grep -cE '^    [a-zA-Z_]+:' \"$EN_FILE\"); EN_TOTAL=${EN_TOTAL:-0}\necho \"DE nested keys: $DE_TOTAL\"\necho \"EN nested keys: $EN_TOTAL\"\necho \"Difference: $((DE_TOTAL - EN_TOTAL))\"",
         "timeout_seconds": 30,
         "on_failure": "continue",
         "workspace": {
@@ -38,14 +38,14 @@
     {
       "type": "agentic",
       "config": {
-        "goal": "Synchronisiere die i18n-Dateien von MySuricates.\n\nDATEIEN:\n- DE (primaer): {{ execution_path }}/ai-automation-frontend/src/i18n/de.ts\n- EN (Uebersetzung): {{ execution_path }}/ai-automation-frontend/src/i18n/en.ts\n\nVORGEHEN:\n1. Lies beide Dateien vollstaendig\n2. Vergleiche die Key-Struktur (Top-Level UND verschachtelte Keys)\n3. Fuer jeden Key der in DE existiert aber nicht in EN:\n   - Uebersetze den deutschen Wert ins Englische\n   - Fuege den Key an der gleichen Position in en.ts ein\n4. Fuer jeden Key der in EN existiert aber nicht in DE:\n   - Uebersetze den englischen Wert ins Deutsche\n   - Fuege den Key an der gleichen Position in de.ts ein\n5. Schreibe die aktualisierten Dateien\n\nWICHTIG:\n- Beide Dateien sind TypeScript: `export default { ... } as const;` oder aehnliches Format\n- Behalte die bestehende Formatierung und Reihenfolge bei\n- Absolute Pfade verwenden: {{ execution_path }}/ai-automation-frontend/src/i18n/de.ts\n- Nur fehlende Keys ergaenzen, bestehende Uebersetzungen NICHT aendern\n- Bei verschachtelten Objekten die komplette Struktur synchronisieren",
+        "goal": "Synchronize the i18n files of MySuricates.\n\nFILES:\n- DE (primary): {{ execution_path }}/ai-automation-frontend/src/i18n/de.ts\n- EN (translation): {{ execution_path }}/ai-automation-frontend/src/i18n/en.ts\n\nPROCEDURE:\n1. Read both files completely\n2. Compare the key structure (top-level AND nested keys)\n3. For every key that exists in DE but not in EN:\n   - Translate the German value into English\n   - Insert the key at the same position in en.ts\n4. For every key that exists in EN but not in DE:\n   - Translate the English value into German\n   - Insert the key at the same position in de.ts\n5. Write the updated files\n\nIMPORTANT:\n- Both files are TypeScript: `export default { ... } as const;` or a similar format\n- Keep the existing formatting and order\n- Use absolute paths: {{ execution_path }}/ai-automation-frontend/src/i18n/de.ts\n- Only add missing keys, do NOT change existing translations\n- For nested objects, synchronize the complete structure",
         "max_iterations": 15,
         "max_total_tokens": 200000,
         "iteration_timeout_seconds": 120,
         "total_timeout_seconds": 900,
         "max_repeated_actions": 3,
         "require_approval": false,
-        "success_criteria": "Beide i18n-Dateien haben exakt die gleiche Key-Struktur. Kein Key fehlt in einer der beiden Dateien."
+        "success_criteria": "Both i18n files have exactly the same key structure. No key is missing in either file."
       }
     },
     {
@@ -63,22 +63,22 @@
     {
       "type": "simple",
       "config": {
-        "label": "Ergebnis erklären",
+        "label": "Explain the result",
         "timeout_seconds": 120,
-        "command": "Fasse das i18n-Sync-Ergebnis in maximal 5 Zeilen zusammen:\n\n{{ previous_output }}\n\n- Wurden Keys ergaenzt? Wenn ja, wie viele und in welcher Datei?\n- Build-Ergebnis\n- Zeilen-Differenz zwischen de.ts und en.ts\n\nAm Ende GENAU diese Zeile:\ngate_status: GREEN wenn Build OK und Differenz < 5, YELLOW wenn Differenz > 5, RED wenn Build fehlgeschlagen"
+        "command": "Summarize the i18n sync result in at most 5 lines:\n\n{{ previous_output }}\n\n- Were keys added? If so, how many and in which file?\n- Build result\n- Line difference between de.ts and en.ts\n\nAt the end, EXACTLY this line:\ngate_status: GREEN if the build is OK and the difference < 5, YELLOW if the difference > 5, RED if the build failed"
       }
     },
     {
       "type": "shell",
       "config": {
         "label": "Gate-Verdict",
-        "command": "PREV={{ previous_output }}\n\nif echo \"$PREV\" | grep -qi 'gate_status: RED'; then\n  echo 'i18n Sync: FAILED'\n  echo 'gate_status: RED'\n  echo 'gate_category: i18n-sync'\n  echo 'gate_description: i18n-Sync fehlgeschlagen'\nelif echo \"$PREV\" | grep -qi 'gate_status: YELLOW'; then\n  echo 'i18n Sync: Differenz vorhanden'\n  echo 'gate_status: YELLOW'\n  echo 'gate_category: i18n-sync'\n  echo 'gate_description: i18n-Dateien haben groessere Differenz'\nelif echo \"$PREV\" | grep -qi 'gate_status: GREEN'; then\n  echo 'i18n Sync: OK'\n  echo 'gate_status: GREEN'\n  echo 'gate_category: i18n-sync'\n  echo 'gate_description: i18n-Dateien synchron'\nelse\n  echo 'i18n Sync: UNVOLLSTAENDIG'\n  echo 'gate_status: YELLOW'\n  echo 'gate_category: i18n-sync'\n  echo 'gate_description: Ergebnis unvollstaendig — kein Gate-Status im Report (KI-Block fehlgeschlagen oder unklar)'\nfi",
+        "command": "PREV={{ previous_output }}\n\nif echo \"$PREV\" | grep -qi 'gate_status: RED'; then\n  echo 'i18n Sync: FAILED'\n  echo 'gate_status: RED'\n  echo 'gate_category: i18n-sync'\n  echo 'gate_description: i18n sync failed'\nelif echo \"$PREV\" | grep -qi 'gate_status: YELLOW'; then\n  echo 'i18n Sync: difference found'\n  echo 'gate_status: YELLOW'\n  echo 'gate_category: i18n-sync'\n  echo 'gate_description: i18n files have a larger difference'\nelif echo \"$PREV\" | grep -qi 'gate_status: GREEN'; then\n  echo 'i18n Sync: OK'\n  echo 'gate_status: GREEN'\n  echo 'gate_category: i18n-sync'\n  echo 'gate_description: i18n files in sync'\nelse\n  echo 'i18n Sync: INCOMPLETE'\n  echo 'gate_status: YELLOW'\n  echo 'gate_category: i18n-sync'\n  echo 'gate_description: Result incomplete — no gate status in the report (AI block failed or unclear)'\nfi",
         "timeout_seconds": 10,
         "shell_escape_variables": true
       }
     }
   ],
-  "version": "1.1.1",
+  "version": "1.2.0",
   "author": "MySuricates",
   "metadata": {
     "workspace": {
@@ -88,5 +88,5 @@
       "branch": true
     }
   },
-  "integrity": "sha256:5d17c6b3a0a124ac522e366722d0f7663aadeabc5305fa447edcbbc14dcc3523"
+  "integrity": "sha256:111910e81e6b6d54f3cddef35ad4fdd6024e3424cfbb2686d1326c15d0c5e004"
 }

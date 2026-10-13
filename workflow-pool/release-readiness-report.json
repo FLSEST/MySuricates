@@ -15,13 +15,13 @@
     {
       "type": "simple",
       "config": {
-        "label": "Release-Bericht erstellen",
-        "command": "Erstelle einen strukturierten Release-Readiness-Bericht aus den folgenden Quality-Gate-Ergebnissen:\n\n{{ previous_chain_output }}\n\nFormat (Markdown):\n\n## Release Readiness: [FREIGEGEBEN / BLOCKIERT / MIT VORBEHALT]\n\n| Produkt | Status | Details |\n|---------|--------|---------|\n| Hunt-Daten | ... | ... |\n| Flutter App | ... | ... |\n| Website | ... | ... |\n| Backend | ... | ... |\n\n## Zusammenfassung\nKurze Bewertung in 2-3 Sätzen.\n\n## Nächste Schritte\n- Konkrete Handlungsempfehlungen basierend auf den Gate-Ergebnissen\n\nVerwende die gate_status-Werte aus den Outputs: GREEN = ✅, YELLOW = ⚠️, RED = ❌.\nWenn kein gate_status gefunden wurde, analysiere den Output selbst.\n\nGesamtstatus:\n- FREIGEGEBEN: Alle Gates GREEN\n- MIT VORBEHALT: Mindestens ein YELLOW, kein RED\n- BLOCKIERT: Mindestens ein RED"
+        "label": "Create the release report",
+        "command": "Create a structured release readiness report from the following quality gate results:\n\n{{ previous_chain_output }}\n\nFormat (Markdown):\n\n## Release Readiness: [APPROVED / BLOCKED / WITH RESERVATIONS]\n\n| Gate | Status | Details |\n|------|--------|---------|\n| <one row per quality gate or product found in the results, named as there> | ... | ... |\n\n## Summary\nShort assessment in 2-3 sentences.\n\n## Next steps\n- Concrete recommendations based on the gate results\n\nUse the gate_status values from the outputs: GREEN = ✅, YELLOW = ⚠️, RED = ❌.\nIf no gate_status was found, analyze the output yourself.\n\nOverall status:\n- APPROVED: all gates GREEN\n- WITH RESERVATIONS: at least one YELLOW, no RED\n- BLOCKED: at least one RED"
       }
     }
   ],
   "model": "opus",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "author": "MySuricates",
-  "integrity": "sha256:01207b6c6f59bd17618836793b4c3dcbcbde91937bec3511b760290e50c4461b"
+  "integrity": "sha256:0869f9031878d4cb7f21acaa3f46a7b4e7307f5ef40a17c66b0258ca18399aa2"
 }

@@ -165,9 +165,10 @@ class AuditRuleKeyCatalogTest {
                                         + value + "' uebersteht die Normalisierung nicht");
                             }
                         }
-                        if (!hasFixed && !rest.contains("subject = Pfad")) {
+                        // "subject = path" in the English prompts (TODO 82f16b41), "subject = Pfad" in German ones
+                        if (!hasFixed && !rest.contains("subject = path") && !rest.contains("subject = Pfad")) {
                             violations.add(variant.label() + ": ruleKey '" + ruleKey
-                                    + "' legt kein subject fest (subject \"<wert>\" oder subject = Pfad …)");
+                                    + "' legt kein subject fest (subject \"<wert>\" oder subject = path …)");
                         }
                     }
                 }
@@ -186,8 +187,8 @@ class AuditRuleKeyCatalogTest {
     @Test
     void catalogFixedSubjectsAreTheOnesThePublicReadinessPromptDemands() throws IOException {
         Pattern entry = Pattern.compile("(?m)^- ruleKey \"([a-z0-9][a-z0-9.\\-]*)\"(.*)$");
-        // subject "a" — or a choice: subject "a" or "b" (then no fixed value).
-        Pattern fixedSubject = Pattern.compile("subject (\"[^\"]*\"(?: oder \"[^\"]*\")*)");
+        // subject "a" — or a choice: subject "a" or "b" (then no fixed value); German prompts write "oder".
+        Pattern fixedSubject = Pattern.compile("subject (\"[^\"]*\"(?: (?:or|oder) \"[^\"]*\")*)");
         Pattern quoted = Pattern.compile("\"([^\"]*)\"");
         List<String> violations = new ArrayList<>();
         Set<String> promptKeys = new LinkedHashSet<>();

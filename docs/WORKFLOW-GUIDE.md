@@ -304,7 +304,7 @@ Füllt das Dashboard-Ergebnis des Runs direkt aus der Config – dieselben Felde
 
 ```json
 { "type": "dashboard-report", "config": { "status": "{{ block.ampel.output }}", "title": "Nightly QA",
-  "kpis": [{ "label": "Hunts", "value": "{{ hunt_count }}", "trend": "UP" }], "summary": "{{ block.analyse.output }}" } }
+  "kpis": [{ "label": "Orders", "value": "{{ order_count }}", "trend": "UP" }], "summary": "{{ block.analyse.output }}" } }
 ```
 
 - Ein zur Laufzeit leerer Platzhalter lässt das Feld entfallen (bei `status` ein Fehler); ein KPI entfällt nur, wenn alle seine Werte leer sind. Ein **unaufgelöster** Platzhalter oder ein Vertragsbruch (zu lang, unbekanntes Feld in einem KPI, Zahl statt String, unsichtbare Zeichen) lässt den Schritt scheitern; die Meldung nennt das Feld, nie den Wert.
@@ -632,9 +632,9 @@ fi
 
 Wenn mehrere Blöcke Gates emittieren, gewinnt der höchste Schweregrad (RED > YELLOW > GREEN). Bei Gleichstand gilt für RED und YELLOW das erste Gate – die Ursache, nach deren Kategorie auch das Auto-TODO heißt –, für GREEN das letzte, also das abschließende Urteil statt des `Command exit 0` eines `checked_command` davor – es sei denn, es sagt weniger: Das synthetische `Command exit N` verdrängt nie eine Beschreibung mit eigenen Worten, auch nicht hinter dem Urteil, und ein GREEN ohne `gate_description` keines mit. Fehlt dem späteren die `gate_category`, bleibt die bisherige (TODO 2aa9ddd5).
 
-**Gate-Verdict nach KI-Blöcken: Fallback nie GREEN.** Ein Shell-Block, der den `gate_status` aus dem Output eines Simple-/Agentic-Blocks parst, darf im `else`-Zweig nicht GREEN melden — sonst wird ein leerer, abgebrochener oder als `UNKNOWN` markierter KI-Report zum grünen Gate (gesehen 2026-09-13, Security-Audit ohne Codezugriff). Muster: RED → RED, YELLOW → YELLOW, explizites GREEN → GREEN, sonst YELLOW mit `gate_description: Ergebnis unvollständig — kein Gate-Status im Report`. Deterministische Build-Gates (Exit-Code entscheidet) dürfen weiter `else → GREEN` nutzen.
+**Gate-Verdict nach KI-Blöcken: Fallback nie GREEN.** Ein Shell-Block, der den `gate_status` aus dem Output eines Simple-/Agentic-Blocks parst, darf im `else`-Zweig nicht GREEN melden — sonst wird ein leerer, abgebrochener oder als `UNKNOWN` markierter KI-Report zum grünen Gate (gesehen 2026-09-13, Security-Audit ohne Codezugriff). Muster: RED → RED, YELLOW → YELLOW, explizites GREEN → GREEN, sonst YELLOW mit `gate_description: result incomplete — no gate_status line in the report (AI block failed or unclear)`. Deterministische Build-Gates (Exit-Code entscheidet) dürfen weiter `else → GREEN` nutzen.
 
-**Das Gate liest den Report-Block selbst, nicht dessen Zusammenfassung.** Folgt auf den Report noch ein KI-Block, der ihn kurz zusammenfasst, dann parst das Gate `{{ block.report.output }}` und nimmt dort die letzte `gate_status:`-Zeile, nicht `{{ previous_output }}`. Gültig ist nur eine Zeile mit genau einem Urteilswort nach dem Doppelpunkt, davor und dahinter höchstens Markdown (`*`, `_`, `` ` ``) und Leerraum: Gibt das Modell die Schablonenzeile „gate_status: GREEN wenn …, YELLOW wenn …“ unverändert zurück, zählt sie nicht – sonst entschiede ihr erstes Wort. Ohne gültige Zeile greift der Fallback YELLOW. Zwei Audits liefen 2026-09 in den Fallback UNVOLLSTÄNDIG, weil die Zusammenfassung „7,1/10 (YELLOW)“ statt einer `gate_status:`-Zeile schrieb (TODO 68dbfa19 „Audit-Workflows optimieren“). Die Zusammenfassung selbst gibt dann keine `gate_`-Zeilen aus: `gate_summary` wertet die Gate-Zeilen **jedes** Steps aus, eine zweite Zeile wäre ein zweiter Gate-Eintrag. Die Plattform-Audits verzichten seitdem ganz auf so eine Zusammenfassung: Ihre Ausgabe las kein Block, und genau das meldet der Analyzer als `unwired-output`.
+**Das Gate liest den Report-Block selbst, nicht dessen Zusammenfassung.** Folgt auf den Report noch ein KI-Block, der ihn kurz zusammenfasst, dann parst das Gate `{{ block.report.output }}` und nimmt dort die letzte `gate_status:`-Zeile, nicht `{{ previous_output }}`. Gültig ist nur eine Zeile mit genau einem Urteilswort nach dem Doppelpunkt, davor und dahinter höchstens Markdown (`*`, `_`, `` ` ``) und Leerraum: Gibt das Modell die Schablonenzeile „gate_status: GREEN if …, YELLOW if …“ unverändert zurück, zählt sie nicht – sonst entschiede ihr erstes Wort. Ohne gültige Zeile greift der Fallback YELLOW. Zwei Audits liefen 2026-09 in den Fallback (heute `INCOMPLETE`, damals `UNVOLLSTÄNDIG`), weil die Zusammenfassung „7,1/10 (YELLOW)“ statt einer `gate_status:`-Zeile schrieb (TODO 68dbfa19 „Audit-Workflows optimieren“). Die Zusammenfassung selbst gibt dann keine `gate_`-Zeilen aus: `gate_summary` wertet die Gate-Zeilen **jedes** Steps aus, eine zweite Zeile wäre ein zweiter Gate-Eintrag. Die Plattform-Audits verzichten seitdem ganz auf so eine Zusammenfassung: Ihre Ausgabe las kein Block, und genau das meldet der Analyzer als `unwired-output`.
 
 **`run.metadata.gate_summary`** aggregiert zusätzlich alle geparsten Gates des Runs:
 
@@ -692,8 +692,8 @@ Ein Workflow kann sein Dashboard-Ergebnis auch als Markerzeile in einer Blockaus
 
 ```
 dashboard_widget: {"title": "Nightly QA", "status": "YELLOW",
-  "kpis": [{"label": "Hunts", "value": "1361", "trend": "UP"}],
-  "items": ["3 Hunts ohne Route"], "summary": "Zwei Befunde."}
+  "kpis": [{"label": "Orders", "value": "1361", "trend": "UP"}],
+  "items": ["3 Bestellungen ohne Versanddatum"], "summary": "Zwei Befunde."}
 ```
 
 - Felder und Grenzen wie beim `dashboard-report`-Block ([Block-Referenz](block-referenz.md#dashboard-report)): `status` ist Pflicht (`GREEN`, `YELLOW`, `RED`), KPI-`label` und -`value` je ≤ 40 Zeichen, `value` ist ein **String**, `trend` `UP`/`DOWN`/`FLAT`. Ein unbekanntes Feld – auch in einem KPI-Objekt – lehnt den ganzen Vertrag ab, ebenso ein leerer, zu langer oder nicht einzeiliger Text (Steuer-, Zero-Width-, Bidi-, Separator-, Private-Use-Zeichen). Geprüft wird beim Run-Ende und beim Lesen erneut.

@@ -11,16 +11,16 @@
   "category": "CONTENT",
   "scope": "external",
   "tags": [ "saas-factory", "content" ],
-  "version": "1.0.1",
+  "version": "1.1.0",
   "author": "MySuricates",
   "model": "sonnet",
-  "instructions": "Erstellt eine Marketing-Landing-Page für die generierte App. Tonalität und Zielgruppe aus der Spec übernehmen. Anti-AI-Tells beachten (kein 'unleash', 'leverage', 'seamless').\nArbeitsverzeichnis fuer diesen Run ist {{ execution_path }}. Verwende ausschliesslich diesen Run-Workspace fuer Builds und Code-Aenderungen. {{ project_path }} identifiziert nur das Originalprojekt. Kein automatischer Merge oder Push; Ergebnisse zur separaten Uebernahme behalten.",
+  "instructions": "Creates a marketing landing page for the generated app. Take the tone and target audience from the spec. Avoid AI tells (no 'unleash', 'leverage', 'seamless').\nThe working directory for this run is {{ execution_path }}. Use only this run workspace for builds and code changes. {{ project_path }} only identifies the original project. No automatic merge or push; keep the results for separate adoption.",
   "blocks": [
     {
       "type": "simple",
       "config": {
         "timeout_seconds": 300,
-        "command": "Generiere Landing-Page-Copy für die App {{ slug }}.\n\nSPEC-AUSZUG:\n- Name: {{ name }}\n- Type: {{ spec_type }}\n- Target Users: {{ target_users }}\n- Brand Tone: {{ brand_tone }}\n- Primary Color: {{ brand_primary_color }}\n- Features (Phase 1): {{ feature_order_json }}\n\nGib JSON aus mit Struktur:\n{\n  \"hero\": {\"headline\": \"...\", \"subheadline\": \"...\"},\n  \"features\": [{\"title\": \"...\", \"description\": \"...\", \"benefit\": \"...\"}, ...],\n  \"cta\": {\"primary\": \"...\", \"micro\": \"...\"},\n  \"meta\": {\"title\": \"...\", \"description\": \"...\", \"og_title\": \"...\", \"og_description\": \"...\"},\n  \"og_image_prompt\": \"...\"\n}\n\nMatcht den Brand-Tone exakt. Spricht den target_users persona direkt an, NICHT 'everyone'.",
+        "command": "Generate landing-page copy for the app {{ slug }}.\n\nSPEC EXCERPT:\n- Name: {{ name }}\n- Type: {{ spec_type }}\n- Target Users: {{ target_users }}\n- Brand Tone: {{ brand_tone }}\n- Primary Color: {{ brand_primary_color }}\n- Features (Phase 1): {{ feature_order_json }}\n\nOutput JSON with this structure:\n{\n  \"hero\": {\"headline\": \"...\", \"subheadline\": \"...\"},\n  \"features\": [{\"title\": \"...\", \"description\": \"...\", \"benefit\": \"...\"}, ...],\n  \"cta\": {\"primary\": \"...\", \"micro\": \"...\"},\n  \"meta\": {\"title\": \"...\", \"description\": \"...\", \"og_title\": \"...\", \"og_description\": \"...\"},\n  \"og_image_prompt\": \"...\"\n}\n\nMatch the brand tone exactly. Address the target_users persona directly, NOT 'everyone'.",
         "workspace": {
           "mode": "isolated",
           "source": "commit",
@@ -42,11 +42,11 @@
         "total_timeout_seconds": 1200,
         "max_repeated_actions": 3,
         "require_approval": false,
-        "success_criteria": "Im Projekt-Verzeichnis existiert src/app/(marketing)/page.tsx und enthält Hero/Features/CTA aus der Copy. `npm run build` läuft durch.",
-        "goal": "Übernimm folgende Landing-Page-Copy und rendere sie als Next.js Route-Group `(marketing)` im Projekt {{ slug }}.\n\nPROJEKT-PFAD: ${FACTORY_ROOT:-./saas-factory}/{{ slug }}\n\nLANDING-COPY (JSON):\n{{ previous_output }}\n\nAUFGABE:\n1. Lege src/app/(marketing)/page.tsx an mit:\n   - Hero (headline + subheadline) — h1, lead-Paragraph\n   - 3-5 Feature-Blocks als Grid\n   - CTA-Button (Primary + Micro-Line)\n   - Meta-Tags via Next.js Metadata-Export\n2. Verwende Tailwind-Klassen, die die brand_primary_color {{ brand_primary_color }} dezent integrieren (z. B. als Akzent in Buttons).\n3. Falls noch nicht vorhanden: src/app/(marketing)/layout.tsx mit minimalem Footer.\n4. Nichts aus dem App-Hauptbereich brechen — die / Route bleibt wie sie ist.\n5. Am Ende: `npm run build` ausführen, Fehler fixen.\n\nKeine externen Bilder einbinden (OG-Image-Prompt nur als Kommentar in der Metadata-Konfig hinterlegen)."
+        "success_criteria": "src/app/(marketing)/page.tsx exists in the project directory and contains the hero/features/CTA from the copy. `npm run build` succeeds.",
+        "goal": "Take the following landing-page copy and render it as the Next.js route group `(marketing)` in project {{ slug }}.\n\nPROJECT PATH: ${FACTORY_ROOT:-./saas-factory}/{{ slug }}\n\nLANDING COPY (JSON):\n{{ previous_output }}\n\nTASK:\n1. Create src/app/(marketing)/page.tsx with:\n   - Hero (headline + subheadline) — h1, lead paragraph\n   - 3-5 feature blocks as a grid\n   - CTA button (primary + micro line)\n   - Meta tags via the Next.js metadata export\n2. Use Tailwind classes that subtly integrate the brand_primary_color {{ brand_primary_color }} (e.g. as an accent in buttons).\n3. If not present yet: src/app/(marketing)/layout.tsx with a minimal footer.\n4. Break nothing in the main app area — the / route stays as it is.\n5. At the end: run `npm run build` and fix the errors.\n\nDo not embed external images (put the OG image prompt only as a comment in the metadata config)."
       },
       "requiredCapabilities": []
     }
   ],
-  "integrity": "sha256:f756fab9cde0a7761d1afa062a405bfa87bf3866ba14f2b4a9d147f67fa2bad2"
+  "integrity": "sha256:384d97e550de78cca2d0baff4c2c0586098b86b86ff98b2943a58ffa49066235"
 }

@@ -11,16 +11,16 @@
   "category" : "CODE",
   "scope" : "external",
   "tags" : [ "saas-factory", "feature" ],
-  "version" : "1.0.1",
+  "version" : "1.1.0",
   "author" : "MySuricates",
   "model" : "sonnet",
-  "instructions" : "Implementiert genau EIN Feature im Ziel-Projekt. Hard rule: claim NIE Erfolg ohne grünen factory test. Tests fixen statt verstecken. Niemals Bibliotheken erfinden — wenn etwas fehlt, package.json erweitern.",
+  "instructions" : "Implements exactly ONE feature in the target project. Hard rule: NEVER claim success without a green factory test. Fix tests instead of hiding them. Never invent libraries — if something is missing, extend package.json.",
   "blocks" : [ {
     "type" : "shell",
     "config" : {
       "timeout_seconds" : 60,
       "on_failure" : "continue",
-      "command" : "set -euo pipefail\nFACTORY=\"${FACTORY_ROOT:-./saas-factory}\"\nSLUG=\"{{ slug }}\"\nFEATURE_ID=\"{{ feature_id }}\"\nSTACK=\"{{ stack }}\"\nTARGET=\"$FACTORY/$SLUG\"\n\"$FACTORY/tools/factory\" snippet-apply --feature \"$FEATURE_ID\" --stack \"$STACK\" --target \"$TARGET\" 2>&1 || echo 'Kein Snippet vorhanden — agentic generiert from scratch'"
+      "command" : "set -euo pipefail\nFACTORY=\"${FACTORY_ROOT:-./saas-factory}\"\nSLUG=\"{{ slug }}\"\nFEATURE_ID=\"{{ feature_id }}\"\nSTACK=\"{{ stack }}\"\nTARGET=\"$FACTORY/$SLUG\"\n\"$FACTORY/tools/factory\" snippet-apply --feature \"$FEATURE_ID\" --stack \"$STACK\" --target \"$TARGET\" 2>&1 || echo 'No snippet available — the agentic block generates from scratch'"
     },
     "requiredCapabilities" : [ ]
   }, {
@@ -32,8 +32,8 @@
       "total_timeout_seconds" : 3600,
       "max_repeated_actions" : 3,
       "require_approval" : false,
-      "success_criteria" : "factory test im Projekt-Verzeichnis gibt JSON mit ok=true zurück (lint/typecheck/unit alle passed).",
-      "goal" : "Implementiere das Feature {{ feature_id }} im Projekt {{ slug }}.\n\nKONTEXT:\n- Projekt-Pfad: ${FACTORY_ROOT:-./saas-factory}/{{ slug }}\n- Feature-Beschreibung: {{ feature_desc }}\n- Stack: {{ stack }}\n- Snippet-Resultat (Block 1 oben): {{ previous_output }}\n\nAUFGABE:\n1. Wenn das Snippet bereits Files kopiert hat, fülle Lücken (TODO-Marker, fehlende Imports, business logic).\n2. Sonst: Generiere alle Files für das Feature von Grund auf, im Stack-spezifischen Idiom (Next.js App-Router → src/app/, server actions in src/lib/, Prisma-Schema-Erweiterungen in prisma/schema.prisma).\n3. Schreibe mindestens einen Unit-Test (Vitest/Jest/pytest je nach Stack).\n4. Wenn Prisma-Schema geändert wird: NUR Schema-Datei anpassen — Migration läuft danach via `factory migrate`.\n5. README.md kurz aktualisieren (1-2 Sätze für das neue Feature).\n6. Iteriere via factory test (im Projekt-Verzeichnis ausführen) bis ok=true.\n\nABSOLUTE PFADE verwenden — jede ACTION ist ein eigener Agent ohne Kontext der vorherigen.\nKeine inkrementellen Refactors außerhalb des Features.\nKeine Secrets hartcoden — .env.example pflegen.\n\nWenn factory test fehlschlägt: lies log_tail im JSON-Report, fixe gezielt, re-run. Nie Tests deaktivieren oder skippen."
+      "success_criteria" : "factory test in the project directory returns JSON with ok=true (lint/typecheck/unit all passed).",
+      "goal" : "Implement the feature {{ feature_id }} in project {{ slug }}.\n\nCONTEXT:\n- Project path: ${FACTORY_ROOT:-./saas-factory}/{{ slug }}\n- Feature description: {{ feature_desc }}\n- Stack: {{ stack }}\n- Snippet result (block 1 above): {{ previous_output }}\n\nTASK:\n1. If the snippet already copied files, fill the gaps (TODO markers, missing imports, business logic).\n2. Otherwise: generate all files for the feature from scratch, in the stack-specific idiom (Next.js App Router → src/app/, server actions in src/lib/, Prisma schema extensions in prisma/schema.prisma).\n3. Write at least one unit test (Vitest/Jest/pytest depending on the stack).\n4. If the Prisma schema changes: adjust ONLY the schema file — the migration runs afterwards via `factory migrate`.\n5. Briefly update README.md (1-2 sentences for the new feature).\n6. Iterate via factory test (run it in the project directory) until ok=true.\n\nUse ABSOLUTE PATHS — every ACTION is its own agent without the context of the previous ones.\nNo incremental refactors outside the feature.\nDo not hard-code secrets — maintain .env.example.\n\nIf factory test fails: read log_tail in the JSON report, fix it in a targeted way, re-run. Never disable or skip tests."
     },
     "requiredCapabilities" : [ ],
     "skillIds" : [ "builtin-feature-implementer" ]
@@ -50,10 +50,10 @@
     "config" : {
       "timeout_seconds" : 300,
       "on_failure" : "continue",
-      "command" : "Du bist Code-Reviewer. Reviewe die Änderungen für Feature {{ feature_id }} im Projekt {{ slug }}.\n\nProjekt-Pfad: ${FACTORY_ROOT:-./saas-factory}/{{ slug }}\n\nAUFGABE:\n1. Schaue dir den letzten Commit an (`cd $PROJEKT && git log -1 --stat && git show HEAD`)\n2. Bewerte: Bugs, Security-Issues, Performance, Maintainability\n3. Gib NUR Findings mit Severity HIGH oder CRITICAL aus — keine Stilmeckerei\n4. Falls alles OK ist: 'CODE_REVIEW: PASSED — keine Findings'\n5. Falls Findings: Liste mit File:Line + Beschreibung + Fix-Vorschlag"
+      "command" : "You are a code reviewer. Review the changes for feature {{ feature_id }} in project {{ slug }}.\n\nProject path: ${FACTORY_ROOT:-./saas-factory}/{{ slug }}\n\nTASK:\n1. Look at the last commit (`cd $PROJEKT && git log -1 --stat && git show HEAD`)\n2. Assess: bugs, security issues, performance, maintainability\n3. Output ONLY findings with severity HIGH or CRITICAL — no style nitpicking\n4. If everything is OK: 'CODE_REVIEW: PASSED — no findings'\n5. If there are findings: a list with File:Line + description + suggested fix"
     },
     "requiredCapabilities" : [ ],
     "skillIds" : [ "builtin-code-review" ]
   } ],
-  "integrity": "sha256:f7f84c75bb74265c4679b25eb2ee272b2225f29ae83e8f86ee390151febea41c"
+  "integrity": "sha256:ae8ff20e2e08b17527f29b3d4f01565360e05c702d6a649dcdf686003437df92"
 }

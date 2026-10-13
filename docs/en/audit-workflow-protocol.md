@@ -82,7 +82,7 @@ disposition. A prompt therefore fixes the `subject` per `ruleKey` — a fixed va
 concern the repository or a module as a whole (files and numbers then go into
 `description`/`evidence`), otherwise the path relative to the repository root, one finding per
 file. The model to follow is the ruleKey list in the "Public Readiness" evidence prompt
-(`subject "<value>"` or `subject = Pfad` per entry); `AuditRuleKeyCatalogTest` makes sure no entry
+(`subject "<value>"` or `subject = path` per entry); `AuditRuleKeyCatalogTest` makes sure no entry
 there leaves it out (TODO `3a9e275b` — evidence prompt: fix the subject per ruleKey).
 
 A colon in the `subject` carries meaning: if a file or class precedes it (`pom.xml:docker-java`,
@@ -92,7 +92,7 @@ the same identity are taken over only once; ingestion reports the rest in the ac
 
 ### Optional: `expectedFindings`
 
-An audit whose measurement block knows the target count (such as `ERWARTETE FINDINGS` in the test
+An audit whose measurement block knows the target count (such as `EXPECTED FINDINGS` in the test
 coverage audit) may write it into the envelope as `"expectedFindings": <N>` next to
 `snapshotComplete`. If it does not match the number of findings delivered, the **entire report is
 discarded**: it is recorded as INVALID, no findings are created, and — crucially — none are marked
@@ -132,7 +132,7 @@ deviating finding itself becomes canonical.
 File-related rules (`subject = path`) and rules with several permitted values
 (`"ai-automation-backend" or "ai-automation-frontend"`) have no fixed value.
 **Metric rules** (one finding per measured value) have the FACT name their prompt lists under
-"Kennzahl-Befunde" as their fixed value – in the performance audit `perf.db.size` → `database_bytes`,
+"metric findings" as their fixed value – in the performance audit `perf.db.size` → `database_bytes`,
 `perf.frontend.bundle-size` → `frontend_bundle_js_bytes`, `perf.frontend.lazy-chunk-preloaded` →
 `frontend_lazy_chunk_preloaded`, plus the collective finding `perf.db.unindexed-column` →
 `unindexed_findby_columns`; in the health check `health.tests-failing` → `backend_tests_failures`,
@@ -140,7 +140,7 @@ File-related rules (`subject = path`) and rules with several permitted values
 "DB-Größe" and the FACT name, and every run created a new finding). Version 6 of the clean-up run
 merges these findings, and those that only stood apart under class name and path, triage included.
 `AuditRuleKeyCatalogTest` keeps catalogue and prompt in step and checks that a prompt's envelope
-example names only a catalogued `ruleKey` (or the placeholder `stabile-regel-id`, `stable-rule-id` in the English Java audits).
+example names only a catalogued `ruleKey` (or the placeholder `stable-rule-id`, `stabile-regel-id` in older German prompts).
 
 ### Evidence check: `evidence` must name a measurement of this run
 
@@ -168,7 +168,7 @@ report block measures deterministically and emits a fact sheet:
 ## FAKTENBLATT
 FAKT files_over_300: 19
 FAKT backend_tests_failures: 0
-NICHT GEMESSEN: step_results_bytes (shell blocks must not read the SQLite database)
+NICHT GEMESSEN: step_results_bytes (shell blocks must not read the SQLite DB (CLAUDE.md) — the step output volume is visible only indirectly via database_bytes)
 TREFFER repository_in_loop: mapper/WishMapper.java:36 workflowRepository.find (loop from line 34)
 
 ## PFLICHTFELDER
@@ -181,7 +181,7 @@ Rules:
   gap, `TREFFER <name>: <file>:<line> …` a candidate with its location. An error path in the
   measuring block always produces a NICHT GEMESSEN line — never a silent zero: "no cycles
   found" and "cycle detection failed" must not look the same.
-- The report prompt carries the measuring rule "evaluate the fact sheet only; do not measure
+- The report prompt carries the measuring rule "Judge solely by the fact sheet; do not measure
   or count anything yourself", names the responsible FAKT lines per dimension, and requires
   every number in the report to cite its FAKT line. Raw logs are included only truncated
   (last 80 lines per measuring block) — to classify a failure, not as counting material.
@@ -209,7 +209,7 @@ Converted audits in `workflow-pool/`:
 | Architecture review (frontend) | block `frontend_metrics` → `scripts/public-readiness/frontend-metrics.sh` (source imports, lines, module cycles) | `scripts/tests/test-frontend-metrics.sh` |
 | Health check | block `facts` (Surefire totals, exit codes, lint/tsc, bundle, code and docs sizes) | `scripts/tests/test-audit-facts.sh` |
 | Performance audit | block `facts` (health probe, heap numbers from `/api/v1/system/jvm-memory`, DB and bundle files, log lines, source patterns) | `scripts/tests/test-audit-facts.sh` |
-| Test coverage | block `metrics` with the target size `ERWARTETE FINDINGS`; the shell block `report` builds the envelope from it, the AI (block `coach`) only supplies the report, `naechster_schritt` and one text per class; the gate counts the envelope against it | `scripts/tests/test-coverage-snapshot.sh` |
+| Test coverage | block `metrics` with the target size `EXPECTED FINDINGS`; the shell block `report` builds the envelope from it, the AI (block `coach`) only supplies the report, `next_step` and one text per class; the gate counts the envelope against it | `scripts/tests/test-coverage-snapshot.sh` |
 | Documentation weight check | block `dossier` → `scripts/public-readiness/docs_orphan_scan.py` (reachability, references, maintenance, topic overlap) | `scripts/tests/test_docs_orphan_scan.py`, gate: `scripts/tests/test-audit-facts.sh` |
 | Security audit | blocks `trivy` (`trivy fs`: lockfiles and direct dependencies from `pom.xml`, development dependencies included; the `pom.xml` parent/BOM chain comes from the read-only mounted `~/.m2/repository` instead of Maven Central), `trivy_jar` (`trivy rootfs` on `target/`: transitive Maven dependencies in the built JAR — `trivy fs` reads no JARs) and `gitleaks` (git history of branches, tags, remotes) in tool mode (`automation-agent-devops`, SARIF → fact sheet); block `data` as a fact sheet with TREFFER lines for code locations, git delta and the tools' preconditions (`git_history_visible`, `backend_jar`); gate: mandatory facts `trivy_findings`, `gitleaks_findings` and, with a built JAR, `trivy_jar_findings` | `scripts/tests/test-audit-facts.sh` (section 13) |
 
@@ -255,8 +255,8 @@ measured findings were classified – without having judged anything. Since vers
   collaborator count in `arch-metrics.sh`. Methods connected through shared collaborators form a group;
   several groups are a split candidate. `nur_konstruktor` names injected fields that are never read.
   If the source is newer than the compiled classes, `stale_classes` appears instead of a table.
-- **Judgement** (AI, Opus): reads the source of each candidate and judges `passt so` (fine as is),
-  `schneiden` (split) or `verlagern` (move). The latter two become findings `arch.mixed-responsibility`
+- **Judgement** (AI, Opus): reads the source of each candidate and judges `fine as is`, `split` or
+  `relocate`. The latter two become findings `arch.mixed-responsibility`
   and `arch.misplaced-logic` – `subject` exactly from the candidate list, severity at most `MEDIUM`,
   evidence without quantities with a unit (otherwise the degradation check would reopen a classification
   whenever the wording changes).
@@ -264,8 +264,8 @@ measured findings were classified – without having judged anything. Since vers
   or has not changed in 7 days is carried over unchanged; only changed candidates and re-checks
   (`AWAITING_VERIFICATION`) are judged anew.
 - **Gate**: open or new judgement findings raise the result to `YELLOW`, never to `RED`. In addition the
-  gate block checks deterministically that every candidate appears under the report's "Urteil"
-  heading; if one is missing, the result is at most `YELLOW` ("Urteil unvollständig").
+  gate block checks deterministically that every candidate appears under the report's "Verdict per
+  candidate" heading; if one is missing, the result is at most `YELLOW` ("verdict incomplete").
 - **Tool facts (4.8.0, TODO `67128699`)**: PMD from the image `automation-agent-analysis` runs in three tool
   blocks – CPD per language (`cpd_java`, `cpd_ts`, raw CSV output, from 100 tokens) and the design rules from
   `scripts/public-readiness/pmd-architecture.xml` (`pmd`, SARIF). `arch_tools.py` reads both: `## duplicates`
@@ -284,7 +284,7 @@ measured findings were classified – without having judged anything. Since vers
   architecture finding counted as unsupported. `arch-findings.py` now appends `## FAKTENBLATT arch`: one FAKT line
   per measured finding and candidate, named after the subject (`arch_com.automation….java`). The evidence of every
   measured finding starts with that name, candidate rows carry it in the column `fakt`, and judgement evidence cites
-  it. `FAKT arch_scope` states the measurement scope; when it changes, the trend reads "nicht vergleichbar". The PMD
+  it. `FAKT arch_scope` states the measurement scope; when it changes, the trend reads "not comparable". The PMD
   block is called `pmd_design`, because the evidence check ignores names under 4 characters.
 - **Known judgements (4.11.0, TODO `ebf6602e`)**: judgements carried forward for files that are no candidate stayed
   unsupported in 4.10 ("unveraendert seit dem letzten Urteil", no fact name). Since TODO `5fc15f50`
@@ -300,16 +300,16 @@ measured findings were classified – without having judged anything. Since vers
 Up to version 4.3.3 the AI wrote the test-coverage envelope itself and miscounted: in the run of
 2026-09-28 it emitted three classes twice, 52 instead of 50 findings. Gate and ingestion rightly
 rejected the run, which left it worthless (TODO `fa66ea31`). Since 4.3.4 the shell block `report`
-builds the envelope: exactly one finding per line of the lists `UNTESTED` and `DUENNE TESTS`, with
+builds the envelope: exactly one finding per line of the lists `UNTESTED` and `THIN TESTS`, with
 `subject`, severity, title and `evidence` taken from the measurement, `expectedFindings` and
 `snapshotComplete` from the header lines. If a header line is missing or its count does not match
 the lines, the envelope says `snapshotComplete: false`. The AI (block `coach`) only supplies the
-report, the line `naechster_schritt: <subject>` (that finding becomes `HIGH`) and, between
-`BEFUND-TEXTE:` and `ENDE BEFUND-TEXTE`, one sentence per class as `<subject> | <text>`. A missing
+report, the line `next_step: <subject>` (that finding becomes `HIGH`) and, between
+`FINDING TEXTS:` and `END FINDING TEXTS`, one sentence per class as `<subject> | <text>`. A missing
 text gets a default. A `subject` with a different path counts for the class with the same file name
 if that name is unique; otherwise it is discarded like an unknown one, as is an envelope written by
-the AI. If `ENDE BEFUND-TEXTE` is missing, the section ends at the next `gate_` or
-`naechster_schritt` line. The
+the AI. If `END FINDING TEXTS` is missing, the section ends at the next `gate_` or
+`next_step` line. The
 measuring block lists every `subject` only once, even for two classes of the same name in different
 packages.
 
@@ -330,7 +330,7 @@ it as RESOLVED.
 Triaged findings (`ACCEPTED_RISK`, `DISMISSED` according to `{{ audit_findings }}`, matched by
 `ruleKey` + `subject`, normalised as in the fingerprint) stay in the envelope, but they do not count towards the gate: otherwise the
 documentation weight audit would stay YELLOW for good with every triage. The `gate_description` names
-them separately ("dazu N bewusst eingeordnet").
+them separately, as `(plus N deliberately triaged)`.
 
 ## Known findings in the prompt: `{{ audit_findings }}`
 
@@ -397,15 +397,15 @@ its disposition.
 ### The report prompts use `audit_findings`
 
 The five audits in `workflow-pool/` (architecture review, performance audit, test coverage, security
-audit, health check) receive the variable in their report prompt right after `OFFENE TODOS`, as the
-section `BEKANNTE BEFUNDE` (TODO `1cf996df`). Before the envelope section, all five carry the same
-rule block word for word, `UMGANG MIT BEKANNTEN BEFUNDEN (VERBINDLICH)` (the prompts are German):
+audit, health check) receive the variable in their report prompt right after `OPEN TODOS`, as the
+section `KNOWN FINDINGS` (TODO `1cf996df`). Before the envelope section, all five carry the same
+rule block word for word, `HANDLING KNOWN FINDINGS (BINDING)`:
 
 - **Identity:** `ruleKey` and `subject` of a known finding are taken over exactly, even if the model
   would name it differently.
 - **Markdown:** the findings table shows only `OPEN`, `AWAITING_VERIFICATION` and new findings.
-  Classified ones are summed up in one line, `Bewusst eingeordnet: <N> (akzeptiert <x>, verworfen
-  <y>) - siehe Audit Center`, unless one has measurably degraded. Degraded means: a supporting
+  Classified ones are summed up in one line, `Deliberately triaged: <N> (accepted <x>, dismissed
+  <y>) - see Audit Center`, unless one has measurably degraded. Degraded means: a supporting
   metric lies more than 10 % above its last value, or the change rate newly reaches the hotspot
   threshold. That is the threshold at which
   `AuditAcceptancePolicy` reopens an acceptance, too; smaller fluctuations do not count.
@@ -432,7 +432,7 @@ and GHSA identifier of the package, and a newly added identifier counts as degra
 of the check).
 
 The documentation weight audit (Doku-Zehrprobe) and the public readiness evidence also have a valid
-`metadata.audit` and, since TODO `3fb33d9b`, carry the same section (as `## BEKANNTE BEFUNDE …`, in
+`metadata.audit` and, since TODO `3fb33d9b`, carry the same section (as `## KNOWN FINDINGS …`, in
 line with their headings) and the same rule block, each before its envelope part. Before, they saw
 earlier findings only as Markdown in `previous_report`. Section 10b of the same test checks this.
 

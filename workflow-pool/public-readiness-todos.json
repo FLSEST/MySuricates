@@ -17,8 +17,8 @@
   ],
   "model": "opus",
   "effort": "medium",
-  "instructions": "Du schlaegst TODOs aus vorliegenden Befunden vor und emittierst sie erst nach menschlicher Freigabe.\n\nEvidenz zuerst: Schlage nur vor, was in den uebergebenen Befunden steht. Erfinde keine Aufgaben und leite keine aus allgemeinem Wissen ueber Software ab.\n\nKeine Dubletten: Gegen die Liste der offenen TODOs pruefen. Was dort schon steht, wird nicht erneut vorgeschlagen — nenne es stattdessen als bereits erfasst.\n\nOeffentlich unbedenklich: Keine Geheimnisse, Token, privaten Pfade oder personenbezogenen Daten in Titeln oder Beschreibungen. Schwaerze mit [REDACTED].\n\nKeine unkontrollierten Artefakte: Lege keine Dateien an und aendere nichts im Repository.",
-  "version": "1.0.0",
+  "instructions": "You propose TODOs from the findings at hand and emit them only after human approval.\n\nEvidence first: propose only what is in the findings passed to you. Do not invent tasks and do not derive any from general knowledge about software.\n\nNo duplicates: check against the list of open TODOs. Whatever is already there is not proposed again — name it as already tracked instead.\n\nSafe for the public: no secrets, tokens, private paths or personal data in titles or descriptions. Redact with [REDACTED].\n\nNo uncontrolled artifacts: do not create any files and do not change anything in the repository.",
+  "version": "1.1.0",
   "author": "MySuricates",
   "defaultContext": {},
   "blocks": [
@@ -26,20 +26,20 @@
       "type": "simple",
       "name": "kandidaten",
       "config": {
-        "label": "TODO-Kandidaten vorschlagen",
+        "label": "Propose TODO candidates",
         "timeout_seconds": 1200,
-        "command": "Schlage aus den folgenden Befunden TODO-Kandidaten vor.\n\n## Befunde der vorgelagerten Stufe\n{{ previous_chain_output }}\n\n## Bereits offene TODOs (nicht doppelt vorschlagen)\n{{ open_todos }}\n\n---\n\nRegeln:\n\n1. Ein Kandidat je Befund, der vor der Veroeffentlichung wirklich erledigt sein muss. Befunde, die nur zur Kenntnis dienen, werden keine TODOs.\n2. Steht in den Befunden nichts Belastbares — etwa weil dieser Workflow einzeln statt in der Kette laeuft und der Abschnitt oben leer oder unaufgeloest ist —, schlage **nichts** vor und schreibe das ausdruecklich hin.\n3. Pruefe jeden Kandidaten gegen die Liste der offenen TODOs. Treffer werden nicht vorgeschlagen, sondern unter \"bereits erfasst\" genannt, mit der erkannten TODO-Kennung.\n4. Der Titel ist ein knapper Imperativ auf Deutsch.\n\nGib eine Tabelle aus:\n\n| # | Titel (Imperativ) | Prioritaet | Tags | Begruendung mit Beleg aus den Befunden |\n|---|---|---|---|---|\n\nErlaubte Prioritaeten: CRITICAL, HIGH, MEDIUM, LOW.\n\nDanach ein Abschnitt \"bereits erfasst\" und ein Abschnitt \"bewusst kein TODO\" mit je einer kurzen Begruendung.\n\nEmittiere in diesem Block noch **keine** todo_item-Marker — darueber entscheidet der naechste Schritt."
+        "command": "Propose TODO candidates from the following findings.\n\n## Findings of the preceding stage\n{{ previous_chain_output }}\n\n## TODOs already open (do not propose them twice)\n{{ open_todos }}\n\n---\n\nRules:\n\n1. One candidate per finding that really has to be done before publication. Findings that are for information only do not become TODOs.\n2. If the findings contain nothing solid — for example because this workflow runs on its own instead of in the chain and the section above is empty or unresolved —, propose **nothing** and say so explicitly.\n3. Check every candidate against the list of open TODOs. Matches are not proposed but listed under \"already tracked\", with the recognized TODO identifier.\n4. The title is a concise imperative in English.\n\nOutput a table:\n\n| # | Title (imperative) | Priority | Tags | Reason with evidence from the findings |\n|---|---|---|---|---|\n\nAllowed priorities: CRITICAL, HIGH, MEDIUM, LOW.\n\nThen a section \"already tracked\" and a section \"deliberately not a TODO\", each with a short reason.\n\nDo **not** emit any todo_item markers in this block yet — the next step decides about that."
       }
     },
     {
       "type": "approval",
       "name": "freigabe",
       "config": {
-        "question": "Sollen aus den vorgeschlagenen Kandidaten TODOs angelegt werden?",
+        "question": "Should TODOs be created from the proposed candidates?",
         "options": [
-          "Ja",
-          "Nein",
-          "Nur die mit Prioritaet HIGH und CRITICAL"
+          "Yes",
+          "No",
+          "Only those with priority HIGH and CRITICAL"
         ],
         "variable_name": "prd_todo_freigabe",
         "timeout_minutes": 1440,
@@ -50,9 +50,9 @@
       "type": "simple",
       "name": "marker",
       "config": {
-        "label": "Freigegebene TODO-Marker emittieren",
+        "label": "Emit the approved TODO markers",
         "timeout_seconds": 600,
-        "command": "Emittiere die freigegebenen TODO-Marker.\n\n## Vorgeschlagene Kandidaten\n{{ block.kandidaten.output }}\n\n## Entscheidung des Menschen\n{{ prd_todo_freigabe }}\n\n---\n\nVerhalten je nach Entscheidung:\n\n- **Ja** — emittiere fuer jeden Kandidaten der Tabelle genau einen Marker.\n- **Nur die mit Prioritaet HIGH und CRITICAL** — emittiere nur diese, und nenne die uebergangenen namentlich.\n- **Nein**, leere oder unklare Entscheidung — emittiere **keinen** Marker und schreibe hin, dass nichts angelegt wurde.\n\nMarkerformat, jeder Marker auf einer eigenen Zeile, ohne Einrueckung, ohne Aufzaehlungszeichen, ohne Text davor in derselben Zeile:\n\ntodo_item: Titel im Imperativ | HIGH | release,public-readiness | Beschreibung mit Beleg\n\nDie Tags beginnen immer mit `release,public-readiness`, danach optional weitere.\n\nSchreibe zum Schluss eine Zeile, wie viele Marker emittiert wurden und auf welcher Entscheidung das beruht."
+        "command": "Emit the approved TODO markers.\n\n## Proposed candidates\n{{ block.kandidaten.output }}\n\n## The human's decision\n{{ prd_todo_freigabe }}\n\n---\n\nBehavior depending on the decision:\n\n- **Yes** — emit exactly one marker for every candidate in the table.\n- **Only those with priority HIGH and CRITICAL** — emit only these, and name the ones left out by name.\n- **No**, or an empty or unclear decision — emit **no** marker and state that nothing was created.\n\nMarker format: each marker on its own line, without indentation, without a bullet, without any text before it on the same line:\n\ntodo_item: Title in the imperative | HIGH | release,public-readiness | Description with evidence\n\nThe tags always start with `release,public-readiness`, optionally followed by more.\n\nFinally, write one line saying how many markers were emitted and which decision that is based on."
       }
     }
   ],
@@ -65,5 +65,5 @@
       "enabled": false
     }
   },
-  "integrity": "sha256:b2d8cfb06ad012afeeb5d30129520edd324ea34837ffcaed9eb181baa4d52d87"
+  "integrity": "sha256:aaa2a9ae0bcc6b30c3a333a79dbeb12d1020018b20211c477f4277108f022754"
 }

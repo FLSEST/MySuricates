@@ -304,7 +304,7 @@ Fills the dashboard result of the run directly from config – the same fields, 
 
 ```json
 { "type": "dashboard-report", "config": { "status": "{{ block.traffic_light.output }}", "title": "Nightly QA",
-  "kpis": [{ "label": "Hunts", "value": "{{ hunt_count }}", "trend": "UP" }], "summary": "{{ block.analysis.output }}" } }
+  "kpis": [{ "label": "Orders", "value": "{{ order_count }}", "trend": "UP" }], "summary": "{{ block.analysis.output }}" } }
 ```
 
 - A placeholder that is empty at run time drops the field (an error for `status`); a KPI is dropped only when all its values are empty. An **unresolved** placeholder or a contract violation (too long, unknown field in a KPI, number instead of string, invisible characters) fails the step; the message names the field, never the value.
@@ -682,8 +682,8 @@ A workflow can also report its dashboard result as a marker line in a block outp
 
 ```
 dashboard_widget: {"title": "Nightly QA", "status": "YELLOW",
-  "kpis": [{"label": "Hunts", "value": "1361", "trend": "UP"}],
-  "items": ["3 hunts without route"], "summary": "Two findings."}
+  "kpis": [{"label": "Orders", "value": "1361", "trend": "UP"}],
+  "items": ["3 orders without shipping date"], "summary": "Two findings."}
 ```
 
 - Fields and bounds as for the `dashboard-report` block ([block reference](block-referenz.md#dashboard-report)): `status` is required (`GREEN`, `YELLOW`, `RED`), KPI `label` and `value` at most 40 characters each, `value` is a **string**, `trend` `UP`/`DOWN`/`FLAT`. An unknown field – in a KPI object too – rejects the whole contract, as does an empty, too long or not single-line text (control, zero-width, bidi, separator, private-use characters). It is checked at the end of the run and again when read.

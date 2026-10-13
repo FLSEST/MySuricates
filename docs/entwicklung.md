@@ -864,7 +864,7 @@ mitgelieferten Notizdatei an.
 **Gate vor dem Push:** Die Kette „Public Readiness“ misst auch den öffentlichen Klon statt des
 Arbeits-Repos — gestartet mit dem Kontext `{"readiness_repo": "<pfad zum öffentlichen Klon>"}`, den
 die Kette an Evidenz und Behauptungen weitergibt. Die Shell-Blöcke lesen dort nur; der Block `stand`
-meldet dann statt „Commits vor origin/main“ die Commits des Arbeits-Repos seit der letzten Übergabe
+meldet dann statt der Commits vor `origin/main` die Commits des Arbeits-Repos seit der letzten Übergabe
 (jüngstes `v*`-Tag im Klon) und ob die Übergabe schon gepusht ist. Ohne den Wert (Standard: leer)
 messen beide Workflows wie bisher den isolierten Klon des Laufs.
 

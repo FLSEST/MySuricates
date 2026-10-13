@@ -80,7 +80,7 @@ python3 - "$DEF" "$FIX" > "$TMP/command.sh" <<'PY'
 import json, sys
 definition = json.load(open(sys.argv[1], encoding='utf-8'))
 blocks = [b for b in definition['blocks']
-          if b.get('config', {}).get('label', '').startswith('Coverage-Metriken')]
+          if b.get('config', {}).get('label', '').startswith('Coverage metrics')]
 assert len(blocks) == 1, f"erwartet genau einen Messblock, gefunden: {len(blocks)}"
 print(blocks[0]['config']['command'].replace('{{ project_path }}', sys.argv[2]))
 PY
@@ -88,12 +88,12 @@ check "Messblock extrahierbar" '[ -s "$TMP/command.sh" ]'
 
 ( cd "$FIX" && bash "$TMP/command.sh" ) > "$TMP/out.txt" 2> "$TMP/err.txt"
 UNTESTED_ROWS="$TMP/untested.txt"
-awk '/^UNTESTED gesamt:/{f=1;next} f && /^[[:space:]]*$/{f=0} f' "$TMP/out.txt" > "$UNTESTED_ROWS"
+awk '/^UNTESTED total:/{f=1;next} f && /^[[:space:]]*$/{f=0} f' "$TMP/out.txt" > "$UNTESTED_ROWS"
 THIN_ROWS="$TMP/thin.txt"
-awk '/^DUENNE TESTS gesamt:/{f=1;next} f && /^[[:space:]]*$/{f=0} f' "$TMP/out.txt" > "$THIN_ROWS"
+awk '/^THIN TESTS total:/{f=1;next} f && /^[[:space:]]*$/{f=0} f' "$TMP/out.txt" > "$THIN_ROWS"
 
 echo "1) Vollstaendigkeit statt Top-N-Fenster"
-check "Zaehlzeile 'UNTESTED gesamt: 21'"      'grep -qx "UNTESTED gesamt: 21" "$TMP/out.txt"'
+check "Zaehlzeile 'UNTESTED total: 21'"       'grep -qx "UNTESTED total: 21" "$TMP/out.txt"'
 check "21 gelistete ungetestete Klassen"      '[ "$(wc -l < "$UNTESTED_ROWS")" -eq 21 ]'
 check "kleinste Klasse (Rang 20) gelistet"    'grep -q "Untested01.java" "$UNTESTED_ROWS"'
 check "groesste Klasse gelistet"              'grep -q "Untested20.java" "$UNTESTED_ROWS"'
@@ -102,7 +102,7 @@ check "kein head -15 im Messblock"            '! grep -q "head -15" "$TMP/comman
 check "package-info not listed"                '! grep -q "package-info" "$UNTESTED_ROWS"'
 check "Record/Interface nicht gelistet"       '! grep -qE "PlainRecord|PlainPort|Shape" "$UNTESTED_ROWS"'
 check "Record/Interface als ausgenommen gezaehlt" \
-  'grep -qx "Datenklassen ausgenommen (DTO/Entity/Repository/Event/Enum/Record/Interface): 3" "$TMP/out.txt"'
+  'grep -qx "Data classes excluded (DTO/Entity/Repository/Event/Enum/Record/Interface): 3" "$TMP/out.txt"'
 
 echo "2) Kompaktes, stabiles Zeilenformat (paket/Klasse.java<TAB>LOC)"
 check "jede Zeile paket/Klasse.java<TAB>LOC" \
@@ -114,14 +114,14 @@ check "absteigend nach LOC sortiert" \
 check "erste Zeile ist die groesste Klasse"   'head -1 "$UNTESTED_ROWS" | grep "Untested20.java" >/dev/null'
 
 echo "3) Duenne Tests ebenfalls vollstaendig und ohne Shell-Fehler"
-check "Zaehlzeile 'DUENNE TESTS gesamt: 2'"   'grep -qx "DUENNE TESTS gesamt: 2" "$TMP/out.txt"'
+check "Zaehlzeile 'THIN TESTS total: 2'"      'grep -qx "THIN TESTS total: 2" "$TMP/out.txt"'
 check "2 gelistete duenne Tests"              '[ "$(wc -l < "$THIN_ROWS")" -eq 2 ]'
 check "ThinOne gelistet"                      'grep -q "^ThinOne\.java${TAB}" "$THIN_ROWS"'
 check "ThinTwo gelistet"                      'grep -q "^ThinTwo\.java${TAB}" "$THIN_ROWS"'
 check "keine Ganzzahl-Fehlermeldung (stderr)" '! grep -qiE "Ganzzahl|integer expression" "$TMP/err.txt"'
 
 echo "4) Soll-Groesse des Snapshots"
-check "Zeile 'ERWARTETE FINDINGS: 23'"        'grep -qx "ERWARTETE FINDINGS: 23" "$TMP/out.txt"'
+check "Zeile 'EXPECTED FINDINGS: 23'"         'grep -qx "EXPECTED FINDINGS: 23" "$TMP/out.txt"'
 
 echo "5) Report-Prompt bindet den Snapshot an die vollstaendige Liste"
 # Since fa66ea31 the shell block report (metadata.audit.reportBlock) assembles the envelope; the
@@ -134,7 +134,7 @@ audit = definition['metadata']['audit']
 prompt = audit.get('promptBlock', audit['reportBlock'])
 print(next(b['config']['command'] for b in definition['blocks'] if b.get('name') == prompt))
 PY
-check "Prompt nennt 'UNTESTED gesamt'"        'grep -q "UNTESTED gesamt" "$PROMPT"'
+check "Prompt nennt 'UNTESTED total'"         'grep -q "UNTESTED total" "$PROMPT"'
 check "Prompt nennt kein Top-15-Fenster"      '! grep -q "Top 15" "$PROMPT"'
 check "Prompt begruendet snapshotComplete"    'grep -q "snapshotComplete" "$PROMPT"'
 check "Prompt kennt den Unvollstaendig-Fall"  'grep -q "snapshotComplete\": *false\|snapshotComplete\":false" "$PROMPT"'
@@ -142,13 +142,13 @@ check "Prompt kennt den Unvollstaendig-Fall"  'grep -q "snapshotComplete\": *fal
 # otherwise the target number would no longer match.
 check "Prompt bekommt die bekannten Befunde"   'grep -q "{{ audit_findings }}" "$PROMPT"'
 check "Empfehlung nur nicht eingeordnete Klassen" \
-  'grep -q "^Waehlbar fuer NAECHSTER SCHRITT und die Roadmap (naechste 5) sind nur Klassen, die unter BEKANNTE BEFUNDE nicht ACCEPTED_RISK oder DISMISSED sind" "$PROMPT"'
+  'grep -q "^Eligible for NEXT STEP and the roadmap (next 5) are only classes that are not ACCEPTED_RISK or DISMISSED under KNOWN FINDINGS" "$PROMPT"'
 check "Prompt sagt: eingeordnete Klassen bleiben im Envelope (Zusammenbau, Abschnitt 9)" \
-  'grep -q "laesst keine gelistete Klasse weg, auch keine eingeordnete (ACCEPTED_RISK, DISMISSED; sie zaehlen in ERWARTETE FINDINGS mit)" "$PROMPT"'
+  'grep -q "leaves out no listed class, not even a triaged one (ACCEPTED_RISK, DISMISSED; they are counted in EXPECTED FINDINGS)" "$PROMPT"'
 check "Prompt verlangt keinen eigenen Envelope mehr" \
-  'grep -q "Den Envelope (mysuricates:audit-result:v1) schreibst du NICHT" "$PROMPT" && ! grep -q "^Schliesse die Antwort mit genau einem versteckten Envelope ab" "$PROMPT"'
-check "Prompt fordert naechster_schritt und BEFUND-TEXTE an" \
-  'grep -q "naechster_schritt: <subject>" "$PROMPT" && grep -q "^2. Ein Abschnitt, der mit der Zeile \"BEFUND-TEXTE:\" beginnt" "$PROMPT"'
+  'grep -q "You do NOT write the envelope (mysuricates:audit-result:v1)" "$PROMPT" && ! grep -q "^Close the answer with exactly one hidden envelope" "$PROMPT"'
+check "Prompt fordert next_step und FINDING TEXTS an" \
+  'grep -q "next_step: <subject>" "$PROMPT" && grep -q "^2. A section that starts with the line \"FINDING TEXTS:\"" "$PROMPT"'
 
 echo "6) Gate-Verdict prueft den Snapshot deterministisch"
 # Placeholders are inserted single-quoted as in TemplateResolver.resolveShellSafe
@@ -178,11 +178,11 @@ envelope_report() {  # $1 = number of ruleKeys, $2 = snapshotComplete (true|fals
   for ((i = 0; i < $1; i++)); do
     findings="$findings{\"ruleKey\":\"test-coverage.untested-class\",\"subject\":\"p/C$i.java\",\"severity\":\"MEDIUM\",\"title\":\"t\"},"
   done
-  printf '### Coverage-Coach\n\ngate_status: YELLOW\n\n<!-- mysuricates:audit-result:v1\n{"snapshotComplete":%s,"findings":[%s]}\n-->\n' \
+  printf '### Coverage coach\n\ngate_status: YELLOW\n\n<!-- mysuricates:audit-result:v1\n{"snapshotComplete":%s,"findings":[%s]}\n-->\n' \
     "$2" "${findings%,}"
 }
 
-GATE_METRICS="$(printf 'UNTESTED gesamt: 20\nDUENNE TESTS gesamt: 0\nERWARTETE FINDINGS: 20\n')"
+GATE_METRICS="$(printf 'UNTESTED total: 20\nTHIN TESTS total: 0\nEXPECTED FINDINGS: 20\n')"
 GATE_PREV="$(printf 'Kurzfassung\ngate_status: YELLOW\n')"
 
 run_gate() {  # $1 = report output, writes gate output to $TMP/gate.txt
@@ -201,7 +201,7 @@ check "18/20 Findings: RED"                  'grep -qx "gate_status: RED" "$TMP/
 check "18/20 Findings: audit-incomplete"     'grep -qx "gate_category: audit-incomplete" "$TMP/gate.txt"'
 check "18/20 Findings: Zahlen im Grund"      'grep "^gate_description:" "$TMP/gate.txt" | grep "18" >/dev/null && grep "^gate_description:" "$TMP/gate.txt" | grep "20" >/dev/null'
 
-run_gate "$(printf '### Coverage-Coach\n\ngate_status: GREEN\n')"
+run_gate "$(printf '### Coverage coach\n\ngate_status: GREEN\n')"
 check "kein Envelope: RED"                   'grep -qx "gate_status: RED" "$TMP/gate.txt"'
 check "kein Envelope: audit-invalid"         'grep -qx "gate_category: audit-invalid" "$TMP/gate.txt"'
 
@@ -209,9 +209,9 @@ run_gate "$(envelope_report 20 false)"
 check "snapshotComplete false: RED"          'grep -qx "gate_status: RED" "$TMP/gate.txt"'
 check "snapshotComplete false: audit-invalid" 'grep -qx "gate_category: audit-invalid" "$TMP/gate.txt"'
 
-GATE_METRICS="$(printf 'UNTESTED gesamt: 20\n')" run_gate "$(envelope_report 20 true)"
-check "ohne ERWARTETE FINDINGS: RED"         'grep -qx "gate_status: RED" "$TMP/gate.txt"'
-check "ohne ERWARTETE FINDINGS: incomplete"  'grep -qx "gate_category: audit-incomplete" "$TMP/gate.txt"'
+GATE_METRICS="$(printf 'UNTESTED total: 20\n')" run_gate "$(envelope_report 20 true)"
+check "ohne EXPECTED FINDINGS: RED"          'grep -qx "gate_status: RED" "$TMP/gate.txt"'
+check "ohne EXPECTED FINDINGS: incomplete"   'grep -qx "gate_category: audit-incomplete" "$TMP/gate.txt"'
 
 echo "7) Gate zaehlt wie die Ingestion nur den letzten Envelope (1cf996df)"
 # previous_report is the first 3000 characters of the previous run, with short reports including the envelope. If the
@@ -230,8 +230,8 @@ run_gate "$(envelope_report 20 true; printf '%s\n' '<!-- mysuricates:audit-resul
 check "eigener abgeschnitten nach vollstaendigem altem: RED" \
   'grep -qx "gate_status: RED" "$TMP/gate.txt" && grep -qx "gate_category: audit-invalid" "$TMP/gate.txt"'
 # If the envelope begins and ends in the same line, it counts as well; what comes after does not belong to it.
-GATE_METRICS="$(printf 'UNTESTED gesamt: 1\nDUENNE TESTS gesamt: 0\nERWARTETE FINDINGS: 1\n')" \
-  run_gate "$(printf '%s\n' '### Coverage-Coach' 'gate_status: YELLOW' \
+GATE_METRICS="$(printf 'UNTESTED total: 1\nTHIN TESTS total: 0\nEXPECTED FINDINGS: 1\n')" \
+  run_gate "$(printf '%s\n' '### Coverage coach' 'gate_status: YELLOW' \
   '<!-- mysuricates:audit-result:v1 {"snapshotComplete":true,"findings":[{"ruleKey":"test-coverage.untested-class","subject":"p/C0.java","severity":"MEDIUM","title":"t"}]} -->' \
   'Nachsatz ohne Envelope')"
 check "einzeiliger Envelope wird gezaehlt, der Nachsatz nicht" \
@@ -242,7 +242,7 @@ check "einzeiliger Envelope wird gezaehlt, der Nachsatz nicht" \
 # would be missing, and it would report RED although the ingestion accepts the report.
 envelope_lines() {  # $1 = number of findings, $2 = description of the eleventh
   local i sep desc
-  printf '%s\n' '### Coverage-Coach' 'gate_status: YELLOW' '<!-- mysuricates:audit-result:v1' \
+  printf '%s\n' '### Coverage coach' 'gate_status: YELLOW' '<!-- mysuricates:audit-result:v1' \
     '{"snapshotComplete":true,"findings":['
   for ((i = 0; i < $1; i++)); do
     sep=','; [ "$i" -eq $(($1 - 1)) ] && sep=''
@@ -331,26 +331,26 @@ git init -q "$FIXR" && ( cd "$FIXR" && git -c user.name=t -c user.email=t@exampl
 python3 - "$DEF" "$FIXR" > "$TMP/command-records.sh" <<'PY'
 import json, sys
 definition = json.load(open(sys.argv[1], encoding='utf-8'))
-block = next(b for b in definition['blocks'] if b.get('config', {}).get('label', '').startswith('Coverage-Metriken'))
+block = next(b for b in definition['blocks'] if b.get('config', {}).get('label', '').startswith('Coverage metrics'))
 print(block['config']['command'].replace('{{ project_path }}', sys.argv[2]))
 PY
 ( cd "$FIXR" && bash "$TMP/command-records.sh" ) > "$TMP/out-records.txt" 2> "$TMP/err-records.txt"
-awk '/^UNTESTED gesamt:/{f=1;next} f && /^[[:space:]]*$/{f=0} f' "$TMP/out-records.txt" > "$TMP/untested-records.txt"
+awk '/^UNTESTED total:/{f=1;next} f && /^[[:space:]]*$/{f=0} f' "$TMP/out-records.txt" > "$TMP/untested-records.txt"
 check "Record mit Parser-Methode ist ungetestet gelistet" \
   'grep -q "^service/ical/ContentLine\.java${TAB}[0-9]\+$" "$TMP/untested-records.txt"'
 check "Accessor, kompakter und zweiter Konstruktor sind keine Logik" '! grep -q "Window" "$TMP/untested-records.txt"'
 check "Methodenkopf in Kommentar oder String ist keine Logik"         '! grep -q "Quoted" "$TMP/untested-records.txt"'
 check "Record mit Logik und Test bleibt ungelistet"                    '! grep -q "Checked" "$TMP/untested-records.txt"'
 check "genau ein ungetesteter Record, Soll-Groesse 1" \
-  'grep -qx "UNTESTED gesamt: 1" "$TMP/out-records.txt" && grep -qx "ERWARTETE FINDINGS: 1" "$TMP/out-records.txt"'
+  'grep -qx "UNTESTED total: 1" "$TMP/out-records.txt" && grep -qx "EXPECTED FINDINGS: 1" "$TMP/out-records.txt"'
 check "nur die zwei Records ohne Logik ausgenommen" \
-  'grep -qx "Datenklassen ausgenommen (DTO/Entity/Repository/Event/Enum/Record/Interface): 2" "$TMP/out-records.txt"'
+  'grep -qx "Data classes excluded (DTO/Entity/Repository/Event/Enum/Record/Interface): 2" "$TMP/out-records.txt"'
 check "Messblock laeuft ohne stderr" '[ ! -s "$TMP/err-records.txt" ]'
 
 echo "9) Envelope deterministisch aus der Soll-Liste (fa66ea31)"
 # Run 073e9933: the AI output three classes twice (52 instead of 50 findings), the gate went RED and the run
 # was worthless. Now the shell block report builds the envelope from the lists of the measuring block; the AI delivers
-# only report, naechster_schritt and texts per class. Duplicates are thus impossible, missing texts
+# only report, next_step and texts per class. Duplicates are thus impossible, missing texts
 # are replaced by a default text, an envelope from the AI does not count.
 render_block() {  # $1 = name of the block, $2 = metric output, $3 = coach output, $4 = report output
   python3 - "$DEF" "$1" "$2" "$3" "$4" <<'PY'
@@ -381,14 +381,14 @@ finding_field() {  # $1 = subject, $2 = field
 METRICS_OUT="$(cat "$TMP/out.txt")"
 # Like run 073e9933: the AI lists classes twice, names an invented one, writes its own envelope
 # with 25 findings and uses tab, " | " and bullet characters mixed.
-COACH_OUT="$(printf '%s\n' '### Coverage-Coach' '' '**Status**: 40.0%' '' \
-  '**naechster_schritt:** `service/deep/Untested05.java`' '' 'BEFUND-TEXTE:' \
-  "service/deep/Untested20.java${TAB}Groesste Klasse: Kernpfade mit UntestedTest als Vorlage pruefen." \
-  'service/deep/Untested20.java | Doppelt genannt, der erste Text gilt.' \
-  '- controller/NoPublicUntested.java | Enum-Werte und --> Pfeil im Text abdecken.' \
-  'ThinOne.java | Die sechs fehlenden public-Methoden abdecken.' \
-  'service/Erfunden.java | Diese Klasse gibt es nicht.' \
-  'ENDE BEFUND-TEXTE' '' 'gate_status: YELLOW' 'gate_category: test-coverage' 'gate_description: 40%' '' \
+COACH_OUT="$(printf '%s\n' '### Coverage coach' '' '**Status**: 40.0%' '' \
+  '**next_step:** `service/deep/Untested05.java`' '' 'FINDING TEXTS:' \
+  "service/deep/Untested20.java${TAB}Largest class: check the core paths with UntestedTest as a template." \
+  'service/deep/Untested20.java | Named twice, the first text applies.' \
+  '- controller/NoPublicUntested.java | Cover the enum values and the --> arrow in the text.' \
+  'ThinOne.java | Cover the six missing public methods.' \
+  'service/Invented.java | This class does not exist.' \
+  'END FINDING TEXTS' '' 'gate_status: YELLOW' 'gate_category: test-coverage' 'gate_description: 40%' '' \
   '<!-- mysuricates:audit-result:v1' \
   "{\"snapshotComplete\":true,\"expectedFindings\":25,\"findings\":[$(for i in $(seq 1 25); do printf '{"ruleKey":"test-coverage.untested-class","subject":"p/C.java","severity":"MEDIUM","title":"t"},'; done | sed 's/,$//')]}" \
   '-->')"
@@ -403,30 +403,30 @@ f = e["findings"]
 print(len(f), len({(x["ruleKey"], x["subject"]) for x in f}), e["expectedFindings"], e["snapshotComplete"],
       sum(x["severity"] == "HIGH" for x in f), sum(x["ruleKey"] == "test-coverage.untested-class" for x in f),
       sum(x["ruleKey"] == "test-coverage.thin-test" for x in f))' "$TMP/envelope.json")"
-check "23 Findings wie ERWARTETE FINDINGS, keins doppelt" '[ "$ENV_TOTAL" -eq 23 ] && [ "$ENV_UNIQUE" -eq 23 ]'
+check "23 Findings wie EXPECTED FINDINGS, keins doppelt" '[ "$ENV_TOTAL" -eq 23 ] && [ "$ENV_UNIQUE" -eq 23 ]'
 check "expectedFindings 23, snapshotComplete true" '[ "$ENV_EXPECTED" -eq 23 ] && [ "$ENV_COMPLETE" = True ]'
 check "21 untested-class, 2 thin-test"             '[ "$ENV_UNTESTED" -eq 21 ] && [ "$ENV_THIN" -eq 2 ]'
 check "genau eine HIGH: der naechste Schritt"      '[ "$ENV_HIGH" -eq 1 ] && [ "$(finding_field service/deep/Untested05.java severity)" = HIGH ]'
 check "uebrige ungetestete MEDIUM, duenne LOW" \
   '[ "$(finding_field service/deep/Untested20.java severity)" = MEDIUM ] && [ "$(finding_field ThinOne.java severity)" = LOW ]'
 check "Text der KI je Klasse, beim doppelten der erste" \
-  '[ "$(finding_field service/deep/Untested20.java description)" = "Groesste Klasse: Kernpfade mit UntestedTest als Vorlage pruefen." ]'
+  '[ "$(finding_field service/deep/Untested20.java description)" = "Largest class: check the core paths with UntestedTest as a template." ]'
 check "Aufzaehlungszeichen und \" | \" gelesen, --> entschaerft" \
-  '[ "$(finding_field controller/NoPublicUntested.java description)" = "Enum-Werte und -> Pfeil im Text abdecken." ]'
+  '[ "$(finding_field controller/NoPublicUntested.java description)" = "Cover the enum values and the -> arrow in the text." ]'
 check "ohne Text der KI: Standardtext" \
-  'finding_field service/deep/Untested01.java description | grep "^Eigenen Test fuer Untested01 anlegen" >/dev/null'
-check "erfundene Klasse nicht im Envelope"         '! grep -q "Erfunden" "$TMP/envelope.json"'
+  'finding_field service/deep/Untested01.java description | grep "^Add a dedicated test for Untested01;" >/dev/null'
+check "erfundene Klasse nicht im Envelope"         '! grep -q "Invented" "$TMP/envelope.json"'
 check "evidence und Titel aus der Messung" \
-  '[ "$(finding_field service/deep/Untested20.java evidence)" = "200 LOC" ] && [ "$(finding_field ThinTwo.java evidence)" = "1/10 @Test/public (10%)" ] && [ "$(finding_field ThinTwo.java title)" = "Duenner Test: ThinTwo" ]'
+  '[ "$(finding_field service/deep/Untested20.java evidence)" = "200 LOC" ] && [ "$(finding_field ThinTwo.java evidence)" = "1/10 @Test/public (10%)" ] && [ "$(finding_field ThinTwo.java title)" = "Thin test: ThinTwo" ]'
 check "Bericht bleibt, Texte-Abschnitt und naechster_schritt nicht" \
-  'grep -qx "### Coverage-Coach" "$TMP/report.txt" && grep -qx "gate_status: YELLOW" "$TMP/report.txt" && ! grep -q "BEFUND-TEXTE\|naechster_schritt\|Diese Klasse gibt es nicht" "$TMP/report.txt"'
+  'grep -qx "### Coverage coach" "$TMP/report.txt" && grep -qx "gate_status: YELLOW" "$TMP/report.txt" && ! grep -q "FINDING TEXTS\|next_step\|This class does not exist" "$TMP/report.txt"'
 GATE_METRICS="$METRICS_OUT" run_gate "$(cat "$TMP/report.txt")"
 check "Gate auf dem zusammengesetzten Report: Status aus dem Bericht" \
   'grep -qx "gate_status: YELLOW" "$TMP/gate.txt" && grep -qx "gate_category: test-coverage" "$TMP/gate.txt"'
-assemble "$METRICS_OUT" "$(printf '%s\n' 'naechster_schritt: service/Erfunden.java' 'gate_status: GREEN')"
+assemble "$METRICS_OUT" "$(printf '%s\n' 'next_step: service/Invented.java' 'gate_status: GREEN')"
 check "unbekannter naechster Schritt: keine HIGH, alle mit Standardtext" \
-  '! grep -q "\"HIGH\"" "$TMP/envelope.json" && [ "$(grep -o "Eigenen Test fuer" "$TMP/envelope.json" | wc -l)" -eq 21 ]'
-assemble "$(printf '%s\n' "$METRICS_OUT" | sed '/^DUENNE TESTS gesamt:/d')" "$COACH_OUT"
+  '! grep -q "\"HIGH\"" "$TMP/envelope.json" && [ "$(grep -o "Add a dedicated test for" "$TMP/envelope.json" | wc -l)" -eq 21 ]'
+assemble "$(printf '%s\n' "$METRICS_OUT" | sed '/^THIN TESTS total:/d')" "$COACH_OUT"
 check "Kopfzeile fehlt: snapshotComplete false" \
   'python3 -c "import json,sys; sys.exit(json.load(open(sys.argv[1]))[\"snapshotComplete\"] is not False)" "$TMP/envelope.json"'
 GATE_METRICS="$METRICS_OUT" run_gate "$(cat "$TMP/report.txt")"
@@ -435,27 +435,27 @@ check "Kopfzeile fehlt: Gate RED audit-invalid" \
 assemble "$(printf '%s\n' "$METRICS_OUT" | sed '/^service\/deep\/Untested03\.java/d')" "$COACH_OUT"
 check "Kopfzeile zaehlt mehr Zeilen als gelistet: snapshotComplete false" 'grep -q "\"snapshotComplete\": false" "$TMP/envelope.json"'
 
-# If "ENDE BEFUND-TEXTE" is missing, the section ends at the next gate_ or naechster_schritt line: otherwise
+# If "END FINDING TEXTS" is missing, the section ends at the next gate_ or next_step line: otherwise
 # it would swallow the verdict and next step (review fa66ea31).
-assemble "$METRICS_OUT" "$(printf '%s\n' '### Coverage-Coach' 'BEFUND-TEXTE:' \
-  'service/deep/Untested09.java | Text ohne Abschlusszeile.' '' '**gate_status:** YELLOW' 'gate_category: test-coverage' \
-  'naechster_schritt: service/deep/Untested05.java' 'Schlusssatz des Berichts.')"
-check "ohne ENDE BEFUND-TEXTE: gate-Zeilen bleiben im Bericht" \
-  'grep -qx "\*\*gate_status:\*\* YELLOW" "$TMP/report.txt" && grep -qx "gate_category: test-coverage" "$TMP/report.txt" && grep -qx "Schlusssatz des Berichts." "$TMP/report.txt"'
-check "ohne ENDE BEFUND-TEXTE: naechster Schritt wird HIGH, Text davor gilt" \
-  '[ "$(finding_field service/deep/Untested05.java severity)" = HIGH ] && [ "$(finding_field service/deep/Untested09.java description)" = "Text ohne Abschlusszeile." ]'
+assemble "$METRICS_OUT" "$(printf '%s\n' '### Coverage coach' 'FINDING TEXTS:' \
+  'service/deep/Untested09.java | Text without a closing line.' '' '**gate_status:** YELLOW' 'gate_category: test-coverage' \
+  'next_step: service/deep/Untested05.java' 'Closing sentence of the report.')"
+check "ohne END FINDING TEXTS: gate-Zeilen bleiben im Bericht" \
+  'grep -qx "\*\*gate_status:\*\* YELLOW" "$TMP/report.txt" && grep -qx "gate_category: test-coverage" "$TMP/report.txt" && grep -qx "Closing sentence of the report." "$TMP/report.txt"'
+check "ohne END FINDING TEXTS: naechster Schritt wird HIGH, Text davor gilt" \
+  '[ "$(finding_field service/deep/Untested05.java severity)" = HIGH ] && [ "$(finding_field service/deep/Untested09.java description)" = "Text without a closing line." ]'
 # If the AI names a subject with a different path, the text of the class with the same file name applies, if it
-# is unambiguous; otherwise the default text stays. The same for naechster_schritt.
-TWIN_METRICS="$(printf '%s\n' 'UNTESTED gesamt: 3' "a/Twin.java${TAB}50" "b/Twin.java${TAB}40" "service/deep/Solo.java${TAB}30" '' \
-  'DUENNE TESTS gesamt: 0' '' 'ERWARTETE FINDINGS: 3')"
-assemble "$TWIN_METRICS" "$(printf '%s\n' 'naechster_schritt: com/automation/service/deep/Solo.java' 'BEFUND-TEXTE:' \
-  'Solo.java | Text fuer Solo ueber den Dateinamen.' 'Twin.java | Mehrdeutig, darf nicht greifen.' 'ENDE BEFUND-TEXTE')"
+# is unambiguous; otherwise the default text stays. The same for next_step.
+TWIN_METRICS="$(printf '%s\n' 'UNTESTED total: 3' "a/Twin.java${TAB}50" "b/Twin.java${TAB}40" "service/deep/Solo.java${TAB}30" '' \
+  'THIN TESTS total: 0' '' 'EXPECTED FINDINGS: 3')"
+assemble "$TWIN_METRICS" "$(printf '%s\n' 'next_step: com/automation/service/deep/Solo.java' 'FINDING TEXTS:' \
+  'Solo.java | Text for Solo via the file name.' 'Twin.java | Ambiguous, must not apply.' 'END FINDING TEXTS')"
 check "abweichender Pfad, eindeutiger Dateiname: Text der KI" \
-  '[ "$(finding_field service/deep/Solo.java description)" = "Text fuer Solo ueber den Dateinamen." ]'
+  '[ "$(finding_field service/deep/Solo.java description)" = "Text for Solo via the file name." ]'
 check "abweichender Pfad im naechsten Schritt: HIGH ueber den Dateinamen" \
   '[ "$(finding_field service/deep/Solo.java severity)" = HIGH ]'
 check "mehrdeutiger Dateiname: Standardtext fuer beide" \
-  'finding_field a/Twin.java description | grep "^Eigenen Test fuer Twin" >/dev/null && finding_field b/Twin.java description | grep "^Eigenen Test fuer Twin" >/dev/null'
+  'finding_field a/Twin.java description | grep "^Add a dedicated test for Twin;" >/dev/null && finding_field b/Twin.java description | grep "^Add a dedicated test for Twin;" >/dev/null'
 
 # Classes of the same name in two packages would yield the same thin-test-subject twice: the measuring block lists
 # only the thinnest line per name, EXPECTED FINDINGS counts it once.
@@ -476,7 +476,7 @@ print(block['config']['command'].replace('{{ project_path }}', sys.argv[2]))
 PY
 ( cd "$FIXD" && bash "$TMP/command-dup.sh" ) > "$TMP/out-dup.txt" 2> "$TMP/err-dup.txt"
 check "gleichnamige duenne Klassen: eine Zeile, die duennste" \
-  'grep -qx "DUENNE TESTS gesamt: 1" "$TMP/out-dup.txt" && grep -qx "Twin.java${TAB}1/10${TAB}10%" "$TMP/out-dup.txt" && grep -qx "ERWARTETE FINDINGS: 1" "$TMP/out-dup.txt"'
+  'grep -qx "THIN TESTS total: 1" "$TMP/out-dup.txt" && grep -qx "Twin.java${TAB}1/10${TAB}10%" "$TMP/out-dup.txt" && grep -qx "EXPECTED FINDINGS: 1" "$TMP/out-dup.txt"'
 
 echo
 echo "passed=$PASS failed=$FAIL"

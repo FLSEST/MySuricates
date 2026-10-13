@@ -19,9 +19,9 @@
   "provider": "PI",
   "model": "openai-codex/gpt-5.5",
   "effort": "medium",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "author": "MySuricates",
-  "instructions": "Erzeuge belegte Dokumentation im ausdrücklich angegebenen Arbeitsverzeichnis. Dies ist ein kontrollierter Dokumentationsauftrag; keine Commits oder Plattformänderungen. Jeder Aufruf schreibt ausschließlich seinen angegebenen Entwurf. Workflow-Blöcke greifen weder auf REST noch auf die DB zu.",
+  "instructions": "Produce evidence-backed documentation in the explicitly given working directory. This is a controlled documentation task; no commits or platform changes. Each call writes only its given draft. Workflow blocks access neither REST nor the DB.",
   "defaultContext": {
     "concept_root": ".",
     "concept_output": "/tmp/mysuricates-concept-pages",
@@ -48,7 +48,7 @@
         "execution_mode": "ai",
         "continue_on_error": false,
         "timeout_seconds": 600,
-        "command": "Arbeitsanker ist das bereits IN_PROGRESS gesetzte TODO des aufrufenden Operators. Erzeuge genau EINE deutsche Konzeptseite zum Mechanismus {{ concept }}.\nLies zuerst {{ concept_output }}/{{ workflow_run_id }}/packets/{{ concept }}.txt. Die Codebelege stammen aus {{ concept_root }}, NICHT aus deinem aktuellen Arbeitsverzeichnis. Bei Bedarf dort gezielt weiterlesen.\n\nSchreibe 180 bis 280 deutsche Wörter ausschließlich nach {{ concept_output }}/{{ workflow_run_id }}/drafts/{{ concept }}.md.\nGenau diese drei Überschriften, in dieser Reihenfolge:\n## Wofür taugt das?\n## Vorteile\n## Nachteile und Kosten\n\nZielgruppe: technisch interessierte Leser ohne Projektwissen, die den Mechanismus übernehmen könnten. Erkläre den Ablauf, einen konkreten sinnvollen Einsatz, Nutzen und tatsächliche Grenzen/Kosten. Nüchtern, lesbar, kein Marketing. Behauptungen müssen im Faktenpaket oder Code belegt sein.\nDie Seite beschreibt den Mechanismus, nicht eine Installation: keine Betriebs-, Bestands- oder Nutzungszahlen einer Instanz nennen und keine Messung einordnen. Fehlende Belege (etwa für fachlichen Nutzen) ausdrücklich als fehlend benennen.\nKeine H1-Überschrift, keine Mermaid-/Codeblöcke, keine Links, keine Metakommentare: Diagramm und Quellenlinks ergänzt das Skript. Keine privaten Namen, Pfade, IDs, Zugangsdaten oder externen Produktvergleiche.\nKeine weiteren Dateien ändern, keine API-/DB-Aufrufe, keine TODO-Änderungen, kein git add/commit/push. Die übergeordnete Sitzung übernimmt Tracking und Review.\nVerwende dein Schreibwerkzeug, prüfe danach, dass die Datei existiert, und antworte kurz mit dem Dateinamen.",
+        "command": "The working anchor is the TODO of the calling operator, already set to IN_PROGRESS. Write exactly ONE German concept page on the mechanism {{ concept }}.\nFirst read {{ concept_output }}/{{ workflow_run_id }}/packets/{{ concept }}.txt. The code evidence comes from {{ concept_root }}, NOT from your current working directory. Read further there in a targeted way if needed.\n\nWrite 180 to 280 German words, only to {{ concept_output }}/{{ workflow_run_id }}/drafts/{{ concept }}.md.\nExactly these three headings, in this order:\n## Wofür taugt das?\n## Vorteile\n## Nachteile und Kosten\n\nAudience: technically interested readers without knowledge of the project who could adopt the mechanism. Explain the flow, one concrete sensible use, the benefit and the actual limits/costs. Sober, readable, no marketing. Claims must be backed by the fact packet or the code.\nThe page describes the mechanism, not an installation: do not state operating, inventory or usage figures of an instance and do not interpret any measurement. Name missing evidence (for instance for the practical benefit) explicitly as missing.\nNo H1 heading, no Mermaid or code blocks, no links, no meta comments: the script adds the diagram and the source links. No private names, paths, IDs, credentials or comparisons with external products.\nDo not change any other files, no API/DB calls, no TODO changes, no git add/commit/push. The parent session takes care of tracking and review.\nUse your write tool, then check that the file exists, and answer briefly with the file name.",
         "provider": "PI",
         "model": "openai-codex/gpt-5.5"
       }
@@ -72,5 +72,5 @@
       }
     }
   ],
-  "integrity": "sha256:75a5956feb5793b28061372c767c07c439ab18a500e6a1d04d744875d09e1d2e"
+  "integrity": "sha256:25ab89475fbefe9c02f277cac910a8a4fcb444fff457ea0110fa4665736f31ac"
 }

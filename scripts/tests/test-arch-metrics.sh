@@ -184,24 +184,24 @@ prompt = blocks[i_report]["config"]["command"]
 assert "{{ block.%s.output }}" % name in prompt, "Report-Prompt referenziert das Faktenblatt nicht"
 assert "mysuricates:audit-result:v1" in prompt, "Envelope fehlt"
 assert "gate_status:" in prompt, "Gate-Marker fehlt"
-assert "Miss nichts selbst" in prompt, "Interpretations-Anweisung fehlt"
-assert "Fehlt das Faktenblatt ganz" in prompt, "Regel fuer fehlendes Faktenblatt fehlt"
+assert "Do not measure anything yourself" in prompt, "Interpretations-Anweisung fehlt"
+assert "If the fact sheet is missing entirely" in prompt, "Regel fuer fehlendes Faktenblatt fehlt"
 # Division of roles: findings and severity come unchanged from ## findings, the AI does not grade by itself.
-assert "## findings" in prompt and "UNVERAENDERT" in prompt, "Uebernahme aus ## findings fehlt"
-assert "keine eigene Schwere" in prompt, "KI darf keine eigene Schwere vergeben"
+assert "## findings" in prompt and "UNCHANGED" in prompt, "Uebernahme aus ## findings fehlt"
+assert "no severity of your own" in prompt, "KI darf keine eigene Schwere vergeben"
 assert "not_measured" in prompt, "nicht gemessene Dimensionen fehlen im Prompt"
 # The old edges are gone: no raw line edges, no package coupling as a finding.
-for gone in (">200 Zeilen", ">300 Zeilen", ">5 Abhaengigkeiten", ">7 Abhaengigkeiten", "herabstufen",
-             "Backend-Paket (Paketkopplung)", "Pakete und Verzeichnisse bekommen arch.high-coupling",
+for gone in (">200 lines", ">300 lines", ">5 dependencies", ">7 dependencies", "downgrade",
+             "backend package (package coupling)", "packages and directories get arch.high-coupling",
              "arch.duplicated-logic"):
     assert gone not in prompt, "alte Regel steht noch im Prompt: " + gone
-assert "Paketkopplung" in prompt and "KEIN Befund mehr" in prompt, "Paketkopplung als Trend fehlt"
-assert "Neu in 4.11.0:" in prompt, "one-off explanation of the known judgments is missing"
-assert all("Neu in 4.%d.0:" % v not in prompt for v in (7, 8, 9, 10)), "earlier one-off explanations are done"
-assert "Regelwechsel 4.6.0" not in prompt, "die einmalige Erklaerung von 4.6.0 ist erledigt"
+assert "Package coupling" in prompt and "NO LONGER a finding" in prompt, "Paketkopplung als Trend fehlt"
+assert "New in 4.11.0:" in prompt, "one-off explanation of the known judgments is missing"
+assert all("New in 4.%d.0:" % v not in prompt for v in (7, 8, 9, 10)), "earlier one-off explanations are done"
+assert "Rule change 4.6.0" not in prompt, "die einmalige Erklaerung von 4.6.0 ist erledigt"
 assert "NCLOC" in prompt and "Hotspot" in prompt, "NCLOC-Baender und Hotspot-Regel fehlen"
-assert "nur Kollaborateure" in prompt, "Zahl meint Kollaborateure"
-assert wf["version"] == "4.11.0", wf["version"]
+assert "only collaborators" in prompt, "Zahl meint Kollaborateure"
+assert wf["version"] == "4.12.0", wf["version"]
 # 67128699: PMD from automation-agent-analysis measures duplicates (CPD per language, CSV) and complexity (SARIF);
 # the tool blocks run before arch_metrics, which hands their outputs on to arch-findings.py.
 tool_blocks = {b.get("name"): b for b in blocks if b["config"].get("container_args")}
@@ -222,14 +222,14 @@ assert "-i" in tool_blocks["lizard"]["config"]["container_args"], "lizard endet 
 for name in ("cpd_java", "jscpd", "pmd_design", "lizard"):
     assert "{{ block.%s.output }}" % name in command, name
 # 2c07ce7e: evidence cites the FAKT lines of ## FAKTENBLATT arch, the report states the measurement scope.
-for marker in ("## FAKTENBLATT arch", "fakt-Namen der Kandidatenzeile", "**Messumfang**: <Wert von FAKT arch_scope", "nicht vergleichbar", "unbelegt"):
+for marker in ("## FAKTENBLATT arch", "fakt name of the candidate line", "**Measurement scope**: <value of FAKT arch_scope", "not comparable", "unverified"):
     assert marker in prompt, "evidence/scope rule missing in the prompt: " + marker
 # ebf6602e: arch-findings.py holds every known judgment against this run; a carried-forward judgment keeps its evidence.
 assert "{{ audit_findings }}" in command and "--known " in command, "known findings do not reach the classification"
-for marker in ("## known_judgments", "Text hinter \"Beleg: \"", "existiert \"nein\"", "\"ungeprueft\""):
+for marker in ("## known_judgments", "text after \"Beleg: \"", "existiert \"nein\"", "\"ungeprueft\""):
     assert marker in prompt, "known-judgment rule missing in the prompt: " + marker
-assert "sonst \"unveraendert seit dem letzten Urteil\"" not in prompt, "carried-forward judgments must keep their evidence"
-for marker in ("## duplicates", "## complexity", "art dublette", "frontend_complexity_state", "nie ein eigener Befund"):
+assert "otherwise \"unchanged since the last verdict\"" not in prompt, "carried-forward judgments must keep their evidence"
+for marker in ("## duplicates", "## complexity", "art dublette", "frontend_complexity_state", "never a finding of its own"):
     assert marker in prompt, "Werkzeug-Fakten im Prompt unvollstaendig: " + marker
 # e0e9495f: the script chooses candidates, arch-seams.py measures their seams, the AI judges.
 assert "ARCH_METRICS_CLASSES_OUT=" in command and "arch-seams.py" in command, "Seams fehlen im Metrik-Block"
@@ -237,13 +237,15 @@ assert command.index("python3 scripts/public-readiness/arch-findings.py") < comm
 assert "\"## recent\"" in command, "## recent muss wie ## files aus dem Backend-Blatt gefiltert werden"
 frontend = next(b for b in blocks if b.get("name") == "frontend_metrics")["config"]["command"]
 assert "\"## recent\"" in frontend, "## recent muss aus dem Frontend-Blatt gefiltert werden"
-for marker in ("URTEIL UEBER DIE KANDIDATEN (VERBINDLICH):", "## review_candidates", "## seams", "### Urteil je Kandidat",
-               "\"passt so\"", "aenderungen_7d", "nie HIGH oder CRITICAL", "keine Mengen mit Einheit",
-               "Verantwortlichkeiten (Urteil)", "offener bzw. neuer Urteilsbefund", "ein Urteilsbefund allein macht nie RED"):
+for marker in ("VERDICT ON THE CANDIDATES (BINDING):", "## review_candidates", "## seams", "### Verdict per candidate",
+               "\"fine as is\"", "aenderungen_7d", "never HIGH or CRITICAL", "no quantities with a unit",
+               "Responsibilities (verdict)", "open or new verdict finding", "a verdict finding alone never makes it RED"):
     assert marker in prompt, "Urteilsschicht unvollstaendig: " + marker
 assert blocks[i_report]["config"].get("timeout_seconds", 0) >= 1200, "Lesen der Kandidaten braucht Zeit"
 gate = next(b for b in blocks if b["config"].get("label", "").startswith("Gate-Verdict"))["config"]["command"]
 assert "{{ block.arch_metrics.output }}" in gate and "review_candidates" in gate, "Gate prueft das Urteil nicht"
+# The gate counts the lines under the report heading it matches; prompt and gate must name the same heading.
+assert "/^#+[[:space:]]+Verdict/" in gate and "\n### Verdict per candidate\n" in prompt, "gate and report disagree on the verdict heading"
 delta = next(b for b in blocks if b.get("name") == "delta_scan")
 assert delta["config"].get("timeout_seconds", 0) >= 180, "Struktur-Scan braucht Luft fuer Last"
 # The collaborator count and the ratchet lists have lived in arch-metrics.sh since 4.6.0.

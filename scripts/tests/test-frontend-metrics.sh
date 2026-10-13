@@ -283,7 +283,7 @@ assert "set -euo pipefail" in metrics["config"]["command"], "Shell-Block ohne se
 assert metrics["config"].get("timeout_seconds", 0) >= 60
 prompt = blocks[i_report]["config"]["command"]
 assert "{{ block.%s.output }}" % name in prompt, "Report-Prompt referenziert das Frontend-Blatt nicht"
-assert "Frontend-Zahlen" in prompt, "Regel fuer die Herkunft der Frontend-Zahlen fehlt"
+assert "Frontend numbers" in prompt, "Regel fuer die Herkunft der Frontend-Zahlen fehlt"
 PY'
 
 echo

@@ -16,23 +16,23 @@
     "installer",
     "release"
   ],
-  "version": "1.1.0",
+  "version": "1.2.0",
   "author": "MySuricates",
   "defaultContext": {
     "ref": "main",
     "way": "host"
   },
-  "instructions": "Deterministischer Lauf ohne KI: das Probe-Skript entscheidet GREEN/RED selbst. Braucht Docker auf dem Host; der Pfad des Reports steht am Ende der Ausgabe.",
+  "instructions": "Deterministic run without AI: the probe script decides GREEN/RED itself. Needs Docker on the host; the path of the report is at the end of the output.",
   "blocks": [
     {
       "type": "shell",
       "config": {
-        "label": "Installer auf frischer Maschine prüfen",
-        "command": "set -euo pipefail\n# Stand, der geprüft wird: Variable ref (Default main). Das Probe-Skript kommt aus genau diesem Stand,\n# nicht aus dem gerade ausgecheckten Branch — so prüft der Lauf, was ein Klon von ref bekommt.\nset -- {{ ref }}; REF=\"${1:-main}\"\n# Weg, den die Probe prüft (Variable way, Default host): host | container | staged – wie Schritt 2 von setup.sh.\n# container und staged brauchen den Docker dieses Rechners.\nset -- {{ way }}; WAY=\"${1:-host}\"\nREPO={{ project_path }}\nTMP=\"$(mktemp -d)\"; trap 'rm -rf \"$TMP\"' EXIT\nred() { echo \"gate_status: RED\"; echo \"gate_category: installer\"; echo \"gate_description: $1\"; exit 1; }\ngit -C \"$REPO\" rev-parse --verify --quiet \"${REF}^{commit}\" >/dev/null || red \"Unbekannter Stand: ${REF}\"\ngit -C \"$REPO\" archive \"$REF\" scripts | tar -x -C \"$TMP\"\n[ -f \"$TMP/scripts/installer-probe.sh\" ] || red \"Stand ${REF} enthält noch kein scripts/installer-probe.sh\"\ncase \"$WAY\" in host|container|staged) ;; *) red \"Unbekannter Weg: ${WAY} (erlaubt: host, container, staged)\" ;; esac\n# Ältere Stände kennen --way nicht; für den Host-Weg deshalb ohne die Option aufrufen.\nWAY_ARGS=(); [ \"$WAY\" = host ] || WAY_ARGS=(--way \"$WAY\")\nset +e\nbash \"$TMP/scripts/installer-probe.sh\" --repo \"$REPO\" --ref \"$REF\" \"${WAY_ARGS[@]}\" 2>&1 | tee \"$TMP/probe.out\"\nRC=\"${PIPESTATUS[0]}\"\nset -e\n# Ohne eigene Gate-Zeilen (Abbruch vor den Prüfungen) wäre das Verdict sonst stillschweigend grün.\ngrep -q '^gate_status:' \"$TMP/probe.out\" || red \"Installer-Probe brach ab (Exit ${RC}), bevor sie prüfen konnte\"\nexit \"$RC\"",
+        "label": "Check the installer on a fresh machine",
+        "command": "set -euo pipefail\n# Revision under test: variable ref (default main). The probe script comes from exactly this revision,\n# not from the branch currently checked out — so the run checks what a clone of ref gets.\nset -- {{ ref }}; REF=\"${1:-main}\"\n# Way the probe checks (variable way, default host): host | container | staged – like step 2 of setup.sh.\n# container and staged need this machine's Docker.\nset -- {{ way }}; WAY=\"${1:-host}\"\nREPO={{ project_path }}\nTMP=\"$(mktemp -d)\"; trap 'rm -rf \"$TMP\"' EXIT\nred() { echo \"gate_status: RED\"; echo \"gate_category: installer\"; echo \"gate_description: $1\"; exit 1; }\ngit -C \"$REPO\" rev-parse --verify --quiet \"${REF}^{commit}\" >/dev/null || red \"Unknown revision: ${REF}\"\ngit -C \"$REPO\" archive \"$REF\" scripts | tar -x -C \"$TMP\"\n[ -f \"$TMP/scripts/installer-probe.sh\" ] || red \"Revision ${REF} does not contain scripts/installer-probe.sh yet\"\ncase \"$WAY\" in host|container|staged) ;; *) red \"Unknown way: ${WAY} (allowed: host, container, staged)\" ;; esac\n# Older revisions do not know --way; so call it without the option for the host way.\nWAY_ARGS=(); [ \"$WAY\" = host ] || WAY_ARGS=(--way \"$WAY\")\nset +e\nbash \"$TMP/scripts/installer-probe.sh\" --repo \"$REPO\" --ref \"$REF\" \"${WAY_ARGS[@]}\" 2>&1 | tee \"$TMP/probe.out\"\nRC=\"${PIPESTATUS[0]}\"\nset -e\n# Without gate lines of its own (abort before the checks) the verdict would otherwise be silently green.\ngrep -q '^gate_status:' \"$TMP/probe.out\" || red \"Installer probe aborted (exit ${RC}) before it could check\"\nexit \"$RC\"",
         "shell_escape_variables": true,
         "timeout_seconds": 3600
       }
     }
   ],
-  "integrity": "sha256:8ff0327ad60f27df4ce2dc08676c219af1decfa442a774a54f365aa94738838b"
+  "integrity": "sha256:142e7d9dc12b3dfd1efc583369a9ce75b077554540ec3306e29da649700aec4e"
 }

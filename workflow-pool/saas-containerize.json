@@ -11,10 +11,10 @@
   "category" : "DEPLOY",
   "scope" : "external",
   "tags" : [ "saas-factory", "docker" ],
-  "version" : "1.0.0",
+  "version" : "1.1.0",
   "author" : "MySuricates",
   "model" : null,
-  "instructions" : "Containerisierung ist deterministisch — keine LLM-Schritte. Nutzt factory-CLI. Approval am Ende, weil der User sich die laufende App anschauen soll.",
+  "instructions" : "Containerization is deterministic — no LLM steps. Uses the factory CLI. Approval at the end, because the user should look at the running app.",
   "blocks" : [ {
     "type" : "shell",
     "config" : {
@@ -28,7 +28,7 @@
       "options" : [ "Yes", "No", "Restart" ],
       "timeout_minutes" : 60,
       "variable_name" : "containerize_decision",
-      "question" : "## Container läuft\n\n{{ previous_output }}\n\nDie App läuft jetzt lokal. Schau sie dir im Browser an — der Port steht im JSON oben.\n\n**Yes** = Pipeline beenden, App ist OK\n**No** = Pipeline beenden, App ist NICHT OK (öffnet TODO für Manual Review)\n**Restart** = Container stoppen und neu bauen (z. B. nach Code-Edits)"
+      "question" : "## Container is running\n\n{{ previous_output }}\n\nThe app is now running locally. Look at it in the browser — the port is in the JSON above.\n\n**Yes** = end the pipeline, the app is OK\n**No** = end the pipeline, the app is NOT OK (opens a TODO for manual review)\n**Restart** = stop the container and rebuild it (e.g. after code edits)"
     },
     "requiredCapabilities" : [ ]
   }, {
@@ -36,9 +36,9 @@
     "config" : {
       "timeout_seconds" : 60,
       "on_failure" : "continue",
-      "command" : "set -euo pipefail\nFACTORY=\"${FACTORY_ROOT:-./saas-factory}\"\nDECISION=\"{{ containerize_decision }}\"\nSLUG=\"{{ slug }}\"\nif [ \"$DECISION\" = 'No' ]; then\n  \"$FACTORY/tools/factory\" create-todo \"Manual Review nötig: $SLUG nach Containerize abgelehnt\" --tag manual-review --tag \"$SLUG\" --priority HIGH --workflow-run '{{ workflow_run_id }}' --reference-type 'containerize_rejected' --reference-id \"$SLUG\" >&2 || true\nfi\necho \"Decision: $DECISION\""
+      "command" : "set -euo pipefail\nFACTORY=\"${FACTORY_ROOT:-./saas-factory}\"\nDECISION=\"{{ containerize_decision }}\"\nSLUG=\"{{ slug }}\"\nif [ \"$DECISION\" = 'No' ]; then\n  \"$FACTORY/tools/factory\" create-todo \"Manual review needed: $SLUG rejected after containerize\" --tag manual-review --tag \"$SLUG\" --priority HIGH --workflow-run '{{ workflow_run_id }}' --reference-type 'containerize_rejected' --reference-id \"$SLUG\" >&2 || true\nfi\necho \"Decision: $DECISION\""
     },
     "requiredCapabilities" : [ ]
   } ],
-  "integrity": "sha256:b96331590c9014995f24c132a66c227534fe08e6cad6ff1a824007a40f13060b"
+  "integrity": "sha256:f3541e8bb14fc948e32d67111a90e08f70bb8df8cbee0ef4b715faeb589d2bad"
 }

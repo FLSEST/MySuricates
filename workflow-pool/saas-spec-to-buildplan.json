@@ -11,10 +11,10 @@
   "category" : "BUSINESS",
   "scope" : "external",
   "tags" : [ "saas-factory", "planning" ],
-  "version" : "1.0.1",
+  "version" : "1.1.0",
   "author" : "MySuricates",
   "model" : "opus",
-  "instructions" : "Du bist die erste Stufe der SaaS-Factory-Pipeline. Aus einer spec.md erzeugst du einen strukturierten Build-Plan inklusive Stack-Empfehlung. Sei explizit über Annahmen, formuliere offene Fragen statt schweigend zu raten. Pflicht: respektiere constraints.must_avoid hart.",
+  "instructions" : "You are the first stage of the SaaS factory pipeline. From a spec.md you create a structured build plan including a stack recommendation. Be explicit about assumptions; phrase open questions instead of guessing silently. Mandatory: strictly respect constraints.must_avoid.",
   "defaultContext" : {
     "spec_path" : ""
   },
@@ -22,7 +22,7 @@
     "type" : "shell",
     "config" : {
       "timeout_seconds" : 60,
-      "command" : "set -euo pipefail\nSPEC=\"{{ spec_path }}\"\nFACTORY=\"${FACTORY_ROOT:-./saas-factory}\"\nif [ -z \"$SPEC\" ]; then\n  echo 'ERROR: spec_path Kontextvariable fehlt' >&2; exit 2\nfi\ncase \"$SPEC\" in /*) ;; *) SPEC=\"$FACTORY/$SPEC\" ;; esac\n\"$FACTORY/tools/factory\" validate-spec \"$SPEC\""
+      "command" : "set -euo pipefail\nSPEC=\"{{ spec_path }}\"\nFACTORY=\"${FACTORY_ROOT:-./saas-factory}\"\nif [ -z \"$SPEC\" ]; then\n  echo 'ERROR: context variable spec_path is missing' >&2; exit 2\nfi\ncase \"$SPEC\" in /*) ;; *) SPEC=\"$FACTORY/$SPEC\" ;; esac\n\"$FACTORY/tools/factory\" validate-spec \"$SPEC\""
     },
     "requiredCapabilities" : [ ]
   }, {
@@ -35,7 +35,7 @@
     "type" : "simple",
     "config" : {
       "timeout_seconds" : 600,
-      "command" : "Du erhältst die geparste Frontmatter-Validation als JSON von Block 1 und den vollständigen spec.md-Text von Block 2.\n\nVALIDATION-RESULT (Block 1, JSON):\n{{ step_1_output }}\n\nSPEC-INHALT (Block 2):\n{{ previous_output }}\n\nVERFÜGBARE RECIPES (im saas-factory Projekt unter recipes/):\n- nextjs-prisma-postgres (Next.js 15 + Prisma + Postgres + Tailwind, App-Router)\n\nAUFGABE — Erstelle einen JSON-Build-Plan mit folgender Struktur:\n```json\n{\n  \"stack\": {\n    \"framework\": \"...\",\n    \"db\": \"...\",\n    \"auth\": \"...\",\n    \"recipe\": \"recipe-name oder null\",\n    \"cli_fallback\": \"command oder null\"\n  },\n  \"stack_reasoning\": \"1-2 Sätze warum dieser Stack zur Spec passt\",\n  \"feature_order\": [\"feature-id-1\", \"feature-id-2\", ...],\n  \"per_feature\": {\n    \"feature-id-1\": {\n      \"snippet_hint\": \"snippets/<stack>/<feature>/ oder null\",\n      \"complexity\": \"S|M|L\",\n      \"risks\": [\"risk-1\", \"risk-2\"]\n    }\n  },\n  \"open_questions\": [\"Frage 1\", \"Frage 2\"]\n}\n```\n\nWICHTIG:\n- Berücksichtige nur Phase-1-Features (must_have=true UND phase=1 oder default).\n- Wenn die Spec einen stack_hint hat, respektiere ihn — nur überschreiben, wenn er in Konflikt mit must_avoid steht.\n- Bei mehrdeutigen Anforderungen → open_questions, NICHT raten."
+      "command" : "You receive the parsed frontmatter validation as JSON from block 1 and the full spec.md text from block 2.\n\nVALIDATION RESULT (block 1, JSON):\n{{ step_1_output }}\n\nSPEC CONTENT (block 2):\n{{ previous_output }}\n\nAVAILABLE RECIPES (in the saas-factory project under recipes/):\n- nextjs-prisma-postgres (Next.js 15 + Prisma + Postgres + Tailwind, App Router)\n\nTASK — create a JSON build plan with the following structure:\n```json\n{\n  \"stack\": {\n    \"framework\": \"...\",\n    \"db\": \"...\",\n    \"auth\": \"...\",\n    \"recipe\": \"recipe-name or null\",\n    \"cli_fallback\": \"command or null\"\n  },\n  \"stack_reasoning\": \"1-2 sentences on why this stack fits the spec\",\n  \"feature_order\": [\"feature-id-1\", \"feature-id-2\", ...],\n  \"per_feature\": {\n    \"feature-id-1\": {\n      \"snippet_hint\": \"snippets/<stack>/<feature>/ or null\",\n      \"complexity\": \"S|M|L\",\n      \"risks\": [\"risk-1\", \"risk-2\"]\n    }\n  },\n  \"open_questions\": [\"Question 1\", \"Question 2\"]\n}\n```\n\nIMPORTANT:\n- Consider only phase-1 features (must_have=true AND phase=1 or default).\n- If the spec has a stack_hint, respect it — override it only if it conflicts with must_avoid.\n- For ambiguous requirements → open_questions, do NOT guess."
     },
     "requiredCapabilities" : [ ],
     "skillIds" : [ "builtin-spec-architect" ]
@@ -45,9 +45,9 @@
       "options" : [ "Yes", "Edit", "Abort" ],
       "timeout_minutes" : 60,
       "variable_name" : "buildplan_decision",
-      "question" : "## Build-Plan Review\n\n{{ previous_output }}\n\n**Yes** = Plan akzeptieren, weiter zu Scaffold\n**Edit** = Plan ändern (gib im Folge-Run einen modifizierten Plan als Kontext mit)\n**Abort** = Pipeline abbrechen"
+      "question" : "## Build plan review\n\n{{ previous_output }}\n\n**Yes** = accept the plan, continue to scaffold\n**Edit** = change the plan (pass a modified plan as context in the follow-up run)\n**Abort** = cancel the pipeline"
     },
     "requiredCapabilities" : [ ]
   } ],
-  "integrity": "sha256:c6ae9e7aaf26de892a80a851c33257b754631fa542f38f9ce9045f33a7ac96a6"
+  "integrity": "sha256:eb3c49ab240d567cad4fd3845cddadede42b4b219f9d5f9e81370fc101040d2b"
 }

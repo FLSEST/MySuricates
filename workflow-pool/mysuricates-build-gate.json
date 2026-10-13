@@ -62,23 +62,23 @@
     {
       "type": "simple",
       "config": {
-        "label": "Ergebnis erklären",
+        "label": "Explain the result",
         "timeout_seconds": 120,
-        "command": "Fasse Backend {{ step_0_output }}, Frontend Build {{ step_1_output }} und Lint {{ step_2_output }} zusammen. Uebernimm technische Ergebnisse unveraendert; keine eigenen Gate-Marker."
+        "command": "Summarize backend {{ step_0_output }}, frontend build {{ step_1_output }} and lint {{ step_2_output }}. Keep technical results unchanged; no gate markers of your own."
       }
     },
     {
       "type": "shell",
       "config": {
         "label": "Gate-Verdict",
-        "command": "# Prüfe ob das Ergebnis RED enthält\nPREV={{ previous_output }}\n\nif echo \"$PREV\" | grep -qi 'gate_status: RED'; then\n  echo 'Build Gate: FAILED'\n  echo 'gate_status: RED'\n  echo 'gate_category: mysuricates-build'\n  echo 'gate_description: MySuricates Build Gate fehlgeschlagen'\nelif echo \"$PREV\" | grep -qi 'gate_status: GREEN'; then\n  echo 'Build Gate: PASSED'\n  echo 'gate_status: GREEN'\n  echo 'gate_category: mysuricates-build'\n  echo 'gate_description: MySuricates Build Gate bestanden'\nelse\n  echo 'Build Gate: UNVOLLSTAENDIG'\n  echo 'gate_status: YELLOW'\n  echo 'gate_category: mysuricates-build'\n  echo 'gate_description: Ergebnis unvollstaendig — kein Gate-Status im Report (KI-Block fehlgeschlagen oder unklar)'\nfi",
+        "command": "# Check whether the result contains RED\nPREV={{ previous_output }}\n\nif echo \"$PREV\" | grep -qi 'gate_status: RED'; then\n  echo 'Build Gate: FAILED'\n  echo 'gate_status: RED'\n  echo 'gate_category: mysuricates-build'\n  echo 'gate_description: MySuricates Build Gate failed'\nelif echo \"$PREV\" | grep -qi 'gate_status: GREEN'; then\n  echo 'Build Gate: PASSED'\n  echo 'gate_status: GREEN'\n  echo 'gate_category: mysuricates-build'\n  echo 'gate_description: MySuricates Build Gate passed'\nelse\n  echo 'Build Gate: INCOMPLETE'\n  echo 'gate_status: YELLOW'\n  echo 'gate_category: mysuricates-build'\n  echo 'gate_description: Result incomplete — no gate status in the report (AI block failed or unclear)'\nfi",
         "timeout_seconds": 10,
         "shell_escape_variables": true
       }
     }
   ],
   "model": "sonnet",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "author": "MySuricates",
   "metadata": {
     "autoTodo": {
@@ -91,6 +91,6 @@
       "install_npm": true
     }
   },
-  "instructions": "\n\nRun-Isolation: Arbeite ausschliesslich in {{ execution_path }}. Der Originalpfad {{ project_path }} identifiziert das Projekt und darf nicht beschrieben werden. Keine automatischen Merges, Pushes oder Wechsel auf main/master. Aenderungen bleiben auf dem Run-Branch zur expliziten Uebernahme. Bei einem fehlgeschlagenen technischen Check darf ein Report keinen Erfolg behaupten. Gepruefter Commit: {{ workspace_source_sha }}; Logs: {{ workspace_logs }}.",
-  "integrity": "sha256:85011a6d4252827ff2eedd0e154d5f66fc016fbb30319b93d903a0e192ecc68d"
+  "instructions": "\n\nRun isolation: work only in {{ execution_path }}. The original path {{ project_path }} identifies the project and must not be written to. No automatic merges, pushes or switches to main/master. Changes stay on the run branch for explicit adoption. If a technical check failed, a report must not claim success. Checked commit: {{ workspace_source_sha }}; logs: {{ workspace_logs }}.",
+  "integrity": "sha256:4f181618f6186dd23f2b39f4189eb81f3e12d1b748857c549ae6d7269b1b6aca"
 }

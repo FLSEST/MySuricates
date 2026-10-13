@@ -78,8 +78,8 @@ und der Doku-Zehrprobe zählen denselben Envelope, mit demselben awk-Baustein (T
 Disposition zurück. Ein Prompt legt das `subject` deshalb je `ruleKey` fest — einen festen Wert
 für Regeln, die das Repository oder ein Modul als Ganzes betreffen (Dateien und Zahlen gehören
 dann in `description`/`evidence`), sonst den Pfad relativ zur Repo-Wurzel, je Datei ein Finding.
-Vorbild ist die ruleKey-Liste im Evidenz-Prompt von „Public Readiness“ (`subject "<wert>"` bzw.
-`subject = Pfad` je Eintrag); `AuditRuleKeyCatalogTest` hält fest, dass dort kein Eintrag die
+Vorbild ist die ruleKey-Liste im Evidenz-Prompt von „Public Readiness“ (`subject "<value>"` bzw.
+`subject = path` je Eintrag); `AuditRuleKeyCatalogTest` hält fest, dass dort kein Eintrag die
 Angabe vergisst (TODO `3a9e275b` — Evidenz-Prompt: subject je ruleKey festschreiben).
 
 Ein Doppelpunkt im `subject` hat Bedeutung: Steht davor eine Datei oder Klasse
@@ -90,7 +90,7 @@ im Activity-Log.
 
 ### Optional: `expectedFindings`
 
-Ein Audit, dessen Messblock die Soll-Zahl kennt (etwa `ERWARTETE FINDINGS` in der
+Ein Audit, dessen Messblock die Soll-Zahl kennt (etwa `EXPECTED FINDINGS` in der
 Test-Abdeckung), kann sie als `"expectedFindings": <N>` neben `snapshotComplete` in den Envelope
 schreiben. Stimmt sie nicht mit der Zahl der gelieferten Findings überein, wird der **ganze
 Report verworfen**: Er wird als INVALID historisiert, es entstehen keine Findings, und vor allem
@@ -128,10 +128,10 @@ Abweichung kam als Wiedergänger ohne die Einordnung des alten Befunds zurück. 
 der ist, den der Prompt schon verlangte, behält jeder Befund, der sich daran hielt, seinen
 Fingerprint. Altbestand mit abweichendem `subject` führt `AuditFingerprintMigrationJob` (seit v5) beim
 Start auf den kanonischen Befund zusammen – samt Einordnung (`ACCEPTED_RISK`/`DISMISSED`, Notiz);
-gibt es keinen, wird der abweichende selbst kanonisch. Dateibezogene Regeln (`subject = Pfad`) und Regeln mit mehreren erlaubten Werten
-(`"ai-automation-backend" oder "ai-automation-frontend"`) bleiben ohne festen Wert.
+gibt es keinen, wird der abweichende selbst kanonisch. Dateibezogene Regeln (`subject = path`) und Regeln mit mehreren erlaubten Werten
+(`"ai-automation-backend" or "ai-automation-frontend"`) bleiben ohne festen Wert.
 **Kennzahl-Regeln** (ein Befund je Messwert) haben den FAKT-Namen als festen Wert, den ihr Prompt
-unter „Kennzahl-Befunde“ nennt – im Performance-Audit `perf.db.size` → `database_bytes`,
+unter „metric findings“ nennt – im Performance-Audit `perf.db.size` → `database_bytes`,
 `perf.frontend.bundle-size` → `frontend_bundle_js_bytes`, `perf.frontend.lazy-chunk-preloaded` →
 `frontend_lazy_chunk_preloaded`, dazu das Sammel-Finding `perf.db.unindexed-column` →
 `unindexed_findby_columns`; im Health-Check `health.tests-failing` → `backend_tests_failures`,
@@ -140,7 +140,7 @@ unter „Kennzahl-Befunde“ nennt – im Performance-Audit `perf.db.size` → `
 führt diese Befunde und die, die nur unter Klassenname bzw. Pfad getrennt standen, samt Einordnung
 zusammen.
 `AuditRuleKeyCatalogTest` hält Katalog und Prompt gleich und prüft, dass auch das Envelope-Beispiel
-eines Prompts nur einen katalogisierten `ruleKey` (oder den Platzhalter `stabile-regel-id`, in den englischen Java-Audits `stable-rule-id`) nennt.
+eines Prompts nur einen katalogisierten `ruleKey` (oder den Platzhalter `stable-rule-id`, in älteren deutschen Prompts `stabile-regel-id`) nennt.
 
 ### Belegprüfung: `evidence` muss eine Messung dieses Laufs nennen
 
@@ -168,8 +168,8 @@ Report-Block misst deterministisch und gibt ein Faktenblatt aus:
 ## FAKTENBLATT
 FAKT files_over_300: 19
 FAKT backend_tests_failures: 0
-NICHT GEMESSEN: step_results_bytes (Shell-Blöcke dürfen die SQLite-DB nicht lesen)
-TREFFER repository_in_loop: mapper/WishMapper.java:36 workflowRepository.find (Schleife ab Zeile 34)
+NICHT GEMESSEN: step_results_bytes (shell blocks must not read the SQLite DB (CLAUDE.md) — the step output volume is visible only indirectly via database_bytes)
+TREFFER repository_in_loop: mapper/WishMapper.java:36 workflowRepository.find (loop from line 34)
 
 ## PFLICHTFELDER
 PFLICHT-FAKTEN: database_bytes source_files_scanned transactional_slow_call_count
@@ -181,8 +181,8 @@ Regeln:
   offene Lücke, `TREFFER <name>: <datei>:<zeile> …` ein Kandidat mit Fundstelle. Ein
   Fehlerpfad im Messblock erzeugt immer eine NICHT-GEMESSEN-Zeile — nie eine stille Null:
   „0 Zyklen gefunden" und „Zyklensuche fehlgeschlagen" dürfen nicht gleich aussehen.
-- Der Report-Prompt enthält die Messregel „Bewerte ausschließlich das Faktenblatt; miss und
-  zähle nichts selbst", nennt zu jeder Dimension die zuständigen FAKT-Zeilen und verlangt,
+- Der Report-Prompt enthält die Messregel „Judge solely by the fact sheet; do not measure or
+  count anything yourself", nennt zu jeder Dimension die zuständigen FAKT-Zeilen und verlangt,
   dass jede Zahl im Report ihre FAKT-Zeile nennt. Rohlogs kommen nur gekürzt (letzte 80
   Zeilen je Messblock) mit — zur Einordnung eines Fehlschlags, nicht als Zählmaterial.
 - Der Gate-Block prüft deterministisch, ob die Pflicht-FAKT-Zeilen vorliegen, und setzt
@@ -208,7 +208,7 @@ Umgestellte Audits im `workflow-pool/`:
 | Architektur-Review (Frontend) | Block `frontend_metrics` → `scripts/public-readiness/frontend-metrics.sh` (Quelltext-Importe, Zeilen, Modul-Zyklen) | `scripts/tests/test-frontend-metrics.sh` |
 | Health-Check | Block `facts` (Surefire-Summen, Exit-Codes, Lint/tsc, Bundle, Code- und Doku-Größen) | `scripts/tests/test-audit-facts.sh` |
 | Performance-Audit | Block `facts` (Health-Sonde, Heap-Zahlen aus `/api/v1/system/jvm-memory`, DB- und Bundle-Dateien, Logzeilen, Quelltext-Muster) | `scripts/tests/test-audit-facts.sh` |
-| Test-Abdeckung | Block `metrics` mit Soll-Größe `ERWARTETE FINDINGS`; der Shell-Block `report` baut daraus den Envelope, die KI (Block `coach`) liefert nur Bericht, `naechster_schritt` und Texte je Klasse; Gate zählt den Envelope dagegen | `scripts/tests/test-coverage-snapshot.sh` |
+| Test-Abdeckung | Block `metrics` mit Soll-Größe `EXPECTED FINDINGS`; der Shell-Block `report` baut daraus den Envelope, die KI (Block `coach`) liefert nur Bericht, `next_step` und Texte je Klasse; Gate zählt den Envelope dagegen | `scripts/tests/test-coverage-snapshot.sh` |
 | Doku-Zehrprobe | Block `dossier` → `scripts/public-readiness/docs_orphan_scan.py` (Erreichbarkeit, Verweise, Pflegestand, Themen-Überlappung) | `scripts/tests/test_docs_orphan_scan.py`, Gate: `scripts/tests/test-audit-facts.sh` |
 | Security-Audit | Blöcke `trivy` (`trivy fs`: Lockfiles und direkte Abhängigkeiten aus `pom.xml`, Entwicklungs-Abhängigkeiten eingeschlossen; die Parent-/BOM-Kette der `pom.xml` kommt aus dem schreibgeschützt eingebundenen `~/.m2/repository` statt von Maven Central), `trivy_jar` (`trivy rootfs` auf `target/`: transitive Maven-Abhängigkeiten im gebauten JAR — `trivy fs` liest keine JARs) und `gitleaks` (Git-Historie aus Branches, Tags, Remotes) im Werkzeug-Modus (`automation-agent-devops`, SARIF → Faktenblatt); Block `data` als Faktenblatt mit TREFFER-Zeilen für Code-Fundstellen, Git-Delta und die Voraussetzungen der Werkzeuge (`git_history_visible`, `backend_jar`); Gate: Pflicht-Fakten `trivy_findings`, `gitleaks_findings` und bei gebautem JAR `trivy_jar_findings` | `scripts/tests/test-audit-facts.sh` (Abschnitt 13) |
 
@@ -255,16 +255,16 @@ gilt: **Das Skript bestimmt, wo hingeschaut wird, die KI, was dort los ist.**
   in `arch-metrics.sh`. Methoden, die über gemeinsame Kollaborateure zusammenhängen, bilden eine Gruppe;
   mehrere Gruppen sind ein Schnitt-Kandidat. `nur_konstruktor` nennt injizierte, nie gelesene Felder.
   Ist der Quelltext jünger als das Kompilat, steht `stale_classes` statt einer Tabelle da.
-- **Urteil** (KI, Opus): liest den Quelltext jedes Kandidaten und urteilt `passt so`, `schneiden` oder
-  `verlagern`. Die beiden letzten ergeben Befunde `arch.mixed-responsibility` bzw. `arch.misplaced-logic` –
+- **Urteil** (KI, Opus): liest den Quelltext jedes Kandidaten und urteilt `fine as is`, `split` oder
+  `relocate`. Die beiden letzten ergeben Befunde `arch.mixed-responsibility` bzw. `arch.misplaced-logic` –
   `subject` genau aus der Kandidatenliste, Schwere höchstens `MEDIUM`, Evidenz ohne Mengen mit Einheit
   (sonst öffnete die Verschlechterungsprüfung eine Einordnung bei jeder Umformulierung).
 - **Weiterführen statt Sinneswandel**: Ein bekannter Urteilsbefund zu einer Datei, die kein Kandidat ist
   oder sich in 7 Tagen nicht geändert hat, wird unverändert weitergeführt; neu geurteilt wird nur über
   geänderte Kandidaten und über Wiedervorlagen (`AWAITING_VERIFICATION`).
 - **Gate**: Offene oder neue Urteilsbefunde heben auf `YELLOW`, nie auf `RED`. Zusätzlich prüft der
-  Gate-Block deterministisch, ob jeder Kandidat unter der Überschrift „Urteil“ des Reports steht; fehlt
-  einer, ist das Ergebnis höchstens `YELLOW` („Urteil unvollständig“).
+  Gate-Block deterministisch, ob jeder Kandidat unter der Überschrift „Verdict per candidate“ des Reports
+  steht; fehlt einer, ist das Ergebnis höchstens `YELLOW` („verdict incomplete“).
 - **Werkzeug-Fakten (4.8.0, TODO `67128699`)**: PMD aus dem Image `automation-agent-analysis` läuft in drei
   Werkzeug-Blöcken – CPD je Sprache (`cpd_java`, `cpd_ts`, Rohausgabe CSV, ab 100 Tokens) und die Designregeln
   aus `scripts/public-readiness/pmd-architecture.xml` (`pmd`, SARIF). `arch_tools.py` liest beides:
@@ -283,7 +283,7 @@ gilt: **Das Skript bestimmt, wo hingeschaut wird, die KI, was dort los ist.**
   galten alle Architektur-Befunde als unbelegt. `arch-findings.py` hängt nun `## FAKTENBLATT arch` an: je Messbefund
   und Kandidat eine FAKT-Zeile, benannt nach dem Subjekt (`arch_com.automation….java`). Die evidence jedes
   Messbefunds beginnt mit diesem Namen, Kandidatenzeilen tragen ihn in der Spalte `fakt`, und Urteilsbelege zitieren
-  ihn. `FAKT arch_scope` nennt den Messumfang; ändert er sich, lautet der Trend „nicht vergleichbar“. Der PMD-Block
+  ihn. `FAKT arch_scope` nennt den Messumfang; ändert er sich, lautet der Trend „not comparable“. Der PMD-Block
   heißt `pmd_design`, weil die Belegprüfung Namen unter 4 Zeichen ignoriert.
 - **Bekannte Urteile (4.11.0, TODO `ebf6602e`)**: Weitergeführte Urteile zu Dateien, die kein Kandidat sind, blieben
   in 4.10 unbelegt („unveraendert seit dem letzten Urteil“, ohne Faktnamen). Seit TODO `5fc15f50` liefert
@@ -299,15 +299,15 @@ gilt: **Das Skript bestimmt, wo hingeschaut wird, die KI, was dort los ist.**
 Bis Version 4.3.3 schrieb die KI den Envelope der Test-Abdeckung selbst und zählte dabei falsch: Im
 Lauf vom 2026-09-28 gab sie drei Klassen doppelt aus, 52 statt 50 Findings. Gate und Ingestion
 verwarfen den Lauf zu Recht, er war damit aber wertlos (TODO `fa66ea31`). Seit 4.3.4 baut der
-Shell-Block `report` den Envelope: je Zeile der Listen `UNTESTED` und `DUENNE TESTS` genau ein
+Shell-Block `report` den Envelope: je Zeile der Listen `UNTESTED` und `THIN TESTS` genau ein
 Finding mit `subject`, Schwere, Titel und `evidence` aus der Messung, `expectedFindings` und
 `snapshotComplete` aus den Kopfzeilen. Fehlt eine Kopfzeile oder stimmt ihre Zahl nicht mit den
 Zeilen überein, steht `snapshotComplete: false` im Envelope. Von der KI (Block `coach`) kommen nur
-der Bericht, die Zeile `naechster_schritt: <subject>` (dieses Finding wird `HIGH`) und zwischen
-`BEFUND-TEXTE:` und `ENDE BEFUND-TEXTE` je Klasse ein Satz `<subject> | <Text>`. Fehlt ein Text,
+der Bericht, die Zeile `next_step: <subject>` (dieses Finding wird `HIGH`) und zwischen
+`FINDING TEXTS:` und `END FINDING TEXTS` je Klasse ein Satz `<subject> | <Text>`. Fehlt ein Text,
 gilt ein Standardtext. Ein `subject` mit anderem Pfad gilt für die Klasse mit demselben Dateinamen,
 wenn er eindeutig ist; sonst wird es wie ein unbekanntes verworfen, ebenso ein Envelope der KI. Fehlt
-`ENDE BEFUND-TEXTE`, endet der Abschnitt an der nächsten `gate_`- oder `naechster_schritt`-Zeile. Der
+`END FINDING TEXTS`, endet der Abschnitt an der nächsten `gate_`- oder `next_step`-Zeile. Der
 Messblock listet jedes `subject` nur einmal, auch zwei gleichnamige Klassen aus verschiedenen
 Paketen.
 
@@ -327,8 +327,8 @@ Der Report-Prompt trägt zusätzlich die Regel, einen unverändert gebliebenen B
 Vorlaufs erneut zu melden: sonst schlösse ein bloßer Sinneswandel ihn als RESOLVED.
 Eingeordnete Befunde (`ACCEPTED_RISK`, `DISMISSED` laut `{{ audit_findings }}`, abgeglichen über
 `ruleKey` + `subject`, normalisiert wie im Fingerprint) führt der Report im Envelope weiter, ins Gate zählen sie aber nicht: sonst bliebe
-die Zehrprobe mit jeder Einordnung dauerhaft YELLOW. Die `gate_description` nennt sie getrennt
-(„dazu N bewusst eingeordnet“).
+die Zehrprobe mit jeder Einordnung dauerhaft YELLOW. Die `gate_description` nennt sie getrennt,
+als `(plus N deliberately triaged)`.
 
 ## Bekannte Befunde im Prompt: `{{ audit_findings }}`
 
@@ -392,15 +392,15 @@ Schreibweise wäre ein Wiedergänger ohne seine Einordnung.
 ### Die Report-Prompts nutzen `audit_findings`
 
 Die fünf Audits im `workflow-pool/` (Architektur-Review, Performance-Audit, Test-Abdeckung,
-Security-Audit, Health-Check) bekommen die Variable im Report-Prompt direkt nach `OFFENE TODOS`
-als Abschnitt `BEKANNTE BEFUNDE` (TODO `1cf996df`). Vor dem Envelope-Abschnitt steht in allen
-fünf wortgleich der Regelblock `UMGANG MIT BEKANNTEN BEFUNDEN (VERBINDLICH)`:
+Security-Audit, Health-Check) bekommen die Variable im Report-Prompt direkt nach `OPEN TODOS`
+als Abschnitt `KNOWN FINDINGS` (TODO `1cf996df`). Vor dem Envelope-Abschnitt steht in allen
+fünf wortgleich der Regelblock `HANDLING KNOWN FINDINGS (BINDING)`:
 
 - **Identität:** `ruleKey` und `subject` eines bekannten Befunds werden exakt übernommen, auch
   wenn das Modell ihn anders benennen würde.
 - **Markdown:** Die Findings-Tabelle zeigt nur `OPEN`, `AWAITING_VERIFICATION` und neue Befunde.
-  Eingeordnete stehen gesammelt in einer Zeile `Bewusst eingeordnet: <N> (akzeptiert <x>,
-  verworfen <y>) - siehe Audit Center`, außer einer hat sich messbar verschlechtert. Verschlechtert
+  Eingeordnete stehen gesammelt in einer Zeile `Deliberately triaged: <N> (accepted <x>,
+  dismissed <y>) - see Audit Center`, außer einer hat sich messbar verschlechtert. Verschlechtert
   heißt: Eine belegende Kennzahl liegt um mehr als 10 % über ihrem letzten Wert, oder die
   Änderungsrate erreicht die Hotspot-Schwelle neu. Ab dieser Schwelle öffnet auch
   `AuditAcceptancePolicy` eine Akzeptanz wieder; kleinere Schwankungen zählen nicht.
@@ -426,7 +426,7 @@ Der Beleg nennt alle CVE- und GHSA-Kennungen des Pakets, und eine neu hinzugekom
 dort als Verschlechterung (Abschnitt 13 der Prüfung).
 
 Die Doku-Zehrprobe und die Public-Readiness-Evidenz haben ebenfalls ein gültiges `metadata.audit` und
-tragen seit TODO `3fb33d9b` denselben Abschnitt (als `## BEKANNTE BEFUNDE …`, passend zu ihren
+tragen seit TODO `3fb33d9b` denselben Abschnitt (als `## KNOWN FINDINGS …`, passend zu ihren
 Überschriften) und denselben Regelblock, jeweils vor ihrem Envelope-Teil. Vorher sahen sie Vorbefunde
 nur als Markdown im `previous_report`. Das prüft Abschnitt 10b desselben Tests.
 

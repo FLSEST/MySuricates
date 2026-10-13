@@ -18,13 +18,13 @@
     "todo-driven"
   ],
   "model": "opus",
-  "instructions": "Du schreibst Tests fuer das MySuricates-Projekt. REGELN: 1) NUR Test-Dateien schreiben/aendern, NIEMALS Production-Code. 2) JUnit 5 + Mockito + AssertJ. 3) Bestehende Test-Patterns als Vorlage nutzen. 4) Nach dem Schreiben: mvn test -Dtest=NeuerTest ausfuehren.\n\nRun-Isolation: Arbeite ausschliesslich in {{ execution_path }}. Der Originalpfad {{ project_path }} identifiziert das Projekt und darf nicht beschrieben werden. Keine automatischen Merges, Pushes oder Wechsel auf main/master. Aenderungen bleiben auf dem Run-Branch zur expliziten Uebernahme. Bei einem fehlgeschlagenen technischen Check darf ein Report keinen Erfolg behaupten. Gepruefter Commit: {{ workspace_source_sha }}; Logs: {{ workspace_logs }}.",
+  "instructions": "You write tests for the MySuricates project. RULES: 1) Write/change ONLY test files, NEVER production code. 2) JUnit 5 + Mockito + AssertJ. 3) Use existing test patterns as a template. 4) After writing: run mvn test -Dtest=NewTest.\n\nRun isolation: work only in {{ execution_path }}. The original path {{ project_path }} identifies the project and must not be written to. No automatic merges, pushes or switches to main/master. Changes stay on the run branch for explicit adoption. If a technical check failed, a report must not claim success. Checked commit: {{ workspace_source_sha }}; logs: {{ workspace_logs }}.",
   "blocks": [
     {
       "type": "shell",
       "config": {
-        "label": "TODO-Kontext laden",
-        "command": "BASE={{ execution_path }}\n\necho '========================================'\necho '  AUFGABE'\necho '========================================'\necho 'TODO-Titel: {{ todo_title }}'\necho 'TODO-Beschreibung: {{ todo_description }}'\necho ''\n\necho '========================================'\necho '  ZIEL-KLASSE ANALYSIEREN'\necho '========================================'\n# Versuche die Klasse aus dem TODO-Titel zu extrahieren\nCLASS_NAME=$(echo '{{ todo_title }}' | grep -oE '[A-Z][a-zA-Z]+' | head -1)\necho \"Erkannte Klasse: $CLASS_NAME\"\n\n# Finde die Source-Datei\nSRC=$(find \"$BASE/ai-automation-backend/src/main/java\" -name \"${CLASS_NAME}.java\" 2>/dev/null | head -1)\nif [ -n \"$SRC\" ]; then\n  echo \"Source: $SRC\"\n  echo \"LOC: $(wc -l < \"$SRC\")\"\n  echo ''\n  echo '--- Public Methoden ---'\n  grep -n 'public ' \"$SRC\" | grep -v 'class \\|interface ' | head -20\nelse\n  echo \"Source NICHT GEFUNDEN fuer: $CLASS_NAME\"\n  # Breitere Suche\n  echo '--- Aehnliche Dateien ---'\n  find \"$BASE/ai-automation-backend/src/main/java\" -name \"*${CLASS_NAME}*\" 2>/dev/null | head -5\n  find \"$BASE/ai-automation-frontend/src\" -name \"*${CLASS_NAME}*\" 2>/dev/null | head -5\nfi\n\n# Prüfe ob schon ein Test existiert\nTEST=$(find \"$BASE/ai-automation-backend/src/test/java\" -name \"${CLASS_NAME}Test.java\" -o -name \"${CLASS_NAME}Tests.java\" 2>/dev/null | head -1)\nif [ -n \"$TEST\" ]; then\n  echo ''\n  echo \"Existierender Test: $TEST\"\n  echo \"Test LOC: $(wc -l < \"$TEST\")\"\n  echo \"Test-Methoden: $(grep -c '@Test' \"$TEST\")\"\nelse\n  echo ''\n  echo 'Kein existierender Test'\nfi\n\necho ''\necho '========================================'\necho '  REFERENZ-TESTS (gleiches Package)'\necho '========================================'\nif [ -n \"$SRC\" ]; then\n  PKG_DIR=$(dirname \"$SRC\" | sed 's|src/main/java|src/test/java|')\n  if [ -d \"$PKG_DIR\" ]; then\n    ls \"$PKG_DIR\"/*Test.java 2>/dev/null | head -3 | while read tf; do\n      echo \"Referenz: $(basename $tf) ($(grep -c '@Test' \"$tf\") tests)\"\n    done\n  else\n    echo '(kein Test-Package vorhanden)'\n  fi\nfi",
+        "label": "Load the TODO context",
+        "command": "BASE={{ execution_path }}\n\necho '========================================'\necho '  TASK'\necho '========================================'\necho 'TODO title: {{ todo_title }}'\necho 'TODO description: {{ todo_description }}'\necho ''\n\necho '========================================'\necho '  ANALYZE THE TARGET CLASS'\necho '========================================'\n# Try to extract the class from the TODO title\nCLASS_NAME=$(echo '{{ todo_title }}' | grep -oE '[A-Z][a-zA-Z]+' | head -1)\necho \"Detected class: $CLASS_NAME\"\n\n# Find the source file\nSRC=$(find \"$BASE/ai-automation-backend/src/main/java\" -name \"${CLASS_NAME}.java\" 2>/dev/null | head -1)\nif [ -n \"$SRC\" ]; then\n  echo \"Source: $SRC\"\n  echo \"LOC: $(wc -l < \"$SRC\")\"\n  echo ''\n  echo '--- Public methods ---'\n  grep -n 'public ' \"$SRC\" | grep -v 'class \\|interface ' | head -20\nelse\n  echo \"Source NOT FOUND for: $CLASS_NAME\"\n  # Broader search\n  echo '--- Similar files ---'\n  find \"$BASE/ai-automation-backend/src/main/java\" -name \"*${CLASS_NAME}*\" 2>/dev/null | head -5\n  find \"$BASE/ai-automation-frontend/src\" -name \"*${CLASS_NAME}*\" 2>/dev/null | head -5\nfi\n\n# Check whether a test already exists\nTEST=$(find \"$BASE/ai-automation-backend/src/test/java\" -name \"${CLASS_NAME}Test.java\" -o -name \"${CLASS_NAME}Tests.java\" 2>/dev/null | head -1)\nif [ -n \"$TEST\" ]; then\n  echo ''\n  echo \"Existing test: $TEST\"\n  echo \"Test LOC: $(wc -l < \"$TEST\")\"\n  echo \"Test methods: $(grep -c '@Test' \"$TEST\")\"\nelse\n  echo ''\n  echo 'No existing test'\nfi\n\necho ''\necho '========================================'\necho '  REFERENCE TESTS (same package)'\necho '========================================'\nif [ -n \"$SRC\" ]; then\n  PKG_DIR=$(dirname \"$SRC\" | sed 's|src/main/java|src/test/java|')\n  if [ -d \"$PKG_DIR\" ]; then\n    ls \"$PKG_DIR\"/*Test.java 2>/dev/null | head -3 | while read tf; do\n      echo \"Reference: $(basename $tf) ($(grep -c '@Test' \"$tf\") tests)\"\n    done\n  else\n    echo '(no test package present)'\n  fi\nfi",
         "timeout_seconds": 15,
         "on_failure": "continue",
         "workspace": {
@@ -38,8 +38,8 @@
     {
       "type": "agentic",
       "config": {
-        "label": "Test schreiben (Opus)",
-        "goal": "Schreibe einen Test fuer die Klasse aus dem TODO.\n\nKONTEXT:\n{{ previous_output }}\n\nOFFENE TODOS (fuer Kontext):\n{{ open_todos }}\n\nVORGEHEN:\n1. Lies die Source-Datei vollstaendig\n2. Falls ein Test existiert: Lies ihn und ergaenze fehlende Test-Methoden\n3. Falls kein Test existiert: Lies 1-2 Referenz-Tests im gleichen Package als Vorlage\n4. Schreibe den Test:\n   - JUnit 5 (@Test, @BeforeEach, @ExtendWith(MockitoExtension.class))\n   - @Mock fuer alle Dependencies, @InjectMocks fuer die Ziel-Klasse\n   - Naming: should_<expected>_when_<condition>\n   - AssertJ Assertions (assertThat)\n   - Mindestens: Happy-Path + Error-Path fuer jede wichtige public Methode\n   - Edge Cases fuer kritische Logik\n5. Fuehre den Test aus: cd {{ execution_path }}/ai-automation-backend && mvn test -Dtest=\"<TestName>\" -q\n6. Falls der Test fehlschlaegt: Korrigiere und erneut ausfuehren\n7. Wenn der Test besteht: git add + git commit mit Message 'test: Add tests for <ClassName>'\n\nWICHTIG:\n- Absolute Pfade: {{ execution_path }}/...\n- NUR Test-Dateien erstellen/aendern, NIEMALS Production-Code\n- Falls die Klasse nicht gefunden wird: Melde Fehler und beende\n- Falls mvn test nach 3 Versuchen nicht besteht: Aenderungen verwerfen (git checkout), Fehler melden",
+        "label": "Write the test (Opus)",
+        "goal": "Write a test for the class from the TODO.\n\nCONTEXT:\n{{ previous_output }}\n\nOPEN TODOS (for context):\n{{ open_todos }}\n\nPROCEDURE:\n1. Read the source file completely\n2. If a test exists: read it and add the missing test methods\n3. If no test exists: read 1-2 reference tests in the same package as a template\n4. Write the test:\n   - JUnit 5 (@Test, @BeforeEach, @ExtendWith(MockitoExtension.class))\n   - @Mock for all dependencies, @InjectMocks for the target class\n   - Naming: should_<expected>_when_<condition>\n   - AssertJ assertions (assertThat)\n   - At least: happy path + error path for every important public method\n   - Edge cases for critical logic\n5. Run the test: cd {{ execution_path }}/ai-automation-backend && mvn test -Dtest=\"<TestName>\" -q\n6. If the test fails: fix it and run it again\n7. When the test passes: git add + git commit with the message 'test: Add tests for <ClassName>'\n\nIMPORTANT:\n- Absolute paths: {{ execution_path }}/...\n- Create/change ONLY test files, NEVER production code\n- If the class is not found: report an error and stop\n- If mvn test does not pass after 3 attempts: discard the changes (git checkout) and report the error",
         "timeout_seconds": 900,
         "max_iterations": 15,
         "max_total_tokens": 250000,
@@ -47,7 +47,7 @@
         "total_timeout_seconds": 1800,
         "max_repeated_actions": 3,
         "require_approval": false,
-        "success_criteria": "Test-Datei erstellt, mvn test besteht, Commit erstellt."
+        "success_criteria": "Test file created, mvn test passes, commit created."
       }
     },
     {
@@ -65,22 +65,22 @@
     {
       "type": "simple",
       "config": {
-        "label": "Ergebnis erklären",
+        "label": "Explain the result",
         "timeout_seconds": 120,
-        "command": "Fasse das Ergebnis in maximal 5 Zeilen zusammen:\n\n{{ previous_output }}\n\n- Welche Klasse wurde getestet\n- Wie viele Test-Methoden geschrieben\n- Ob Tests bestanden\n- Ob ein Commit erstellt wurde\n\ngate_status: GREEN wenn Test besteht und committed, YELLOW wenn Test besteht aber nicht committed, RED wenn Test fehlschlaegt"
+        "command": "Summarize the result in at most 5 lines:\n\n{{ previous_output }}\n\n- Which class was tested\n- How many test methods were written\n- Whether the tests passed\n- Whether a commit was created\n\ngate_status: GREEN if the test passes and is committed, YELLOW if the test passes but is not committed, RED if the test fails"
       }
     },
     {
       "type": "shell",
       "config": {
         "label": "Gate-Verdict",
-        "command": "PREV={{ previous_output }}\n\nif echo \"$PREV\" | grep -qi 'gate_status: RED'; then\n  echo 'Test-Sync: FEHLGESCHLAGEN'\n  echo 'gate_status: RED'\n  echo 'gate_category: test-sync'\n  echo 'gate_description: Test konnte nicht geschrieben werden'\nelif echo \"$PREV\" | grep -qi 'gate_status: YELLOW'; then\n  echo 'Test-Sync: TEILWEISE'\n  echo 'gate_status: YELLOW'\n  echo 'gate_category: test-sync'\n  echo 'gate_description: Test geschrieben, manuelle Pruefung empfohlen'\nelif echo \"$PREV\" | grep -qi 'gate_status: GREEN'; then\n  echo 'Test-Sync: ERFOLGREICH'\n  echo 'gate_status: GREEN'\n  echo 'gate_category: test-sync'\n  echo 'gate_description: Test geschrieben, verifiziert und committed'\nelse\n  echo 'Test-Sync: UNVOLLSTAENDIG'\n  echo 'gate_status: YELLOW'\n  echo 'gate_category: test-sync'\n  echo 'gate_description: Ergebnis unvollstaendig — kein Gate-Status im Report (KI-Block fehlgeschlagen oder unklar)'\nfi",
+        "command": "PREV={{ previous_output }}\n\nif echo \"$PREV\" | grep -qi 'gate_status: RED'; then\n  echo 'Test-Sync: FAILED'\n  echo 'gate_status: RED'\n  echo 'gate_category: test-sync'\n  echo 'gate_description: Test could not be written'\nelif echo \"$PREV\" | grep -qi 'gate_status: YELLOW'; then\n  echo 'Test-Sync: PARTIAL'\n  echo 'gate_status: YELLOW'\n  echo 'gate_category: test-sync'\n  echo 'gate_description: Test written, manual review recommended'\nelif echo \"$PREV\" | grep -qi 'gate_status: GREEN'; then\n  echo 'Test-Sync: SUCCESSFUL'\n  echo 'gate_status: GREEN'\n  echo 'gate_category: test-sync'\n  echo 'gate_description: Test written, verified and committed'\nelse\n  echo 'Test-Sync: INCOMPLETE'\n  echo 'gate_status: YELLOW'\n  echo 'gate_category: test-sync'\n  echo 'gate_description: Result incomplete — no gate status in the report (AI block failed or unclear)'\nfi",
         "timeout_seconds": 10,
         "shell_escape_variables": true
       }
     }
   ],
-  "version": "3.0.0",
+  "version": "3.1.0",
   "author": "MySuricates",
   "defaultContext": {
     "todo_title": "",
@@ -94,5 +94,5 @@
       "branch": true
     }
   },
-  "integrity": "sha256:d3c987244e2643a050c3ef58a22d95a6b132daa23a7ad368f76399664feaa2a4"
+  "integrity": "sha256:dd5d3a53baa96e86ec4fceaf89b0e30153ff8fce8c8e7dd74b5d37b2211d4b0e"
 }
