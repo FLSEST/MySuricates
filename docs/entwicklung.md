@@ -767,9 +767,10 @@ es sich unter die Releases mischte.
 
 `.github/workflows/release.yml` läuft bei jedem Push eines `v*`-Tags und legt automatisch ein
 GitHub-Release an (`gh release create "$TAG" --verify-tag --title "$TAG" --notes-file notes.md`).
-Die Notizen entstehen **deterministisch, ohne KI** über `scripts/release-notes.sh <prev-tag> <tag>`:
+Die Notizen entstehen **deterministisch, ohne KI** über `scripts/release-notes.sh <prev-tag> <tag>`,
+englisch wie das öffentliche Repo, die Überschriften eingeschlossen:
 
-- **Überblick**: Betreffzeilen der Merge-Commits zwischen den beiden Tags
+- **Overview**: Betreffzeilen der Merge-Commits zwischen den beiden Tags
   (`git log --first-parent --merges`). Interne TODO-Kürzel-Klammern werden für die öffentlichen
   Notizen entfernt (`scripts/lib/strip-todo-brackets.py`): eine abschließende Klammer, deren Inhalt
   mit einem 8-Hex-Kürzel beginnt (Titel, Kommalisten und verschachtelte Klammern danach egal, z. B.
@@ -777,15 +778,17 @@ Die Notizen entstehen **deterministisch, ohne KI** über `scripts/release-notes.
   deren letztes Komma-Element ein reines Kürzel ist (`(Stand 2026-09-22, <8-hex>)`), sowie eine
   Klammer mitten im Betreff, die nur aus Kürzeln besteht (`(TODO <8-hex>)`). Eine normale Klammer
   ohne Kürzel bleibt stehen.
-- **Änderungen nach Typ**: Nicht-Merge-Commits, gruppiert nach Conventional-Präfix
+- **Changes by type**: Nicht-Merge-Commits, gruppiert nach Conventional-Präfix
   (`feat`/`fix`/`perf`/`refactor`/`docs`/`test`/…).
-- **Verhaltensänderungen**: Einträge aus [„Verhaltensänderungen"](#verhaltensänderungen) unten,
-  die nach dem Datum des vorigen Tags liegen — ohne solche Einträge entfällt der Abschnitt.
-- **Vergleich**: Link auf den Compare-View `prev...tag` (entfällt beim allerersten Release, das
-  keinen Vorgänger-Tag hat).
+- **Behavior changes**: die Einträge aus [„Verhaltensänderungen"](#verhaltensänderungen) unten in
+  ihrer englischen Fassung (`docs/en/entwicklung.md`, „**Since …**“), die nach dem Datum des vorigen
+  Tags liegen — ohne solche Einträge entfällt der Abschnitt.
+- **Comparison**: Link auf den Compare-View `prev...tag`.
 
-Das Skript läuft ohne Vorgänger-Tag (`scripts/release-notes.sh "" v0.1.0`) und auch dann, wenn im
-aktuellen Repo keine passenden Merge-Commits existieren (z. B. im kuratierten öffentlichen Repo, das
+Ohne Vorgänger-Tag (`scripts/release-notes.sh "" v0.7.8`) gibt das Skript nur den Titel und einen
+Satz aus („First public release. …“), keine Listen: Das erste Tag im neuen öffentlichen Repo hat
+keinen Vorgänger, und die ganze History als Liste kam in der Probe auf 2 830 Zeilen (2026-10-13).
+Es läuft auch dann, wenn im aktuellen Repo keine passenden Merge-Commits existieren (z. B. im kuratierten öffentlichen Repo, das
 die Merge-Historie des Arbeits-Repos nicht mitbekommt) — die betroffenen Abschnitte entfallen dann
 einfach, statt einen Fehler zu werfen. Die Action nimmt eine mitgelieferte Notizdatei
 (`release-notes/<tag>.md`), falls eine vorhanden ist — etwa aus der

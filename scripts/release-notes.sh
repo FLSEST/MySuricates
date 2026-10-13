@@ -3,13 +3,15 @@
 # GitHub action (release.yml) needs no model call (TODO 3c75962d). Writes to stdout.
 #
 # Usage: scripts/release-notes.sh <prev-tag> <tag>
-#   <prev-tag>  predecessor tag, or "" for the very first release (no numbers/comparison before it)
+#   <prev-tag>  predecessor tag, or "" for the very first release: then the notes are one short
+#               paragraph, since listing the whole history (thousands of lines for the first public
+#               release, 2026-10-13) tells a reader nothing
 #   <tag>       the tag to publish (must exist)
 #
-# Must run in BOTH repos (private working repo + curated public repo): the
-# public repo has no merge commits from the working repo and possibly no docs/entwicklung.md
-# with the same entries -- affected sections are then simply omitted instead of throwing an error.
-# See docs/entwicklung.md -> "GitHub-Release bei jedem Tag".
+# The notes are English, like the public repo. Must run in BOTH repos (private working repo +
+# curated public repo): the public repo has no merge commits from the working repo and possibly no
+# docs/en/entwicklung.md with the same entries -- affected sections are then simply omitted instead
+# of throwing an error. See docs/entwicklung.md -> "GitHub-Release bei jedem Tag".
 set -uo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -70,10 +72,15 @@ strip_todo_brackets() {
 echo "# ${TAG}"
 echo
 
+if [ -z "$PREV" ]; then
+    echo "First public release. The history up to this version is part of the repository (\`git log ${TAG}\`)."
+    exit 0
+fi
+
 # ── Overview: subject lines of the merge commits in the first-parent history ─────────────────────
 MERGE_SUBJECTS="$(git log --first-parent --merges --format='%s' "$RANGE" -- 2>/dev/null | strip_todo_brackets)"
 if [ -n "$MERGE_SUBJECTS" ]; then
-    echo "## Überblick"
+    echo "## Overview"
     echo
     while IFS= read -r subject; do
         [ -n "$subject" ] || continue
@@ -90,7 +97,7 @@ declare -A TYPE_LABEL=(
     [fix]="Fixes"
     [perf]="Performance"
     [refactor]="Refactorings"
-    [docs]="Dokumentation"
+    [docs]="Documentation"
     [test]="Tests"
 )
 TYPE_ORDER="feat fix perf refactor docs test"
@@ -103,7 +110,7 @@ if [ -n "$NONMERGE_SUBJECTS" ]; then
         TYPE_SECTIONS="1"
     done
     if [ -n "$TYPE_SECTIONS" ]; then
-        echo "## Änderungen nach Typ"
+        echo "## Changes by type"
         echo
         for type in $TYPE_ORDER; do
             MATCHES="$(grep -E "^${type}(\\(.*\\))?!?:" <<< "$NONMERGE_SUBJECTS" || true)"
@@ -120,8 +127,8 @@ if [ -n "$NONMERGE_SUBJECTS" ]; then
     fi
 fi
 
-# ── Behavior changes: entries from docs/entwicklung.md, dated after the predecessor tag ────────
-DOCS_FILE="$PROJECT_ROOT/docs/entwicklung.md"
+# ── Behavior changes: entries from docs/en/entwicklung.md, dated after the predecessor tag ─────
+DOCS_FILE="$PROJECT_ROOT/docs/en/entwicklung.md"
 if [ -f "$DOCS_FILE" ]; then
     PREV_DATE=""
     if [ -n "$PREV" ]; then
@@ -133,20 +140,20 @@ if [ -f "$DOCS_FILE" ]; then
 
     ENTRIES=""
     while IFS= read -r heading; do
-        entry_date="$(sed -E 's/^\*\*Seit ([0-9]{4}-[0-9]{2}-[0-9]{2}).*/\1/' <<< "$heading")"
+        entry_date="$(sed -E 's/^\*\*Since ([0-9]{4}-[0-9]{2}-[0-9]{2}).*/\1/' <<< "$heading")"
         [[ "$entry_date" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}$ ]] || continue
         if [ -z "$PREV_DATE" ] || [[ "$entry_date" > "$PREV_DATE" ]]; then
             ENTRIES="${ENTRIES}${heading}"$'\n'
         fi
-    done < <(grep -E '^\*\*Seit [0-9]{4}-[0-9]{2}-[0-9]{2} ' "$DOCS_FILE")
+    done < <(grep -E '^\*\*Since [0-9]{4}-[0-9]{2}-[0-9]{2} ' "$DOCS_FILE")
 
     if [ -n "$ENTRIES" ]; then
-        echo "## Verhaltensänderungen"
+        echo "## Behavior changes"
         echo
         if [ -n "$REPO_SLUG" ]; then
-            echo "Details: [docs/entwicklung.md → Verhaltensänderungen](https://github.com/${REPO_SLUG}/blob/${TAG}/docs/entwicklung.md#verhaltensänderungen)"
+            echo "Details: [docs/en/entwicklung.md → Behavior Changes](https://github.com/${REPO_SLUG}/blob/${TAG}/docs/en/entwicklung.md#behavior-changes)"
         else
-            echo "Details: docs/entwicklung.md → Verhaltensänderungen"
+            echo "Details: docs/en/entwicklung.md → Behavior Changes"
         fi
         echo
         while IFS= read -r heading; do
@@ -159,7 +166,7 @@ fi
 
 # ── Comparison: link to the compare view, omitted for the first release ──────────────────────────
 if [ -n "$PREV" ] && [ -n "$REPO_SLUG" ]; then
-    echo "## Vergleich"
+    echo "## Comparison"
     echo
     echo "[${PREV}...${TAG}](https://github.com/${REPO_SLUG}/compare/${PREV}...${TAG})"
     echo

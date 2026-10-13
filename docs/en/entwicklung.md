@@ -757,7 +757,7 @@ the release list.
 `.github/workflows/release.yml` runs on every push of a `v*` tag and automatically creates a
 GitHub release (`gh release create "$TAG" --verify-tag --title "$TAG" --notes-file notes.md`). The
 notes are generated **deterministically, without AI** by `scripts/release-notes.sh <prev-tag>
-<tag>`:
+<tag>`, in English like the public repo, headings included:
 
 - **Overview**: subject lines of the merge commits between the two tags
   (`git log --first-parent --merges`). Internal TODO-shorthand brackets are stripped for the public
@@ -769,13 +769,15 @@ notes are generated **deterministically, without AI** by `scripts/release-notes.
   left alone.
 - **Changes by type**: non-merge commits, grouped by conventional prefix
   (`feat`/`fix`/`perf`/`refactor`/`docs`/`test`/…).
-- **Behavior changes**: entries from [„Behavior Changes"](#behavior-changes) below that are dated
-  after the previous tag — without such entries, the section is left out.
-- **Comparison**: link to the compare view `prev...tag` (left out for the very first release, which
-  has no previous tag).
+- **Behavior changes**: entries from [„Behavior Changes"](#behavior-changes) below (read from this
+  English page, "**Since …**") that are dated after the previous tag — without such entries, the
+  section is left out.
+- **Comparison**: link to the compare view `prev...tag`.
 
-The script runs without a previous tag (`scripts/release-notes.sh "" v0.1.0`) and also when the
-current repo has no matching merge commits (e.g. in the curated public repo, which does not inherit
+Without a previous tag (`scripts/release-notes.sh "" v0.7.8`) the script prints only the title and one
+sentence ("First public release. …"), no lists: the first tag in the new public repo has no
+predecessor, and the whole history as a list came to 2,830 lines in the probe (2026-10-13). It also
+runs when the current repo has no matching merge commits (e.g. in the curated public repo, which does not inherit
 the working repo's merge history) — the affected sections are simply left out instead of raising an
 error. The action uses a supplied notes file (`release-notes/<tag>.md`) if one exists — for example
 from the [handover to the public repo](#handover-to-the-public-repo), which brings a verified

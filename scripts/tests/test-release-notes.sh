@@ -13,7 +13,7 @@ check() { if eval "$2"; then echo "  ok   $1"; PASS=$((PASS + 1)); else echo "  
 TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT
 
-mkdir -p "$TMP/scripts/lib" "$TMP/docs"
+mkdir -p "$TMP/scripts/lib" "$TMP/docs/en"
 cp "$REPO/scripts/release-notes.sh" "$TMP/scripts/release-notes.sh"
 cp "$REPO/scripts/lib/strip-todo-brackets.py" "$TMP/scripts/lib/strip-todo-brackets.py"
 
@@ -45,64 +45,71 @@ git -C "$TMP" commit -qam "docs: Notiz ergaenzen (33333333)"
 
 git -C "$TMP" tag -a v0.2.0 -m "Release v0.2.0"
 
-echo "1) Erstes Release ohne Vorgaenger-Tag"
-OUT1="$( (cd "$TMP" && bash scripts/release-notes.sh "" v0.1.0) )"; RC1=$?
-check "Skript laeuft durch"                    '[ "$RC1" -eq 0 ]'
-check "kein Vergleichs-Abschnitt"              '! grep -q "## Vergleich" <<< "$OUT1"'
-check "Titel nennt das Tag"                    'grep -q "^# v0.1.0" <<< "$OUT1"'
+echo "1) First release without a predecessor tag: one short paragraph, no lists"
+OUT1="$( (cd "$TMP" && bash scripts/release-notes.sh "" v0.2.0) )"; RC1=$?
+check "script runs through"                    '[ "$RC1" -eq 0 ]'
+check "title names the tag"                    'grep -q "^# v0.2.0" <<< "$OUT1"'
+check "says it is the first public release"    'grep -qF "First public release." <<< "$OUT1"'
+check "no sections and no list items"          '! grep -qE "^##|^- " <<< "$OUT1"'
 
-echo "2) Release mit Vorgaenger: Ueberblick aus Merge-Commits"
+echo "2) Release with a predecessor: overview from the merge commits"
 OUT2="$( (cd "$TMP" && bash scripts/release-notes.sh v0.1.0 v0.2.0) )"; RC2=$?
-check "Skript laeuft durch"                    '[ "$RC2" -eq 0 ]'
-check "Ueberblick-Abschnitt vorhanden"          'grep -q "^## Überblick" <<< "$OUT2"'
-check "Merge-Betreff Feature A gelistet"        'grep -qF "Merge branch '"'"'feat/a'"'"': Feature A" <<< "$OUT2"'
-check "Merge-Betreff Bug B gelistet"            'grep -qF "Merge branch '"'"'fix/b'"'"': Bug B" <<< "$OUT2"'
-check "TODO-Klammer aus Merge-Betreff entfernt" '! grep -q "11111111" <<< "$OUT2"'
+check "script runs through"                    '[ "$RC2" -eq 0 ]'
+check "overview section present"               'grep -q "^## Overview" <<< "$OUT2"'
+check "merge subject feature A listed"         'grep -qF "Merge branch '"'"'feat/a'"'"': Feature A" <<< "$OUT2"'
+check "merge subject bug B listed"             'grep -qF "Merge branch '"'"'fix/b'"'"': Bug B" <<< "$OUT2"'
+check "TODO bracket removed from merge subject" '! grep -q "11111111" <<< "$OUT2"'
 
-echo "3) Typ-Abschnitte aus Nicht-Merge-Commits"
-check "Features-Abschnitt vorhanden"           'grep -q "^### Features" <<< "$OUT2"'
-check "Feature-Zeile ohne TODO-Klammer"         'grep -qF -- "- Feature A einbauen" <<< "$OUT2" && ! grep -qF -- "- Feature A einbauen (11111111 Feature A)" <<< "$OUT2"'
-check "Fixes-Abschnitt vorhanden"               'grep -q "^### Fixes" <<< "$OUT2"'
-check "Fix-Zeile ohne TODO-Klammer"             'grep -qF -- "- Bug B beheben" <<< "$OUT2" && ! grep -qF -- "22222222" <<< "$OUT2"'
-check "Dokumentation-Abschnitt vorhanden"       'grep -q "^### Dokumentation" <<< "$OUT2"'
-check "Doku-Zeile ohne bloße Hash-Klammer"      'grep -qF -- "- Notiz ergaenzen" <<< "$OUT2" && ! grep -qF -- "33333333" <<< "$OUT2"'
+echo "3) Type sections from the non-merge commits"
+check "changes-by-type section present"        'grep -q "^## Changes by type" <<< "$OUT2"'
+check "features section present"               'grep -q "^### Features" <<< "$OUT2"'
+check "feature line without TODO bracket"      'grep -qF -- "- Feature A einbauen" <<< "$OUT2" && ! grep -qF -- "- Feature A einbauen (11111111 Feature A)" <<< "$OUT2"'
+check "fixes section present"                  'grep -q "^### Fixes" <<< "$OUT2"'
+check "fix line without TODO bracket"          'grep -qF -- "- Bug B beheben" <<< "$OUT2" && ! grep -qF -- "22222222" <<< "$OUT2"'
+check "documentation section present"          'grep -q "^### Documentation" <<< "$OUT2"'
+check "docs line without bare hash bracket"    'grep -qF -- "- Notiz ergaenzen" <<< "$OUT2" && ! grep -qF -- "33333333" <<< "$OUT2"'
+check "no German heading left"                 '! grep -qE "^#+ .*(Überblick|Änderungen|Dokumentation|Verhaltens|Vergleich)" <<< "$OUT2"'
 
-echo "4) Vergleichs-Link, wenn ein Vorgaenger-Tag existiert"
-check "Vergleichs-Abschnitt vorhanden"          'grep -q "^## Vergleich" <<< "$OUT2"'
-check "Link auf compare-View"                   'grep -qF "https://github.com/example/mini-repo/compare/v0.1.0...v0.2.0" <<< "$OUT2"'
+echo "4) Compare link when a predecessor tag exists"
+check "comparison section present"             'grep -q "^## Comparison" <<< "$OUT2"'
+check "link to the compare view"               'grep -qF "https://github.com/example/mini-repo/compare/v0.1.0...v0.2.0" <<< "$OUT2"'
 
-echo "5) Fehlerfaelle"
+echo "5) Error cases"
 OUT5="$( (cd "$TMP" && bash scripts/release-notes.sh "" v9.9.9) 2>&1 )"; RC5=$?
-check "unbekanntes Tag bricht ab"               '[ "$RC5" -ne 0 ]'
+check "unknown tag aborts"                     '[ "$RC5" -ne 0 ]'
 OUT6="$( (cd "$TMP" && bash scripts/release-notes.sh) 2>&1 )"; RC6=$?
-check "fehlendes Tag-Argument bricht ab"        '[ "$RC6" -ne 0 ]'
+check "missing tag argument aborts"           '[ "$RC6" -ne 0 ]'
 
-echo "6) Verhaltensaenderungen: entfaellt ohne docs/entwicklung.md"
-check "kein Verhaltensaenderungen-Abschnitt ohne Doku" '! grep -q "## Verhaltensänderungen" <<< "$OUT2"'
+echo "6) Behavior changes: omitted without docs/en/entwicklung.md"
+check "no behavior-changes section without the doc" '! grep -q "## Behavior changes" <<< "$OUT2"'
 
-echo "7) Verhaltensaenderungen: nur Eintraege nach dem Vorgaenger-Tag"
-cat > "$TMP/docs/entwicklung.md" <<'DOCS'
-## Versionierung & Releases
+echo "7) Behavior changes: only entries after the predecessor tag, from the English doc"
+cat > "$TMP/docs/en/entwicklung.md" <<'DOCS'
+## Versioning & Releases
 
-### Verhaltensänderungen
+### Behavior Changes
 
-**Seit 2000-01-01 (Commit aaaaaaaa): Alter Eintrag vor v0.2.0.**
+**Since 2000-01-01 (commit aaaaaaaa): Old entry before v0.2.0.**
 Text.
 
-**Seit 2099-01-01 (Commit bbbbbbbb): Neuer Eintrag nach v0.2.0.**
+**Since 2099-01-01 (commit bbbbbbbb): New entry after v0.2.0.**
 Text.
 DOCS
+# The German source must not be read: its entries would put German into the notes.
+printf '**Seit 2099-01-01 (Commit cccccccc): Deutscher Eintrag.**\n' > "$TMP/docs/entwicklung.md"
 git -C "$TMP" add -A
 git -C "$TMP" commit -qm "docs: Verhaltensaenderungen ergaenzen (44444444)"
 git -C "$TMP" tag -a v0.3.0 -m "Release v0.3.0"
 
 OUT7="$( (cd "$TMP" && bash scripts/release-notes.sh v0.2.0 v0.3.0) )"; RC7=$?
-check "Skript laeuft durch"                            '[ "$RC7" -eq 0 ]'
-check "Verhaltensaenderungen-Abschnitt vorhanden"       'grep -q "^## Verhaltensänderungen" <<< "$OUT7"'
-check "alter Eintrag (vor v0.2.0) fehlt"                '! grep -q "Alter Eintrag" <<< "$OUT7"'
-check "neuer Eintrag (nach v0.2.0) gelistet"            'grep -q "Neuer Eintrag nach v0.2.0" <<< "$OUT7"'
+check "script runs through"                            '[ "$RC7" -eq 0 ]'
+check "behavior-changes section present"               'grep -q "^## Behavior changes" <<< "$OUT7"'
+check "old entry (before v0.2.0) missing"              '! grep -q "Old entry" <<< "$OUT7"'
+check "new entry (after v0.2.0) listed"                'grep -q "New entry after v0.2.0" <<< "$OUT7"'
+check "no entry from the German doc"                   '! grep -q "Deutscher Eintrag" <<< "$OUT7"'
+check "details link to the English section"            'grep -qF "docs/en/entwicklung.md#behavior-changes" <<< "$OUT7"'
 
-echo "8) Mehrere Kuerzel, verschachtelte Klammer im Titel, normale Klammer bleibt"
+echo "8) Several short ids, nested bracket in the title, a normal bracket stays"
 # Pure short-id list without title (series merge format, e.g. "series/w3-…: … (id, id, id, id)")
 git -C "$TMP" checkout -q -b feat/series
 echo "series" >> "$TMP/README.md"
@@ -126,24 +133,24 @@ git -C "$TMP" commit -qam "docs(readme): Sync nachgezogen (Stand 2026-09-22, aaa
 git -C "$TMP" tag -a v0.4.0 -m "Release v0.4.0"
 
 OUT8="$( (cd "$TMP" && bash scripts/release-notes.sh v0.3.0 v0.4.0) )"; RC8=$?
-check "Skript laeuft durch"                              '[ "$RC8" -eq 0 ]'
-check "Serien-Merge-Betreff ohne Kuerzelliste"            'grep -qF -- "Merge series/w3-x: Themenbuendel A, B, C" <<< "$OUT8" && ! grep -qE "66666666|77777777|88888888" <<< "$OUT8"'
-check "verschachtelte Klammer im Titel komplett entfernt" 'grep -qF -- "- Modellstatistik verschoben" <<< "$OUT8" && ! grep -qF -- "99999999" <<< "$OUT8" && ! grep -qF -- "Klammer" <<< "$OUT8"'
-check "normale Klammer ohne Kuerzel bleibt stehen"        'grep -qF -- "- Abhaengigkeit aktualisiert (kein Kuerzel)" <<< "$OUT8"'
-check "Kuerzel am Ende mit Fliesstext davor entfernt"     'grep -qF -- "- Sync nachgezogen" <<< "$OUT8" && ! grep -qF -- "aaaaaaaa" <<< "$OUT8" && ! grep -qF -- "Stand 2026-09-22" <<< "$OUT8"'
+check "script runs through"                              '[ "$RC8" -eq 0 ]'
+check "series merge subject without short-id list"       'grep -qF -- "Merge series/w3-x: Themenbuendel A, B, C" <<< "$OUT8" && ! grep -qE "66666666|77777777|88888888" <<< "$OUT8"'
+check "nested bracket in the title removed completely"   'grep -qF -- "- Modellstatistik verschoben" <<< "$OUT8" && ! grep -qF -- "99999999" <<< "$OUT8" && ! grep -qF -- "Klammer" <<< "$OUT8"'
+check "normal bracket without short id stays"           'grep -qF -- "- Abhaengigkeit aktualisiert (kein Kuerzel)" <<< "$OUT8"'
+check "short id at the end after running text removed"  'grep -qF -- "- Sync nachgezogen" <<< "$OUT8" && ! grep -qF -- "aaaaaaaa" <<< "$OUT8" && ! grep -qF -- "Stand 2026-09-22" <<< "$OUT8"'
 # Behavior-change entries come from docs/entwicklung.md and deliberately quote their commit/
 # TODO hash (see the convention there) — the only allowed places outside
 # that are the compare link (tag names without hex) itself.
-check "kein 8-Hex-Kuerzel mehr ausserhalb Vergleichslink/Verhaltensaenderungen" \
-  '[ -z "$(grep -E "[0-9a-f]{8}" <<< "$OUT8" | grep -v "compare/" | grep -v "^- \*\*Seit ")" ]'
+check "no 8-hex short id outside the compare link and behavior changes" \
+  '[ -z "$(grep -E "[0-9a-f]{8}" <<< "$OUT8" | grep -v "compare/" | grep -v "^- \*\*Since ")" ]'
 
-echo "9) Slug fuer die Links: von aussen gesetzt, leer, lokaler origin"
+echo "9) Slug of the links: set from outside, empty, local origin"
 OUT9="$( (cd "$TMP" && RELEASE_NOTES_REPO_SLUG=public/repo bash scripts/release-notes.sh v0.1.0 v0.2.0) )"
-check "gesetzter Slug ersetzt origin im Vergleichslink"   'grep -qF "https://github.com/public/repo/compare/v0.1.0...v0.2.0" <<< "$OUT9" && ! grep -qF "example/mini-repo" <<< "$OUT9"'
+check "a set slug replaces origin in the compare link"  'grep -qF "https://github.com/public/repo/compare/v0.1.0...v0.2.0" <<< "$OUT9" && ! grep -qF "example/mini-repo" <<< "$OUT9"'
 OUT10="$( (cd "$TMP" && RELEASE_NOTES_REPO_SLUG= bash scripts/release-notes.sh v0.1.0 v0.2.0) )"
-check "leerer Slug: kein Vergleichs-Abschnitt"           '! grep -q "## Vergleich" <<< "$OUT10"'
+check "empty slug: no comparison section"              '! grep -q "## Comparison" <<< "$OUT10"'
 git -C "$TMP" remote set-url origin "$TMP/elsewhere.git"
 OUT11="$( (cd "$TMP" && bash scripts/release-notes.sh v0.1.0 v0.2.0) )"
-check "lokaler origin: kein kaputter GitHub-Link"        '! grep -q "github.com" <<< "$OUT11"'
+check "local origin: no broken GitHub link"            '! grep -q "github.com" <<< "$OUT11"'
 
 echo; echo "passed=$PASS failed=$FAIL"; [ "$FAIL" -eq 0 ]
