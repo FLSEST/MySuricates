@@ -1,5 +1,9 @@
 {
   "id": "deploy-pipeline",
+  "i18n": [
+    "de",
+    "en"
+  ],
   "icon": "🚀",
   "name": {
     "en": "Deploy Pipeline",
@@ -11,9 +15,12 @@
   },
   "category": "CODE",
   "sortOrder": 2,
-  "version": "1.0.1",
+  "version": "1.1.0",
   "model": null,
-  "instructions": "Fuehre die Deploy-Pipeline aus. Stoppe bei fehlgeschlagenen Tests.\nArbeitsverzeichnis fuer diesen Run ist {{ execution_path }}. Verwende ausschliesslich diesen Run-Workspace fuer Builds und Code-Aenderungen. {{ project_path }} identifiziert nur das Originalprojekt. Kein automatischer Merge oder Push; Ergebnisse zur separaten Uebernahme behalten.",
+  "instructions": {
+    "de": "Fuehre die Deploy-Pipeline aus. Stoppe bei fehlgeschlagenen Tests.\nArbeitsverzeichnis fuer diesen Run ist {{ execution_path }}. Verwende ausschliesslich diesen Run-Workspace fuer Builds und Code-Aenderungen. {{ project_path }} identifiziert nur das Originalprojekt. Kein automatischer Merge oder Push; Ergebnisse zur separaten Uebernahme behalten.",
+    "en": "Run the deploy pipeline. Stop when tests fail.\nThe working directory for this run is {{ execution_path }}. Use only this run workspace for builds and code changes. {{ project_path }} only identifies the original project. No automatic merge or push; keep the results so they can be taken over separately."
+  },
   "blocks": [
     {
       "type": "conditional",

@@ -1,5 +1,6 @@
 {
   "id" : "service-health-monitor",
+  "i18n" : [ "de", "en" ],
   "icon" : "🩺",
   "name" : {
     "en" : "Service Health Monitor",
@@ -11,9 +12,12 @@
   },
   "category" : "INFRA",
   "sortOrder" : 47,
-  "version" : "1.0.1",
+  "version" : "1.1.0",
   "model" : null,
-  "instructions" : "Prüfe Service-Health. Variablen: service_urls (zeilengetrennte HTTP/HTTPS URLs), timeout_seconds (default 10).",
+  "instructions" : {
+    "de" : "Prüfe Service-Health. Variablen: service_urls (zeilengetrennte HTTP/HTTPS URLs), timeout_seconds (default 10).",
+    "en" : "Check service health. Variables: service_urls (newline-separated HTTP/HTTPS URLs), timeout_seconds (default 10)."
+  },
   "blocks" : [ {
     "type" : "shell",
     "config" : {
@@ -34,7 +38,10 @@
   }, {
     "type" : "simple",
     "config" : {
-      "command" : "Erstelle einen strukturierten Health-Report basierend auf den Ressourcen- und Service-Prüfergebnissen. Markiere kritische Services, ungewöhnlich hohe Ressourcennutzung und gib konkrete Empfehlungen. Format: Executive Summary, dann Details pro Service."
+      "command" : {
+        "de" : "Erstelle einen strukturierten Health-Report basierend auf den Ressourcen- und Service-Prüfergebnissen. Markiere kritische Services, ungewöhnlich hohe Ressourcennutzung und gib konkrete Empfehlungen. Format: Executive Summary, dann Details pro Service.",
+        "en" : "Create a structured health report based on the resource and service check results. Flag critical services and unusually high resource usage, and give concrete recommendations. Format: executive summary, then details per service."
+      }
     },
     "requiredCapabilities" : [ ]
   } ]

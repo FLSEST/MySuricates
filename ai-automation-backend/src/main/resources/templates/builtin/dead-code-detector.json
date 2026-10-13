@@ -1,5 +1,9 @@
 {
   "id": "dead-code-detector",
+  "i18n": [
+    "de",
+    "en"
+  ],
   "icon": "💀",
   "name": {
     "en": "Dead Code Detector",
@@ -11,9 +15,12 @@
   },
   "category": "CODE",
   "sortOrder": 36,
-  "version": "1.1.0",
+  "version": "1.2.0",
   "model": "sonnet",
-  "instructions": "Findet ungenutzten Code: verwaiste Exports, tote Dateien, ungenutzte Dependencies, tote Code-Pfade.",
+  "instructions": {
+    "de": "Findet ungenutzten Code: verwaiste Exports, tote Dateien, ungenutzte Dependencies, tote Code-Pfade.",
+    "en": "Finds unused code: orphaned exports, dead files, unused dependencies, dead code paths."
+  },
   "blocks": [
     {
       "type": "shell",
@@ -27,7 +34,10 @@
       "type": "simple",
       "config": {
         "timeout_seconds": 600,
-        "command": "Analysiere die gesammelten Code-Daten auf ungenutzten Code:\n\n{{ previous_output }}\n\nSuche systematisch nach:\n1. **Verwaiste Exports**: Exportierte Symbole (Funktionen, Klassen, Interfaces, Typen), die nirgends importiert werden\n2. **Tote Dateien**: Source-Dateien, die von keiner anderen Datei referenziert werden (weder importiert noch als Route/Config eingebunden)\n3. **Ungenutzte Dependencies**: Pakete in package.json/pom.xml, die nirgends im Code importiert werden\n4. **Tote Code-Pfade**: Methoden/Funktionen innerhalb von Dateien, die nur definiert aber nie aufgerufen werden\n5. **Auskommentierter Code**: Groessere Bloecke von auskommentiertem Code, der entfernt werden sollte\n\nFuer jeden Fund: Datei, Symbol/Paket, Evidenz warum es ungenutzt ist. Markiere Confidence (HIGH/MEDIUM/LOW) — nur HIGH melden wenn sicher ungenutzt."
+        "command": {
+          "de": "Analysiere die gesammelten Code-Daten auf ungenutzten Code:\n\n{{ previous_output }}\n\nSuche systematisch nach:\n1. **Verwaiste Exports**: Exportierte Symbole (Funktionen, Klassen, Interfaces, Typen), die nirgends importiert werden\n2. **Tote Dateien**: Source-Dateien, die von keiner anderen Datei referenziert werden (weder importiert noch als Route/Config eingebunden)\n3. **Ungenutzte Dependencies**: Pakete in package.json/pom.xml, die nirgends im Code importiert werden\n4. **Tote Code-Pfade**: Methoden/Funktionen innerhalb von Dateien, die nur definiert aber nie aufgerufen werden\n5. **Auskommentierter Code**: Groessere Bloecke von auskommentiertem Code, der entfernt werden sollte\n\nFuer jeden Fund: Datei, Symbol/Paket, Evidenz warum es ungenutzt ist. Markiere Confidence (HIGH/MEDIUM/LOW) — nur HIGH melden wenn sicher ungenutzt.",
+          "en": "Analyze the collected code data for unused code:\n\n{{ previous_output }}\n\nSearch systematically for:\n1. **Orphaned exports**: exported symbols (functions, classes, interfaces, types) that are not imported anywhere\n2. **Dead files**: source files that no other file references (neither imported nor wired in as a route/config)\n3. **Unused dependencies**: packages in package.json/pom.xml that are not imported anywhere in the code\n4. **Dead code paths**: methods/functions inside files that are only defined but never called\n5. **Commented-out code**: larger blocks of commented-out code that should be removed\n\nFor each finding: file, symbol/package, evidence why it is unused. Mark the confidence (HIGH/MEDIUM/LOW) — report HIGH only when it is certainly unused."
+        }
       },
       "requiredCapabilities": []
     },
@@ -35,7 +45,10 @@
       "type": "simple",
       "config": {
         "timeout_seconds": 600,
-        "command": "Erstelle einen Impact-Report und Cleanup-Plan:\n\n{{ previous_output }}\n\n## Format:\n\n### Summary\n- Geschaetzte Menge an Dead Code (Dateien, LOC)\n- Betroffene Module/Packages\n\n### Findings nach Kategorie\n| # | Kategorie | Datei/Symbol | Confidence | Impact (LOC) | Aktion |\n\n### Cleanup-Aktionsplan\n1. **Safe Deletes** (HIGH confidence): Sofort entfernbar\n2. **Review Required** (MEDIUM confidence): Manuell pruefen\n3. **Dependency Cleanup**: Pakete zum Entfernen\n\nNur HIGH-confidence Findings in den Safe-Delete-Bereich."
+        "command": {
+          "de": "Erstelle einen Impact-Report und Cleanup-Plan:\n\n{{ previous_output }}\n\n## Format:\n\n### Summary\n- Geschaetzte Menge an Dead Code (Dateien, LOC)\n- Betroffene Module/Packages\n\n### Findings nach Kategorie\n| # | Kategorie | Datei/Symbol | Confidence | Impact (LOC) | Aktion |\n\n### Cleanup-Aktionsplan\n1. **Safe Deletes** (HIGH confidence): Sofort entfernbar\n2. **Review Required** (MEDIUM confidence): Manuell pruefen\n3. **Dependency Cleanup**: Pakete zum Entfernen\n\nNur HIGH-confidence Findings in den Safe-Delete-Bereich.",
+          "en": "Create an impact report and cleanup plan:\n\n{{ previous_output }}\n\n## Format:\n\n### Summary\n- Estimated amount of dead code (files, LOC)\n- Affected modules/packages\n\n### Findings by category\n| # | Category | File/symbol | Confidence | Impact (LOC) | Action |\n\n### Cleanup action plan\n1. **Safe Deletes** (HIGH confidence): can be removed right away\n2. **Review Required** (MEDIUM confidence): check manually\n3. **Dependency Cleanup**: packages to remove\n\nOnly HIGH-confidence findings go into the Safe Deletes section."
+        }
       },
       "requiredCapabilities": []
     },
@@ -43,7 +56,10 @@
       "type": "simple",
       "config": {
         "timeout_seconds": 300,
-        "command": "Wandle die Findings aus {{ previous_output }} in native TODO-Marker um. KEINE Dateien schreiben, KEINE API-Aufrufe, kein curl — nur Marker-Zeilen ausgeben; die Plattform legt die TODOs selbst an (AutoTodoService).\n\n## Bestehende offene TODOs (Duplikate vermeiden)\n{{ open_todos }}\n\n## Regeln\n- Pro umsetzbarem Finding genau eine Zeile im Format:\n  todo_item: <Titel im Imperativ> | <HIGH|MEDIUM|LOW> | <tag1,tag2> | <Kurzbeschreibung mit Fundstelle>\n- Maximal 10 todo_item-Zeilen, nur echte, umsetzbare Findings\n- Findings, die ein bestehendes offenes TODO bereits abdeckt, NICHT erneut ausgeben\n- Am Ende genau eine Zeile Gesamtbewertung:\n  gate_status: GREEN (keine Findings) | YELLOW (nur kleinere Findings) | RED (kritische Findings)"
+        "command": {
+          "de": "Wandle die Findings aus {{ previous_output }} in native TODO-Marker um. KEINE Dateien schreiben, KEINE API-Aufrufe, kein curl — nur Marker-Zeilen ausgeben; die Plattform legt die TODOs selbst an (AutoTodoService).\n\n## Bestehende offene TODOs (Duplikate vermeiden)\n{{ open_todos }}\n\n## Regeln\n- Pro umsetzbarem Finding genau eine Zeile im Format:\n  todo_item: <Titel im Imperativ> | <HIGH|MEDIUM|LOW> | <tag1,tag2> | <Kurzbeschreibung mit Fundstelle>\n- Maximal 10 todo_item-Zeilen, nur echte, umsetzbare Findings\n- Findings, die ein bestehendes offenes TODO bereits abdeckt, NICHT erneut ausgeben\n- Am Ende genau eine Zeile Gesamtbewertung:\n  gate_status: GREEN (keine Findings) | YELLOW (nur kleinere Findings) | RED (kritische Findings)",
+          "en": "Turn the findings from {{ previous_output }} into native TODO markers. Do NOT write any files, make NO API calls, no curl — output marker lines only; the platform creates the TODOs itself (AutoTodoService).\n\n## Existing open TODOs (avoid duplicates)\n{{ open_todos }}\n\n## Rules\n- Exactly one line per actionable finding, in this format:\n  todo_item: <title in the imperative> | <HIGH|MEDIUM|LOW> | <tag1,tag2> | <short description with location>\n- At most 10 todo_item lines, only real, actionable findings\n- Do NOT output findings that an existing open TODO already covers\n- At the end, exactly one line with the overall verdict:\n  gate_status: GREEN (no findings) | YELLOW (only minor findings) | RED (critical findings)"
+        }
       },
       "requiredCapabilities": []
     }

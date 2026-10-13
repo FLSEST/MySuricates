@@ -1,5 +1,6 @@
 {
   "id" : "research-enhance",
+  "i18n" : [ "de", "en" ],
   "icon" : "\uD83D\uDD2C",
   "name" : {
     "en" : "Research & Enrichment",
@@ -11,9 +12,12 @@
   },
   "category" : "RESEARCH",
   "sortOrder" : 6,
-  "version" : "1.0.0",
+  "version" : "1.1.0",
   "model" : null,
-  "instructions" : "Scanne das Projekt rekursiv, finde inhaltliche Luecken und reichere die Texte mit Recherche an.",
+  "instructions" : {
+    "de" : "Scanne das Projekt rekursiv, finde inhaltliche Luecken und reichere die Texte mit Recherche an.",
+    "en" : "Scan the project recursively, find gaps in the content and enrich the texts with research."
+  },
   "blocks" : [ {
     "type" : "simple",
     "config" : {
@@ -23,19 +27,28 @@
   }, {
     "type" : "simple",
     "config" : {
-      "command" : "Lies die relevanten Dateien in deinem Projekt. Extrahiere die Kernaussagen und identifiziere inhaltliche Luecken oder Punkte die mehr Tiefe brauchen."
+      "command" : {
+        "de" : "Lies die relevanten Dateien in deinem Projekt. Extrahiere die Kernaussagen und identifiziere inhaltliche Luecken oder Punkte die mehr Tiefe brauchen.",
+        "en" : "Read the relevant files in your project. Extract the key statements and identify gaps in the content or points that need more depth."
+      }
     },
     "requiredCapabilities" : [ ]
   }, {
     "type" : "simple",
     "config" : {
-      "command" : "Recherchiere zu den identifizierten Luecken. Finde aktuelle Fakten, Statistiken und Quellen die den Inhalt bereichern wuerden."
+      "command" : {
+        "de" : "Recherchiere zu den identifizierten Luecken. Finde aktuelle Fakten, Statistiken und Quellen die den Inhalt bereichern wuerden.",
+        "en" : "Research the identified gaps. Find current facts, statistics and sources that would enrich the content."
+      }
     },
     "requiredCapabilities" : [ ]
   }, {
     "type" : "simple",
     "config" : {
-      "command" : "Erstelle eine angereicherte Version der Hauptdatei. Integriere die recherchierten Informationen und fuege Quellenangaben hinzu."
+      "command" : {
+        "de" : "Erstelle eine angereicherte Version der Hauptdatei. Integriere die recherchierten Informationen und fuege Quellenangaben hinzu.",
+        "en" : "Create an enriched version of the main file. Integrate the researched information and add source references."
+      }
     },
     "requiredCapabilities" : [ ]
   } ]

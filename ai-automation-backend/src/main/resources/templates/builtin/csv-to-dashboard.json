@@ -1,5 +1,6 @@
 {
   "id" : "csv-to-dashboard",
+  "i18n" : [ "de", "en" ],
   "icon" : "\uD83D\uDCCA",
   "name" : {
     "en" : "CSV → Interactive Dashboard",
@@ -11,27 +12,42 @@
   },
   "category" : "DATA",
   "sortOrder" : 16,
-  "version" : "1.0.0",
+  "version" : "1.1.0",
   "model" : null,
-  "instructions" : "Erstelle ein interaktives Dashboard mit Chart.js aus den CSV-Daten.",
+  "instructions" : {
+    "de" : "Erstelle ein interaktives Dashboard mit Chart.js aus den CSV-Daten.",
+    "en" : "Build an interactive dashboard with Chart.js from the CSV data."
+  },
   "blocks" : [ {
     "type" : "simple",
     "config" : {
-      "command" : "Lies {{ filepath }}. Analysiere die CSV-Struktur: Spaltennamen, Datentypen, Anzahl Zeilen, fehlende Werte. Identifiziere automatisch: (1) Numerische Spalten fuer KPIs (Summe, Durchschnitt, Min/Max), (2) Zeitliche Spalten fuer Trend-Charts, (3) Kategorische Spalten fuer Pie/Bar-Charts, (4) Korrelationen zwischen Spalten. Gib einen strukturierten Analyse-Plan aus."
+      "command" : {
+        "de" : "Lies {{ filepath }}. Analysiere die CSV-Struktur: Spaltennamen, Datentypen, Anzahl Zeilen, fehlende Werte. Identifiziere automatisch: (1) Numerische Spalten fuer KPIs (Summe, Durchschnitt, Min/Max), (2) Zeitliche Spalten fuer Trend-Charts, (3) Kategorische Spalten fuer Pie/Bar-Charts, (4) Korrelationen zwischen Spalten. Gib einen strukturierten Analyse-Plan aus.",
+        "en" : "Read {{ filepath }}. Analyze the CSV structure: column names, data types, number of rows, missing values. Identify automatically: (1) numeric columns for KPIs (sum, average, min/max), (2) time columns for trend charts, (3) categorical columns for pie/bar charts, (4) correlations between columns. Output a structured analysis plan."
+      }
     },
     "requiredCapabilities" : [ ]
   }, {
     "type" : "agentic",
     "config" : {
       "max_iterations" : 8,
-      "success_criteria" : "index.html in dashboard/ enthaelt mindestens 3 verschiedene Chart-Typen und eine KPI-Uebersicht.",
-      "goal" : "Erstelle ein interaktives HTML-Dashboard in dashboard/. Titel: '{{ title }}'. Basierend auf der CSV-Analyse: (1) KPI-Karten oben (grosse Zahlen mit Vergleichsindikatoren), (2) Trend-Line-Charts fuer zeitliche Daten, (3) Bar/Pie-Charts fuer kategorische Verteilungen, (4) Datentabelle mit Sortierung. Verwende Chart.js via CDN fuer Diagramme, TailwindCSS fuer Layout. Die CSV-Daten sollen als JavaScript-Variable eingebettet werden. Sprache: {{ language }}. Das Dashboard soll als einzelne index.html Datei funktionieren."
+      "success_criteria" : {
+        "de" : "index.html in dashboard/ enthaelt mindestens 3 verschiedene Chart-Typen und eine KPI-Uebersicht.",
+        "en" : "index.html in dashboard/ contains at least 3 different chart types and a KPI overview."
+      },
+      "goal" : {
+        "de" : "Erstelle ein interaktives HTML-Dashboard in dashboard/. Titel: '{{ title }}'. Basierend auf der CSV-Analyse: (1) KPI-Karten oben (grosse Zahlen mit Vergleichsindikatoren), (2) Trend-Line-Charts fuer zeitliche Daten, (3) Bar/Pie-Charts fuer kategorische Verteilungen, (4) Datentabelle mit Sortierung. Verwende Chart.js via CDN fuer Diagramme, TailwindCSS fuer Layout. Die CSV-Daten sollen als JavaScript-Variable eingebettet werden. Sprache: {{ language }}. Das Dashboard soll als einzelne index.html Datei funktionieren.",
+        "en" : "Build an interactive HTML dashboard in dashboard/. Title: '{{ title }}'. Based on the CSV analysis: (1) KPI cards at the top (large numbers with comparison indicators), (2) trend line charts for time-based data, (3) bar/pie charts for categorical distributions, (4) a data table with sorting. Use Chart.js via CDN for the charts and TailwindCSS for the layout. Embed the CSV data as a JavaScript variable. Language: {{ language }}. The dashboard should work as a single index.html file."
+      }
     },
     "requiredCapabilities" : [ ]
   }, {
     "type" : "simple",
     "config" : {
-      "command" : "Pruefe dashboard/index.html. Zaehle die Diagramme, pruefe ob Chart.js korrekt eingebunden ist, und gib eine Uebersicht des Dashboards aus."
+      "command" : {
+        "de" : "Pruefe dashboard/index.html. Zaehle die Diagramme, pruefe ob Chart.js korrekt eingebunden ist, und gib eine Uebersicht des Dashboards aus.",
+        "en" : "Check dashboard/index.html. Count the charts, check whether Chart.js is included correctly, and output an overview of the dashboard."
+      }
     },
     "requiredCapabilities" : [ ]
   } ]

@@ -1,5 +1,9 @@
 {
   "id": "auto-fix-python",
+  "i18n": [
+    "de",
+    "en"
+  ],
   "icon": "🐍",
   "name": {
     "en": "Auto-Fix Python",
@@ -11,15 +15,18 @@
   },
   "category": "CODE",
   "sortOrder": 43,
-  "version": "1.0.2",
+  "version": "1.1.0",
   "model": "sonnet",
-  "instructions": "Du bist ein automatischer Python-Code-Fixer. Deine Aufgabe ist es, Findings aus statischer Analyse sicher zu beheben.\n\nSICHERHEITSREGELN:\n- IMMER auf eigenem Branch arbeiten, nie auf main\n- Ein Commit pro Fix (atomar, reviewbar, revertierbar)\n- Keine Breaking Changes an oeffentlichen APIs\n- Keine Dateien loeschen die noch referenziert werden\n- Dependencies nur updaten wenn Kompatibilitaet geprueft (pip install --dry-run)\n- Bei Unsicherheit: Fix ueberspringen statt riskieren\n- Build und Tests muessen nach allen Fixes bestehen\n\nPYTHON-SPEZIFISCH:\n- Keine Starlette/FastAPI Version-Pins ohne Kompatibilitaetspruefung\n- Bei Whitespace-Fixes (W291, W292, W293): Nur Trailing Whitespace entfernen\n- Bei Import-Sortierung: isort-Konventionen beachten\n- Type-Hints nur hinzufuegen wenn der Typ eindeutig ableitbar ist\n- Bei Dependency-Updates: pip install --dry-run vor dem Commit\n\nCOMMIT-KONVENTIONEN:\n- fix: <beschreibung>\n- refactor: <beschreibung>\n- style: <beschreibung> — fuer Formatting/Whitespace\n- chore: <beschreibung> — fuer Dependency-Updates\nArbeitsverzeichnis fuer diesen Run ist {{ execution_path }}. Verwende ausschliesslich diesen Run-Workspace fuer Builds und Code-Aenderungen. {{ project_path }} identifiziert nur das Originalprojekt. Kein automatischer Merge oder Push; Ergebnisse zur separaten Uebernahme behalten.",
+  "instructions": {
+    "de": "Du bist ein automatischer Python-Code-Fixer. Deine Aufgabe ist es, Findings aus statischer Analyse sicher zu beheben.\n\nSICHERHEITSREGELN:\n- IMMER auf eigenem Branch arbeiten, nie auf main\n- Ein Commit pro Fix (atomar, reviewbar, revertierbar)\n- Keine Breaking Changes an oeffentlichen APIs\n- Keine Dateien loeschen die noch referenziert werden\n- Dependencies nur updaten wenn Kompatibilitaet geprueft (pip install --dry-run)\n- Bei Unsicherheit: Fix ueberspringen statt riskieren\n- Build und Tests muessen nach allen Fixes bestehen\n\nPYTHON-SPEZIFISCH:\n- Keine Starlette/FastAPI Version-Pins ohne Kompatibilitaetspruefung\n- Bei Whitespace-Fixes (W291, W292, W293): Nur Trailing Whitespace entfernen\n- Bei Import-Sortierung: isort-Konventionen beachten\n- Type-Hints nur hinzufuegen wenn der Typ eindeutig ableitbar ist\n- Bei Dependency-Updates: pip install --dry-run vor dem Commit\n\nCOMMIT-KONVENTIONEN:\n- fix: <beschreibung>\n- refactor: <beschreibung>\n- style: <beschreibung> — fuer Formatting/Whitespace\n- chore: <beschreibung> — fuer Dependency-Updates\nArbeitsverzeichnis fuer diesen Run ist {{ execution_path }}. Verwende ausschliesslich diesen Run-Workspace fuer Builds und Code-Aenderungen. {{ project_path }} identifiziert nur das Originalprojekt. Kein automatischer Merge oder Push; Ergebnisse zur separaten Uebernahme behalten.",
+    "en": "You are an automatic Python code fixer. Your task is to fix findings from static analysis safely.\n\nSAFETY RULES:\n- ALWAYS work on a separate branch, never on main\n- One commit per fix (atomic, reviewable, revertible)\n- No breaking changes to public APIs\n- Do not delete files that are still referenced\n- Only update dependencies once compatibility has been checked (pip install --dry-run)\n- When in doubt: skip the fix rather than take a risk\n- Build and tests must pass after all fixes\n\nPYTHON-SPECIFIC:\n- No Starlette/FastAPI version pins without a compatibility check\n- For whitespace fixes (W291, W292, W293): only remove trailing whitespace\n- For import sorting: follow the isort conventions\n- Only add type hints if the type can be inferred unambiguously\n- For dependency updates: pip install --dry-run before the commit\n\nCOMMIT CONVENTIONS:\n- fix: <description>\n- refactor: <description>\n- style: <description> — for formatting/whitespace\n- chore: <description> — for dependency updates\nThe working directory for this run is {{ execution_path }}. Use only this run workspace for builds and code changes. {{ project_path }} only identifies the original project. No automatic merge or push; keep the results so they can be adopted separately."
+  },
   "blocks": [
     {
       "type": "shell",
       "config": {
         "on_failure": "stop",
-        "command": "git status --short\ngit log -1 --oneline\necho \"Run-Branch: $(git branch --show-current)\"",
+        "command": "git status --short\ngit log -1 --oneline\necho \"Run branch: $(git branch --show-current)\"",
         "workspace": {
           "mode": "isolated",
           "source": "commit",
@@ -42,7 +49,10 @@
       "type": "simple",
       "config": {
         "timeout_seconds": 600,
-        "command": "Analysiere die Scan-Ergebnisse und erstelle einen strukturierten Fix-Plan.\n\nSCAN-ERGEBNISSE:\n{{ previous_output }}\n\nDOMAIN-KONTEXT:\n{{ domain_context }}\n\nAUFGABE:\n1. Extrahiere alle Findings aus den Scan-Tools (flake8, pylint, mypy, pip-audit, radon)\n2. Klassifiziere jedes Finding:\n\n   AUTO_FIXABLE (sicher automatisch behebbar):\n   - E1xx: Indentation (E101, E111, E114, E117, E125, E127, E128, E131)\n   - E2xx: Whitespace (E201, E202, E203, E211, E221, E222, E225, E226, E231, E241, E251, E261, E262, E271)\n   - E3xx: Blank lines (E301, E302, E303)\n   - E4xx: Imports (E401, E402)\n   - E5xx: Line length ONLY wenn trivial kuerzbar (E501)\n   - E7xx: Statement (E711, E712, E713, E714, E721, E731, E741)\n   - W1xx-W6xx: Warnings (W191, W291, W292, W293, W391, W503, W504)\n   - Unused imports (F401), undefined names mit klarer Loesung\n   - Missing @override, fehlende Type-Hints bei offensichtlichem Typ\n   - Triviale Dependency-Updates (nur Patch-Version)\n\n   MANUAL_REVIEW (zu komplex/riskant):\n   - API-Signatur-Aenderungen\n   - Architektur-Refactorings\n   - Major/Minor Dependency-Updates\n   - Komplexe Logik-Aenderungen\n   - Radon Complexity > C (benoetigt Redesign)\n\n   INFORMATIONAL:\n   - Nur Hinweise ohne konkreten Fix\n\n3. Sortiere AUTO_FIXABLE: Imports → Whitespace/Formatting → Code-Fixes → Dependencies\n4. Gib den Fix-Plan aus:\n\nFIX_PLAN:\n1. [AUTO_FIXABLE] <Datei>:<Zeile> — <Code> — <Was zu tun ist>\n2. ...\n\nSKIPPED (MANUAL_REVIEW):\n- <Datei>: <Grund>\n\nSKIPPED (INFORMATIONAL):\n- <Beschreibung>\n\nFalls keine Findings: FIX_PLAN: EMPTY - Keine fixbaren Findings gefunden."
+        "command": {
+          "de": "Analysiere die Scan-Ergebnisse und erstelle einen strukturierten Fix-Plan.\n\nSCAN-ERGEBNISSE:\n{{ previous_output }}\n\nDOMAIN-KONTEXT:\n{{ domain_context }}\n\nAUFGABE:\n1. Extrahiere alle Findings aus den Scan-Tools (flake8, pylint, mypy, pip-audit, radon)\n2. Klassifiziere jedes Finding:\n\n   AUTO_FIXABLE (sicher automatisch behebbar):\n   - E1xx: Indentation (E101, E111, E114, E117, E125, E127, E128, E131)\n   - E2xx: Whitespace (E201, E202, E203, E211, E221, E222, E225, E226, E231, E241, E251, E261, E262, E271)\n   - E3xx: Blank lines (E301, E302, E303)\n   - E4xx: Imports (E401, E402)\n   - E5xx: Line length ONLY wenn trivial kuerzbar (E501)\n   - E7xx: Statement (E711, E712, E713, E714, E721, E731, E741)\n   - W1xx-W6xx: Warnings (W191, W291, W292, W293, W391, W503, W504)\n   - Unused imports (F401), undefined names mit klarer Loesung\n   - Missing @override, fehlende Type-Hints bei offensichtlichem Typ\n   - Triviale Dependency-Updates (nur Patch-Version)\n\n   MANUAL_REVIEW (zu komplex/riskant):\n   - API-Signatur-Aenderungen\n   - Architektur-Refactorings\n   - Major/Minor Dependency-Updates\n   - Komplexe Logik-Aenderungen\n   - Radon Complexity > C (benoetigt Redesign)\n\n   INFORMATIONAL:\n   - Nur Hinweise ohne konkreten Fix\n\n3. Sortiere AUTO_FIXABLE: Imports → Whitespace/Formatting → Code-Fixes → Dependencies\n4. Gib den Fix-Plan aus:\n\nFIX_PLAN:\n1. [AUTO_FIXABLE] <Datei>:<Zeile> — <Code> — <Was zu tun ist>\n2. ...\n\nSKIPPED (MANUAL_REVIEW):\n- <Datei>: <Grund>\n\nSKIPPED (INFORMATIONAL):\n- <Beschreibung>\n\nFalls keine Findings: FIX_PLAN: EMPTY - Keine fixbaren Findings gefunden.",
+          "en": "Analyze the scan results and create a structured fix plan.\n\nSCAN RESULTS:\n{{ previous_output }}\n\nDOMAIN CONTEXT:\n{{ domain_context }}\n\nTASK:\n1. Extract all findings from the scan tools (flake8, pylint, mypy, pip-audit, radon)\n2. Classify each finding:\n\n   AUTO_FIXABLE (can be fixed safely and automatically):\n   - E1xx: Indentation (E101, E111, E114, E117, E125, E127, E128, E131)\n   - E2xx: Whitespace (E201, E202, E203, E211, E221, E222, E225, E226, E231, E241, E251, E261, E262, E271)\n   - E3xx: Blank lines (E301, E302, E303)\n   - E4xx: Imports (E401, E402)\n   - E5xx: Line length ONLY if it can be shortened trivially (E501)\n   - E7xx: Statement (E711, E712, E713, E714, E721, E731, E741)\n   - W1xx-W6xx: Warnings (W191, W291, W292, W293, W391, W503, W504)\n   - Unused imports (F401), undefined names with a clear solution\n   - Missing @override, missing type hints where the type is obvious\n   - Trivial dependency updates (patch version only)\n\n   MANUAL_REVIEW (too complex/risky):\n   - API signature changes\n   - Architecture refactorings\n   - Major/minor dependency updates\n   - Complex logic changes\n   - Radon complexity > C (needs a redesign)\n\n   INFORMATIONAL:\n   - Notes only, without a concrete fix\n\n3. Sort AUTO_FIXABLE: imports → whitespace/formatting → code fixes → dependencies\n4. Output the fix plan:\n\nFIX_PLAN:\n1. [AUTO_FIXABLE] <file>:<line> — <code> — <what to do>\n2. ...\n\nSKIPPED (MANUAL_REVIEW):\n- <file>: <reason>\n\nSKIPPED (INFORMATIONAL):\n- <description>\n\nIf there are no findings: FIX_PLAN: EMPTY - No fixable findings found."
+        }
       },
       "requiredCapabilities": []
     },
@@ -52,9 +62,15 @@
         "max_iterations": 25,
         "max_total_tokens": 400000,
         "iteration_timeout_seconds": 600,
-        "goal": "Arbeite den Fix-Plan aus dem vorherigen Schritt ab und committe jeden Fix einzeln.\n\nFIX-PLAN:\n{{ previous_output }}\n\nREGELN:\n1. Nur [AUTO_FIXABLE] Eintraege abarbeiten\n2. Falls FIX_PLAN EMPTY: 'NO_FIXES_NEEDED' ausgeben und beenden\n3. Ein Commit pro Fix — atomare Git-History\n4. Commit-Format: 'fix: <was behoben>' / 'style: <formatting>' / 'chore: <dependency>'\n5. SICHERHEIT:\n   - Keine API-Signaturen aendern\n   - Keine Dateien loeschen die noch importiert werden — pruefe Imports\n   - Bei Dependency-Updates: pip install --dry-run zur Kompatibilitaetspruefung\n   - Bei Unsicherheit: Fix ueberspringen als SKIPPED\n6. WICHTIG: Jede ACTION wird von einem SEPARATEN Agenten ausgefuehrt.\n   Jede ACTION MUSS enthalten:\n   - ABSOLUTE Dateipfade\n   - Vollstaendigen Kontext was zu aendern ist\n   - Nach der Aenderung: git add <datei> && git commit -m '<message>'\n\nAUSGABE am Ende:\nFIXES_APPLIED:\n1. <Datei> — <Commit-Hash> — <Beschreibung>\n\nFIXES_SKIPPED:\n- <Datei> — <Grund>\n\nTOTAL: X Fixes applied, Y skipped",
+        "goal": {
+          "de": "Arbeite den Fix-Plan aus dem vorherigen Schritt ab und committe jeden Fix einzeln.\n\nFIX-PLAN:\n{{ previous_output }}\n\nREGELN:\n1. Nur [AUTO_FIXABLE] Eintraege abarbeiten\n2. Falls FIX_PLAN EMPTY: 'NO_FIXES_NEEDED' ausgeben und beenden\n3. Ein Commit pro Fix — atomare Git-History\n4. Commit-Format: 'fix: <was behoben>' / 'style: <formatting>' / 'chore: <dependency>'\n5. SICHERHEIT:\n   - Keine API-Signaturen aendern\n   - Keine Dateien loeschen die noch importiert werden — pruefe Imports\n   - Bei Dependency-Updates: pip install --dry-run zur Kompatibilitaetspruefung\n   - Bei Unsicherheit: Fix ueberspringen als SKIPPED\n6. WICHTIG: Jede ACTION wird von einem SEPARATEN Agenten ausgefuehrt.\n   Jede ACTION MUSS enthalten:\n   - ABSOLUTE Dateipfade\n   - Vollstaendigen Kontext was zu aendern ist\n   - Nach der Aenderung: git add <datei> && git commit -m '<message>'\n\nAUSGABE am Ende:\nFIXES_APPLIED:\n1. <Datei> — <Commit-Hash> — <Beschreibung>\n\nFIXES_SKIPPED:\n- <Datei> — <Grund>\n\nTOTAL: X Fixes applied, Y skipped",
+          "en": "Work through the fix plan from the previous step and commit each fix separately.\n\nFIX-PLAN:\n{{ previous_output }}\n\nRULES:\n1. Work only on [AUTO_FIXABLE] entries\n2. If FIX_PLAN is EMPTY: output 'NO_FIXES_NEEDED' and stop\n3. One commit per fix — atomic git history\n4. Commit format: 'fix: <what was fixed>' / 'style: <formatting>' / 'chore: <dependency>'\n5. SAFETY:\n   - Do not change API signatures\n   - Do not delete files that are still imported — check the imports\n   - For dependency updates: pip install --dry-run as a compatibility check\n   - When in doubt: skip the fix as SKIPPED\n6. IMPORTANT: Each ACTION is carried out by a SEPARATE agent.\n   Every ACTION MUST contain:\n   - ABSOLUTE file paths\n   - The complete context of what to change\n   - After the change: git add <file> && git commit -m '<message>'\n\nOUTPUT at the end:\nFIXES_APPLIED:\n1. <file> — <commit hash> — <description>\n\nFIXES_SKIPPED:\n- <file> — <reason>\n\nTOTAL: X Fixes applied, Y skipped"
+        },
         "max_repeated_actions": 3,
-        "success_criteria": "Alle AUTO_FIXABLE Issues wurden als einzelne Commits committed oder begruendet uebersprungen.",
+        "success_criteria": {
+          "de": "Alle AUTO_FIXABLE Issues wurden als einzelne Commits committed oder begruendet uebersprungen.",
+          "en": "All AUTO_FIXABLE issues were committed as individual commits or skipped with a reason."
+        },
         "total_timeout_seconds": 5400,
         "require_approval": false
       },
@@ -91,7 +107,10 @@
         ],
         "timeout_minutes": 60,
         "variable_name": "pr_decision",
-        "question": "Review der Run-Ergebnisse bestaetigen. Uebernahme, Push und PR erfolgen danach separat."
+        "question": {
+          "de": "Review der Run-Ergebnisse bestaetigen. Uebernahme, Push und PR erfolgen danach separat.",
+          "en": "Confirm the review of the run results. Adoption, push and PR happen separately afterwards."
+        }
       },
       "requiredCapabilities": []
     },

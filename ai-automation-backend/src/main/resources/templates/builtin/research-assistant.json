@@ -1,5 +1,6 @@
 {
   "id" : "research-assistant",
+  "i18n" : [ "de", "en" ],
   "icon" : "\uD83D\uDD0D",
   "name" : {
     "en" : "Research Assistant",
@@ -11,9 +12,12 @@
   },
   "category" : "RESEARCH",
   "sortOrder" : 3,
-  "version" : "1.0.0",
+  "version" : "1.1.0",
   "model" : null,
-  "instructions" : "Recherchiere gruendlich und stelle sicher dass alle Quellen korrekt zitiert werden.",
+  "instructions" : {
+    "de" : "Recherchiere gruendlich und stelle sicher dass alle Quellen korrekt zitiert werden.",
+    "en" : "Research thoroughly and make sure all sources are cited correctly."
+  },
   "blocks" : [ {
     "type" : "skill-capability",
     "config" : {

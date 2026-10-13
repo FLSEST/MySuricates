@@ -1,5 +1,6 @@
 {
   "id" : "docker-image-build-push",
+  "i18n" : [ "de", "en" ],
   "icon" : "\uD83D\uDC0B",
   "name" : {
     "en" : "Docker Image Build & Push",
@@ -11,9 +12,12 @@
   },
   "category" : "CODE",
   "sortOrder" : 34,
-  "version" : "1.1.0",
+  "version" : "1.2.0",
   "model" : null,
-  "instructions" : "Baue und pushe ein Docker Image. Variablen: dockerfile, image_name, tag, registry.",
+  "instructions" : {
+    "de" : "Baue und pushe ein Docker Image. Variablen: dockerfile, image_name, tag, registry.",
+    "en" : "Build and push a Docker image. Variables: dockerfile, image_name, tag, registry."
+  },
   "blocks" : [ {
     "type" : "shell",
     "config" : {

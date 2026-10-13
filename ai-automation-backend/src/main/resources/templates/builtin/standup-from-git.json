@@ -1,5 +1,6 @@
 {
   "id" : "standup-from-git",
+  "i18n" : [ "de", "en" ],
   "icon" : "☀️",
   "name" : {
     "en" : "Standup Report from Git",
@@ -11,9 +12,12 @@
   },
   "category" : "TEAM",
   "sortOrder" : 49,
-  "version" : "1.0.0",
+  "version" : "1.1.0",
   "model" : null,
-  "instructions" : "Erstelle Standup-Reports. Variablen: since (Zeitraum, default '24 hours ago'), branch (default 'HEAD'), max_commits (default 50).",
+  "instructions" : {
+    "de" : "Erstelle Standup-Reports. Variablen: since (Zeitraum, default '24 hours ago'), branch (default 'HEAD'), max_commits (default 50).",
+    "en" : "Create standup reports. Variables: since (time range, default '24 hours ago'), branch (default 'HEAD'), max_commits (default 50)."
+  },
   "blocks" : [ {
     "type" : "shell",
     "config" : {
@@ -23,7 +27,10 @@
   }, {
     "type" : "simple",
     "config" : {
-      "command" : "Erstelle einen strukturierten Standup-Report im klassischen Format: Was wurde gemacht? Was ist geplant? Gibt es Blocker? Gruppiere nach Autor und leite aus den Commit-Nachrichten und geänderten Dateien thematische Schwerpunkte ab. Halte es knapp und handlungsorientiert."
+      "command" : {
+        "de" : "Erstelle einen strukturierten Standup-Report im klassischen Format: Was wurde gemacht? Was ist geplant? Gibt es Blocker? Gruppiere nach Autor und leite aus den Commit-Nachrichten und geänderten Dateien thematische Schwerpunkte ab. Halte es knapp und handlungsorientiert.",
+        "en" : "Write a structured standup report in the classic format: What was done? What is planned? Are there any blockers? Group by author and derive the main topics from the commit messages and changed files. Keep it brief and action-oriented."
+      }
     },
     "requiredCapabilities" : [ ]
   } ]

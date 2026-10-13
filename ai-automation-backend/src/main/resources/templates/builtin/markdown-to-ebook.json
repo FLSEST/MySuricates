@@ -1,6 +1,7 @@
 {
   "id" : "markdown-to-ebook",
   "icon" : "\uD83D\uDCD6",
+  "i18n" : [ "de", "en" ],
   "name" : {
     "en" : "Markdown → E-Book",
     "de" : "Markdown → E-Book"
@@ -11,33 +12,51 @@
   },
   "category" : "TRANSFORM",
   "sortOrder" : 21,
-  "version" : "1.0.0",
+  "version" : "1.1.0",
   "model" : null,
-  "instructions" : "Kombiniere die Markdown-Dateien zu einem formatierten HTML-E-Book mit Inhaltsverzeichnis.",
+  "instructions" : {
+    "de" : "Kombiniere die Markdown-Dateien zu einem formatierten HTML-E-Book mit Inhaltsverzeichnis.",
+    "en" : "Combine the Markdown files into a formatted HTML e-book with a table of contents."
+  },
   "blocks" : [ {
     "type" : "simple",
     "config" : {
-      "command" : "Finde alle Markdown-Dateien im Projekt (rekursiv, ausser node_modules und .git). Liste sie auf und analysiere: Dateiname, erste Zeile (vermutlicher Titel), Wortanzahl. Schlage eine sinnvolle Kapitel-Reihenfolge vor."
+      "command" : {
+        "de" : "Finde alle Markdown-Dateien im Projekt (rekursiv, ausser node_modules und .git). Liste sie auf und analysiere: Dateiname, erste Zeile (vermutlicher Titel), Wortanzahl. Schlage eine sinnvolle Kapitel-Reihenfolge vor.",
+        "en" : "Find all Markdown files in the project (recursively, except node_modules and .git). List them and analyze: file name, first line (probable title), word count. Suggest a sensible chapter order."
+      }
     },
     "requiredCapabilities" : [ ]
   }, {
     "type" : "simple",
     "config" : {
-      "command" : "Lies alle gefundenen Markdown-Dateien. Erstelle eine Zusammenfassung: (1) Gesamtstruktur (wieviele Kapitel, geschaetzte Seitenzahl), (2) Inhaltsuebersicht pro Kapitel (2-3 Saetze), (3) Thematische Kohaerenz — passen die Texte zusammen? Gibt es Luecken?"
+      "command" : {
+        "de" : "Lies alle gefundenen Markdown-Dateien. Erstelle eine Zusammenfassung: (1) Gesamtstruktur (wieviele Kapitel, geschaetzte Seitenzahl), (2) Inhaltsuebersicht pro Kapitel (2-3 Saetze), (3) Thematische Kohaerenz — passen die Texte zusammen? Gibt es Luecken?",
+        "en" : "Read all Markdown files found. Write a summary: (1) overall structure (how many chapters, estimated page count), (2) content overview per chapter (2-3 sentences), (3) thematic coherence — do the texts fit together? Are there gaps?"
+      }
     },
     "requiredCapabilities" : [ ]
   }, {
     "type" : "agentic",
     "config" : {
       "max_iterations" : 8,
-      "success_criteria" : "index.html und style.css existieren in ebook/ und enthalten alle Kapitel.",
-      "goal" : "Erstelle ein formatiertes E-Book in ebook/. Titel: '{{ title }}', Autor: '{{ author }}', Sprache: {{ language }}. Erstelle: (1) index.html — Hauptdatei mit allen Kapiteln, automatischem Inhaltsverzeichnis mit Ankern, Titelseite mit Autor und Titel, (2) style.css — Buch-typisches CSS: Serifen-Font, angenehme Zeilenbreite (max 70 Zeichen), Kapiteltrenner, Print-CSS mit Seitenumbruechen, (3) Fuege zwischen Kapiteln Trennseiten ein. Alle Markdown-Inhalte sollen korrekt in HTML konvertiert werden (Ueberschriften, Listen, Code-Blocks, Links, Bilder)."
+      "success_criteria" : {
+        "de" : "index.html und style.css existieren in ebook/ und enthalten alle Kapitel.",
+        "en" : "index.html and style.css exist in ebook/ and contain all chapters."
+      },
+      "goal" : {
+        "de" : "Erstelle ein formatiertes E-Book in ebook/. Titel: '{{ title }}', Autor: '{{ author }}', Sprache: {{ language }}. Erstelle: (1) index.html — Hauptdatei mit allen Kapiteln, automatischem Inhaltsverzeichnis mit Ankern, Titelseite mit Autor und Titel, (2) style.css — Buch-typisches CSS: Serifen-Font, angenehme Zeilenbreite (max 70 Zeichen), Kapiteltrenner, Print-CSS mit Seitenumbruechen, (3) Fuege zwischen Kapiteln Trennseiten ein. Alle Markdown-Inhalte sollen korrekt in HTML konvertiert werden (Ueberschriften, Listen, Code-Blocks, Links, Bilder).",
+        "en" : "Create a formatted e-book in ebook/. Title: '{{ title }}', author: '{{ author }}', language: {{ language }}. Create: (1) index.html — main file with all chapters, an automatic table of contents with anchors, a title page with author and title, (2) style.css — book-style CSS: serif font, comfortable line width (max 70 characters), chapter separators, print CSS with page breaks, (3) insert separator pages between chapters. All Markdown content must be converted to HTML correctly (headings, lists, code blocks, links, images)."
+      }
     },
     "requiredCapabilities" : [ ]
   }, {
     "type" : "simple",
     "config" : {
-      "command" : "Pruefe ebook/index.html: Anzahl Kapitel, Inhaltsverzeichnis-Links funktionieren, Gesamtwortanzahl. Erstelle eine Zusammenfassung."
+      "command" : {
+        "de" : "Pruefe ebook/index.html: Anzahl Kapitel, Inhaltsverzeichnis-Links funktionieren, Gesamtwortanzahl. Erstelle eine Zusammenfassung.",
+        "en" : "Check ebook/index.html: number of chapters, whether the table-of-contents links work, total word count. Write a summary."
+      }
     },
     "requiredCapabilities" : [ ]
   } ]

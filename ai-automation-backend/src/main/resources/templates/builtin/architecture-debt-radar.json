@@ -1,5 +1,9 @@
 {
   "id": "architecture-debt-radar",
+  "i18n": [
+    "de",
+    "en"
+  ],
   "icon": "🏗️",
   "name": {
     "en": "Architecture Debt Radar",
@@ -11,9 +15,12 @@
   },
   "category": "CODE",
   "sortOrder": 39,
-  "version": "1.1.0",
+  "version": "1.2.0",
   "model": "sonnet",
-  "instructions": "Deckt strukturelle Architektur-Probleme auf: God Classes, zirkulaere Abhaengigkeiten, Schichtverletzungen, fehlende Abstraktionen.",
+  "instructions": {
+    "de": "Deckt strukturelle Architektur-Probleme auf: God Classes, zirkulaere Abhaengigkeiten, Schichtverletzungen, fehlende Abstraktionen.",
+    "en": "Uncovers structural architecture problems: god classes, circular dependencies, layer violations, missing abstractions."
+  },
   "blocks": [
     {
       "type": "shell",
@@ -27,7 +34,10 @@
       "type": "simple",
       "config": {
         "timeout_seconds": 600,
-        "command": "Analysiere die gesammelten Architektur-Daten auf strukturelle Probleme:\n\n{{ previous_output }}\n\nUntersuche:\n1. **God Classes**: Dateien mit >300 Zeilen, >10 Methoden oder >5 Injections. Welche Verantwortlichkeiten koennten extrahiert werden?\n2. **Zirkulaere Abhaengigkeiten**: Packages die sich gegenseitig importieren (A→B→A). @Lazy-Annotationen als Symptom.\n3. **Schichtverletzungen**: Controller die Repositories direkt nutzen, Services die Controller importieren, etc.\n4. **Fehlende Abstraktionen**: Wo wird gleiche Logik in mehreren Klassen dupliziert statt in ein gemeinsames Interface/Service extrahiert?\n5. **Uebermassige Kopplung**: Klassen mit >5 DI-Injections — Anzeichen fuer zu breite Verantwortlichkeit.\n6. **Package-Struktur**: Stimmt die Package-Organisation mit der logischen Architektur ueberein?\n\nPro Finding: Konkrete Datei(en), Art des Problems, Schweregrad, spezifischer Refactoring-Vorschlag (z.B. welche Methoden in welche neue Klasse extrahieren)."
+        "command": {
+          "de": "Analysiere die gesammelten Architektur-Daten auf strukturelle Probleme:\n\n{{ previous_output }}\n\nUntersuche:\n1. **God Classes**: Dateien mit >300 Zeilen, >10 Methoden oder >5 Injections. Welche Verantwortlichkeiten koennten extrahiert werden?\n2. **Zirkulaere Abhaengigkeiten**: Packages die sich gegenseitig importieren (A→B→A). @Lazy-Annotationen als Symptom.\n3. **Schichtverletzungen**: Controller die Repositories direkt nutzen, Services die Controller importieren, etc.\n4. **Fehlende Abstraktionen**: Wo wird gleiche Logik in mehreren Klassen dupliziert statt in ein gemeinsames Interface/Service extrahiert?\n5. **Uebermassige Kopplung**: Klassen mit >5 DI-Injections — Anzeichen fuer zu breite Verantwortlichkeit.\n6. **Package-Struktur**: Stimmt die Package-Organisation mit der logischen Architektur ueberein?\n\nPro Finding: Konkrete Datei(en), Art des Problems, Schweregrad, spezifischer Refactoring-Vorschlag (z.B. welche Methoden in welche neue Klasse extrahieren).",
+          "en": "Analyze the collected architecture data for structural problems:\n\n{{ previous_output }}\n\nExamine:\n1. **God classes**: files with >300 lines, >10 methods or >5 injections. Which responsibilities could be extracted?\n2. **Circular dependencies**: packages that import each other (A→B→A). @Lazy annotations as a symptom.\n3. **Layer violations**: controllers that use repositories directly, services that import controllers, etc.\n4. **Missing abstractions**: Where is the same logic duplicated in several classes instead of being extracted into a shared interface/service?\n5. **Excessive coupling**: classes with >5 DI injections — a sign of overly broad responsibility.\n6. **Package structure**: Does the package organization match the logical architecture?\n\nPer finding: the concrete file(s), type of problem, severity, a specific refactoring proposal (e.g. which methods to extract into which new class)."
+        }
       },
       "requiredCapabilities": []
     },
@@ -35,7 +45,10 @@
       "type": "simple",
       "config": {
         "timeout_seconds": 600,
-        "command": "Erstelle den Architektur-Schulden-Radar-Report:\n\n{{ previous_output }}\n\n## Format:\n\n### Radar-Uebersicht\n| Dimension | Score (1-10) | Findings | Kritischster Fund |\n|-----------|-------------|----------|-------------------|\n| God Classes | | | |\n| Zirkulaere Deps | | | |\n| Schichtverletzungen | | | |\n| Fehlende Abstraktionen | | | |\n| Kopplung | | | |\n| Package-Struktur | | | |\n\n### God-Class-Aufteilungen\nFuer jede identifizierte God Class:\n- Aktuelle Groesse und Verantwortlichkeiten\n- Vorgeschlagene Aufteilung in N neue Klassen\n- Welche Methoden in welche neue Klasse\n\n### Refactoring-Roadmap\n| Phase | Massnahme | Risiko | Abhaengigkeiten | Geschaetzter Aufwand |\n\nPhasen: 1=Quick Wins (isolierte Aenderungen), 2=Mittelfristig (bedingte Abhaengigkeiten), 3=Langfristig (groessere Umbauarbeiten)."
+        "command": {
+          "de": "Erstelle den Architektur-Schulden-Radar-Report:\n\n{{ previous_output }}\n\n## Format:\n\n### Radar-Uebersicht\n| Dimension | Score (1-10) | Findings | Kritischster Fund |\n|-----------|-------------|----------|-------------------|\n| God Classes | | | |\n| Zirkulaere Deps | | | |\n| Schichtverletzungen | | | |\n| Fehlende Abstraktionen | | | |\n| Kopplung | | | |\n| Package-Struktur | | | |\n\n### God-Class-Aufteilungen\nFuer jede identifizierte God Class:\n- Aktuelle Groesse und Verantwortlichkeiten\n- Vorgeschlagene Aufteilung in N neue Klassen\n- Welche Methoden in welche neue Klasse\n\n### Refactoring-Roadmap\n| Phase | Massnahme | Risiko | Abhaengigkeiten | Geschaetzter Aufwand |\n\nPhasen: 1=Quick Wins (isolierte Aenderungen), 2=Mittelfristig (bedingte Abhaengigkeiten), 3=Langfristig (groessere Umbauarbeiten).",
+          "en": "Write the architecture debt radar report:\n\n{{ previous_output }}\n\n## Format:\n\n### Radar overview\n| Dimension | Score (1-10) | Findings | Most critical finding |\n|-----------|-------------|----------|-------------------|\n| God classes | | | |\n| Circular deps | | | |\n| Layer violations | | | |\n| Missing abstractions | | | |\n| Coupling | | | |\n| Package structure | | | |\n\n### God class splits\nFor each identified god class:\n- Current size and responsibilities\n- Proposed split into N new classes\n- Which methods go into which new class\n\n### Refactoring roadmap\n| Phase | Action | Risk | Dependencies | Estimated effort |\n\nPhases: 1=quick wins (isolated changes), 2=medium term (conditional dependencies), 3=long term (larger restructuring)."
+        }
       },
       "requiredCapabilities": []
     },
@@ -43,7 +56,10 @@
       "type": "simple",
       "config": {
         "timeout_seconds": 300,
-        "command": "Wandle die Findings aus {{ previous_output }} in native TODO-Marker um. KEINE Dateien schreiben, KEINE API-Aufrufe, kein curl — nur Marker-Zeilen ausgeben; die Plattform legt die TODOs selbst an (AutoTodoService).\n\n## Bestehende offene TODOs (Duplikate vermeiden)\n{{ open_todos }}\n\n## Regeln\n- Pro umsetzbarem Finding genau eine Zeile im Format:\n  todo_item: <Titel im Imperativ> | <HIGH|MEDIUM|LOW> | <tag1,tag2> | <Kurzbeschreibung mit Fundstelle>\n- Maximal 10 todo_item-Zeilen, nur echte, umsetzbare Findings\n- Findings, die ein bestehendes offenes TODO bereits abdeckt, NICHT erneut ausgeben\n- Am Ende genau eine Zeile Gesamtbewertung:\n  gate_status: GREEN (keine Findings) | YELLOW (nur kleinere Findings) | RED (kritische Findings)"
+        "command": {
+          "de": "Wandle die Findings aus {{ previous_output }} in native TODO-Marker um. KEINE Dateien schreiben, KEINE API-Aufrufe, kein curl — nur Marker-Zeilen ausgeben; die Plattform legt die TODOs selbst an (AutoTodoService).\n\n## Bestehende offene TODOs (Duplikate vermeiden)\n{{ open_todos }}\n\n## Regeln\n- Pro umsetzbarem Finding genau eine Zeile im Format:\n  todo_item: <Titel im Imperativ> | <HIGH|MEDIUM|LOW> | <tag1,tag2> | <Kurzbeschreibung mit Fundstelle>\n- Maximal 10 todo_item-Zeilen, nur echte, umsetzbare Findings\n- Findings, die ein bestehendes offenes TODO bereits abdeckt, NICHT erneut ausgeben\n- Am Ende genau eine Zeile Gesamtbewertung:\n  gate_status: GREEN (keine Findings) | YELLOW (nur kleinere Findings) | RED (kritische Findings)",
+          "en": "Convert the findings from {{ previous_output }} into native TODO markers. Do NOT write any files, make NO API calls, no curl — only output marker lines; the platform creates the TODOs itself (AutoTodoService).\n\n## Existing open TODOs (avoid duplicates)\n{{ open_todos }}\n\n## Rules\n- Exactly one line per actionable finding, in the format:\n  todo_item: <title in the imperative> | <HIGH|MEDIUM|LOW> | <tag1,tag2> | <short description with location>\n- At most 10 todo_item lines, only real, actionable findings\n- Do NOT output findings that an existing open TODO already covers\n- At the end, exactly one line with the overall rating:\n  gate_status: GREEN (no findings) | YELLOW (only minor findings) | RED (critical findings)"
+        }
       },
       "requiredCapabilities": []
     }

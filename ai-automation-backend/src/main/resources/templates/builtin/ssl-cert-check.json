@@ -1,5 +1,6 @@
 {
   "id" : "ssl-cert-check",
+  "i18n" : [ "de", "en" ],
   "icon" : "🔒",
   "name" : {
     "en" : "SSL Certificate Check",
@@ -11,9 +12,12 @@
   },
   "category" : "INFRA",
   "sortOrder" : 46,
-  "version" : "1.0.1",
+  "version" : "1.1.0",
   "model" : null,
-  "instructions" : "Prüfe SSL-Zertifikate. Variablen: domains (zeilengetrennte Liste von Hostnamen), warn_days (Warnung wenn Ablauf innerhalb N Tage, default 30).",
+  "instructions" : {
+    "de" : "Prüfe SSL-Zertifikate. Variablen: domains (zeilengetrennte Liste von Hostnamen), warn_days (Warnung wenn Ablauf innerhalb N Tage, default 30).",
+    "en" : "Check SSL certificates. Variables: domains (newline-separated list of host names), warn_days (warn if expiry is within N days, default 30)."
+  },
   "blocks" : [ {
     "type" : "foreach",
     "config" : {
@@ -28,7 +32,10 @@
   }, {
     "type" : "simple",
     "config" : {
-      "command" : "Analysiere die SSL-Zertifikat-Prüfergebnisse. Identifiziere kritische (abgelaufen), dringende (<14 Tage), und bald ablaufende Zertifikate. Erstelle eine strukturierte Zusammenfassung mit konkreten Handlungsempfehlungen für jede Domain."
+      "command" : {
+        "de" : "Analysiere die SSL-Zertifikat-Prüfergebnisse. Identifiziere kritische (abgelaufen), dringende (<14 Tage), und bald ablaufende Zertifikate. Erstelle eine strukturierte Zusammenfassung mit konkreten Handlungsempfehlungen für jede Domain.",
+        "en" : "Analyze the SSL certificate check results. Identify critical (expired), urgent (<14 days) and soon-expiring certificates. Create a structured summary with concrete recommended actions for each domain."
+      }
     },
     "requiredCapabilities" : [ ]
   } ]

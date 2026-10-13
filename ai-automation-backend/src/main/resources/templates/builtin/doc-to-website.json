@@ -1,5 +1,6 @@
 {
   "id" : "doc-to-website",
+  "i18n" : [ "de", "en" ],
   "icon" : "\uD83C\uDF10",
   "name" : {
     "en" : "Document → Reading Website",
@@ -11,27 +12,42 @@
   },
   "category" : "TRANSFORM",
   "sortOrder" : 13,
-  "version" : "1.0.0",
+  "version" : "1.1.0",
   "model" : null,
-  "instructions" : "Erstelle eine vollstaendige, responsive Webseite aus dem Dokument. Verwende relative Pfade.",
+  "instructions" : {
+    "de" : "Erstelle eine vollstaendige, responsive Webseite aus dem Dokument. Verwende relative Pfade.",
+    "en" : "Build a complete, responsive website from the document. Use relative paths."
+  },
   "blocks" : [ {
     "type" : "simple",
     "config" : {
-      "command" : "Lies die Datei {{ filepath }}. Analysiere die Struktur: Wie viele Kapitel/Abschnitte gibt es? Was sind die Hauptthemen? Gib eine strukturierte Uebersicht aus."
+      "command" : {
+        "de" : "Lies die Datei {{ filepath }}. Analysiere die Struktur: Wie viele Kapitel/Abschnitte gibt es? Was sind die Hauptthemen? Gib eine strukturierte Uebersicht aus.",
+        "en" : "Read the file {{ filepath }}. Analyze its structure: How many chapters/sections are there? What are the main topics? Output a structured overview."
+      }
     },
     "requiredCapabilities" : [ ]
   }, {
     "type" : "agentic",
     "config" : {
       "max_iterations" : 8,
-      "success_criteria" : "Alle HTML-Dateien existieren in output/{{ title }}/ und sind vollstaendig.",
-      "goal" : "Erstelle eine vollstaendige statische Webseite in output/{{ title }}/. Die Webseite soll enthalten: (1) Eine Startseite mit Gesamtzusammenfassung, (2) Eine Seite pro Kapitel/Abschnitt mit Zusammenfassung und Key Takeaways, (3) Eine Zitate-Seite mit den wichtigsten Passagen, (4) Navigation zwischen allen Seiten, (5) Responsive Design im Stil '{{ style }}' mit TailwindCSS via CDN, (6) Eine einfache Suchfunktion mit JavaScript. Sprache: {{ language }}."
+      "success_criteria" : {
+        "de" : "Alle HTML-Dateien existieren in output/{{ title }}/ und sind vollstaendig.",
+        "en" : "All HTML files exist in output/{{ title }}/ and are complete."
+      },
+      "goal" : {
+        "de" : "Erstelle eine vollstaendige statische Webseite in output/{{ title }}/. Die Webseite soll enthalten: (1) Eine Startseite mit Gesamtzusammenfassung, (2) Eine Seite pro Kapitel/Abschnitt mit Zusammenfassung und Key Takeaways, (3) Eine Zitate-Seite mit den wichtigsten Passagen, (4) Navigation zwischen allen Seiten, (5) Responsive Design im Stil '{{ style }}' mit TailwindCSS via CDN, (6) Eine einfache Suchfunktion mit JavaScript. Sprache: {{ language }}.",
+        "en" : "Build a complete static website in output/{{ title }}/. The website should contain: (1) a home page with an overall summary, (2) one page per chapter/section with a summary and key takeaways, (3) a quotes page with the most important passages, (4) navigation between all pages, (5) responsive design in the style '{{ style }}' with TailwindCSS via CDN, (6) a simple search function in JavaScript. Language: {{ language }}."
+      }
     },
     "requiredCapabilities" : [ ]
   }, {
     "type" : "simple",
     "config" : {
-      "command" : "Pruefe alle erstellten HTML-Dateien in output/{{ title }}/. Liste alle Dateien auf, pruefe ob Links zwischen Seiten funktionieren, und gib eine Zusammenfassung aus: Anzahl Seiten, Gesamtgroesse, Qualitaetsbewertung."
+      "command" : {
+        "de" : "Pruefe alle erstellten HTML-Dateien in output/{{ title }}/. Liste alle Dateien auf, pruefe ob Links zwischen Seiten funktionieren, und gib eine Zusammenfassung aus: Anzahl Seiten, Gesamtgroesse, Qualitaetsbewertung.",
+        "en" : "Check all generated HTML files in output/{{ title }}/. List all files, check whether the links between pages work, and output a summary: number of pages, total size, quality rating."
+      }
     },
     "requiredCapabilities" : [ ]
   } ]

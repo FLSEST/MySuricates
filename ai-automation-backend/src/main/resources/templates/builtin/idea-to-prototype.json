@@ -1,6 +1,7 @@
 {
   "id": "idea-to-prototype",
   "icon": "🚀",
+  "i18n": ["de", "en"],
   "name": {
     "en": "Idea → Working Prototype",
     "de": "Idee → Funktionierender Prototyp"
@@ -11,14 +12,20 @@
   },
   "category": "TRANSFORM",
   "sortOrder": 14,
-  "version": "1.0.1",
+  "version": "1.1.0",
   "model": null,
-  "instructions": "Baue einen funktionierenden Prototyp mit allen Abhaengigkeiten und Build-Konfiguration.\nArbeitsverzeichnis fuer diesen Run ist {{ execution_path }}. Verwende ausschliesslich diesen Run-Workspace fuer Builds und Code-Aenderungen. {{ project_path }} identifiziert nur das Originalprojekt. Kein automatischer Merge oder Push; Ergebnisse zur separaten Uebernahme behalten.",
+  "instructions": {
+    "de": "Baue einen funktionierenden Prototyp mit allen Abhaengigkeiten und Build-Konfiguration.\nArbeitsverzeichnis fuer diesen Run ist {{ execution_path }}. Verwende ausschliesslich diesen Run-Workspace fuer Builds und Code-Aenderungen. {{ project_path }} identifiziert nur das Originalprojekt. Kein automatischer Merge oder Push; Ergebnisse zur separaten Uebernahme behalten.",
+    "en": "Build a working prototype with all dependencies and build configuration.\nThe working directory for this run is {{ execution_path }}. Use only this run workspace for builds and code changes. {{ project_path }} only identifies the original project. No automatic merge or push; keep the results so they can be taken over separately."
+  },
   "blocks": [
     {
       "type": "simple",
       "config": {
-        "command": "Analysiere diese App-Idee: {{ idea }}. Erstelle eine detaillierte Feature-Liste und einen technischen Plan. Tech-Stack: {{ tech_stack }}. Definiere: Datenmodell, Komponenten-Struktur, benoetigte Abhaengigkeiten.",
+        "command": {
+          "de": "Analysiere diese App-Idee: {{ idea }}. Erstelle eine detaillierte Feature-Liste und einen technischen Plan. Tech-Stack: {{ tech_stack }}. Definiere: Datenmodell, Komponenten-Struktur, benoetigte Abhaengigkeiten.",
+          "en": "Analyze this app idea: {{ idea }}. Create a detailed feature list and a technical plan. Tech stack: {{ tech_stack }}. Define: data model, component structure, required dependencies."
+        },
         "workspace": {
           "mode": "isolated",
           "source": "commit",
@@ -32,15 +39,24 @@
       "type": "agentic",
       "config": {
         "max_iterations": 12,
-        "success_criteria": "npm run build laeuft erfolgreich ohne Fehler.",
-        "goal": "Baue einen funktionierenden Prototyp fuer: {{ idea }}. Tech-Stack: {{ tech_stack }}. Erstelle das Projekt in prototype/. Schritte: (1) Projektstruktur anlegen, (2) package.json/Abhaengigkeiten erstellen, (3) npm install ausfuehren, (4) Alle Komponenten und Seiten implementieren, (5) npm run build ausfuehren und Fehler beheben. Kommentare auf {{ language }}."
+        "success_criteria": {
+          "de": "npm run build laeuft erfolgreich ohne Fehler.",
+          "en": "npm run build completes successfully without errors."
+        },
+        "goal": {
+          "de": "Baue einen funktionierenden Prototyp fuer: {{ idea }}. Tech-Stack: {{ tech_stack }}. Erstelle das Projekt in prototype/. Schritte: (1) Projektstruktur anlegen, (2) package.json/Abhaengigkeiten erstellen, (3) npm install ausfuehren, (4) Alle Komponenten und Seiten implementieren, (5) npm run build ausfuehren und Fehler beheben. Kommentare auf {{ language }}.",
+          "en": "Build a working prototype for: {{ idea }}. Tech stack: {{ tech_stack }}. Create the project in prototype/. Steps: (1) set up the project structure, (2) create package.json/dependencies, (3) run npm install, (4) implement all components and pages, (5) run npm run build and fix errors. Comments in {{ language }}."
+        }
       },
       "requiredCapabilities": []
     },
     {
       "type": "simple",
       "config": {
-        "command": "Erstelle eine README.md in prototype/ mit: Projektbeschreibung, Screenshots-Platzhalter, Installation, Starten, Technologie-Stack."
+        "command": {
+          "de": "Erstelle eine README.md in prototype/ mit: Projektbeschreibung, Screenshots-Platzhalter, Installation, Starten, Technologie-Stack.",
+          "en": "Create a README.md in prototype/ with: project description, screenshot placeholders, installation, how to start, technology stack."
+        }
       },
       "requiredCapabilities": []
     }

@@ -1,5 +1,6 @@
 {
   "id" : "translation-pipeline",
+  "i18n" : [ "de", "en" ],
   "icon" : "\uD83C\uDF10",
   "name" : {
     "en" : "Translation Pipeline",
@@ -11,31 +12,46 @@
   },
   "category" : "CONTENT",
   "sortOrder" : 10,
-  "version" : "1.0.0",
+  "version" : "1.1.0",
   "model" : null,
-  "instructions" : "Uebersetze den Text hochwertig mit Qualitaetskontrolle und konsistenten Fachbegriffen.",
+  "instructions" : {
+    "de" : "Uebersetze den Text hochwertig mit Qualitaetskontrolle und konsistenten Fachbegriffen.",
+    "en" : "Translate the text to a high standard, with quality control and consistent terminology."
+  },
   "blocks" : [ {
     "type" : "simple",
     "config" : {
-      "command" : "Lies die Datei {{ filepath }} und gib den Inhalt aus."
+      "command" : {
+        "de" : "Lies die Datei {{ filepath }} und gib den Inhalt aus.",
+        "en" : "Read the file {{ filepath }} and output its content."
+      }
     },
     "requiredCapabilities" : [ ]
   }, {
     "type" : "simple",
     "config" : {
-      "command" : "Uebersetze den Text ins {{ target_language }}. Behalte Formatierung, Fachbegriffe und Struktur bei."
+      "command" : {
+        "de" : "Uebersetze den Text ins {{ target_language }}. Behalte Formatierung, Fachbegriffe und Struktur bei.",
+        "en" : "Translate the text into {{ target_language }}. Keep the formatting, technical terms and structure."
+      }
     },
     "requiredCapabilities" : [ ]
   }, {
     "type" : "simple",
     "config" : {
-      "command" : "Pruefe die Uebersetzung auf: 1) Sprachliche Natuerlichkeit 2) Fachbegriff-Konsistenz 3) Vollstaendigkeit. Liste alle Probleme auf."
+      "command" : {
+        "de" : "Pruefe die Uebersetzung auf: 1) Sprachliche Natuerlichkeit 2) Fachbegriff-Konsistenz 3) Vollstaendigkeit. Liste alle Probleme auf.",
+        "en" : "Check the translation for: 1) natural language 2) consistency of technical terms 3) completeness. List all problems."
+      }
     },
     "requiredCapabilities" : [ ]
   }, {
     "type" : "simple",
     "config" : {
-      "command" : "Korrigiere alle gefundenen Probleme und gib die finale Uebersetzung aus."
+      "command" : {
+        "de" : "Korrigiere alle gefundenen Probleme und gib die finale Uebersetzung aus.",
+        "en" : "Fix all problems found and output the final translation."
+      }
     },
     "requiredCapabilities" : [ ]
   } ]

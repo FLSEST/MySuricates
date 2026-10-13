@@ -1,5 +1,6 @@
 {
   "id" : "sprint-retrospective",
+  "i18n" : [ "de", "en" ],
   "icon" : "🔄",
   "name" : {
     "en" : "Sprint Retrospective",
@@ -11,9 +12,12 @@
   },
   "category" : "TEAM",
   "sortOrder" : 50,
-  "version" : "1.0.0",
+  "version" : "1.1.0",
   "model" : null,
-  "instructions" : "Führe eine Sprint-Retrospektive durch. Variablen: sprint_name, sprint_duration_days (default 14), team_size (default 3), sprint_goal (beschreibt was erreicht werden sollte), sprint_notes (optionale Notizen/Beobachtungen).",
+  "instructions" : {
+    "de" : "Führe eine Sprint-Retrospektive durch. Variablen: sprint_name, sprint_duration_days (default 14), team_size (default 3), sprint_goal (beschreibt was erreicht werden sollte), sprint_notes (optionale Notizen/Beobachtungen).",
+    "en" : "Run a sprint retrospective. Variables: sprint_name, sprint_duration_days (default 14), team_size (default 3), sprint_goal (describes what should have been achieved), sprint_notes (optional notes/observations)."
+  },
   "blocks" : [ {
     "type" : "shell",
     "config" : {
@@ -23,7 +27,10 @@
   }, {
     "type" : "simple",
     "config" : {
-      "command" : "Analysiere die Sprint-Daten und die folgenden Notizen für '{{ sprint_name }}':\n\nSprint-Ziel: {{ sprint_goal }}\nTeam-Notizen: {{ sprint_notes }}\n\nErstelle eine vollständige Retrospektive mit:\n1. **Was lief gut?** (aus Daten und Notizen ableiten)\n2. **Was lief nicht gut?** (Probleme, Blocker, technische Schulden)\n3. **Erkenntnisse** (Muster über mehrere Sprints, wenn erkennbar)\n4. **Maßnahmen** (konkrete, zuweisbare Action Items mit Priorität)\n5. **Team-Gesundheit** (Einschätzung aus verfügbaren Daten)\n\nHalte jeden Abschnitt prägnant und handlungsorientiert."
+      "command" : {
+        "de" : "Analysiere die Sprint-Daten und die folgenden Notizen für '{{ sprint_name }}':\n\nSprint-Ziel: {{ sprint_goal }}\nTeam-Notizen: {{ sprint_notes }}\n\nErstelle eine vollständige Retrospektive mit:\n1. **Was lief gut?** (aus Daten und Notizen ableiten)\n2. **Was lief nicht gut?** (Probleme, Blocker, technische Schulden)\n3. **Erkenntnisse** (Muster über mehrere Sprints, wenn erkennbar)\n4. **Maßnahmen** (konkrete, zuweisbare Action Items mit Priorität)\n5. **Team-Gesundheit** (Einschätzung aus verfügbaren Daten)\n\nHalte jeden Abschnitt prägnant und handlungsorientiert.",
+        "en" : "Analyze the sprint data and the following notes for '{{ sprint_name }}':\n\nSprint goal: {{ sprint_goal }}\nTeam notes: {{ sprint_notes }}\n\nWrite a complete retrospective with:\n1. **What went well?** (derive from the data and notes)\n2. **What did not go well?** (problems, blockers, technical debt)\n3. **Insights** (patterns across several sprints, if recognizable)\n4. **Actions** (concrete, assignable action items with priority)\n5. **Team health** (assessment from the available data)\n\nKeep each section concise and action-oriented."
+      }
     },
     "requiredCapabilities" : [ ]
   } ]

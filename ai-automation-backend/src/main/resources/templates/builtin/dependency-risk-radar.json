@@ -1,5 +1,6 @@
 {
   "id" : "dependency-risk-radar",
+  "i18n" : [ "de", "en" ],
   "icon" : "\uD83E\uDDED",
   "name" : {
     "en" : "Dependency Risk Radar",
@@ -11,9 +12,12 @@
   },
   "category" : "CODE",
   "sortOrder" : 23,
-  "version" : "1.0.1",
+  "version" : "1.1.0",
   "model" : null,
-  "instructions" : "Scanne alle Repos unterhalb des Projektpfads nach npm- oder Maven-Abhaengigkeiten, identifiziere kritische Updates und liefere einen priorisierten Aktionsplan.",
+  "instructions" : {
+    "de" : "Scanne alle Repos unterhalb des Projektpfads nach npm- oder Maven-Abhaengigkeiten, identifiziere kritische Updates und liefere einen priorisierten Aktionsplan.",
+    "en" : "Scan all repos below the project path for npm or Maven dependencies, identify critical updates and deliver a prioritized action plan."
+  },
   "blocks" : [ {
     "type" : "shell",
     "config" : {
@@ -38,14 +42,20 @@
       "params" : {
         "max_entries" : 5
       },
-      "input" : "Aggregierte Dependency-Outputs aus mehreren Repos:\n\n{{ previous_output }}\n\nAufgabe: Fasse die Top-5 dringendsten Updates zusammen. Priorisiere Major/Critical. Nenne je Eintrag: Repo, Paket/Artefakt, current→latest, Risiko (security/major/compat), kurzen Handlungsvorschlag.",
+      "input" : {
+        "de" : "Aggregierte Dependency-Outputs aus mehreren Repos:\n\n{{ previous_output }}\n\nAufgabe: Fasse die Top-5 dringendsten Updates zusammen. Priorisiere Major/Critical. Nenne je Eintrag: Repo, Paket/Artefakt, current→latest, Risiko (security/major/compat), kurzen Handlungsvorschlag.",
+        "en" : "Aggregated dependency outputs from several repos:\n\n{{ previous_output }}\n\nTask: Summarize the top 5 most urgent updates. Prioritize major/critical. For each entry, name: repo, package/artifact, current→latest, risk (security/major/compat), a short recommended action."
+      },
       "capability" : "analyze"
     },
     "requiredCapabilities" : [ ]
   }, {
     "type" : "simple",
     "config" : {
-      "command" : "Erstelle einen Aktionsplan aus der Analyse: Repo | Paket | current→latest | Impact | Empfehlung. Halte dich kurz."
+      "command" : {
+        "de" : "Erstelle einen Aktionsplan aus der Analyse: Repo | Paket | current→latest | Impact | Empfehlung. Halte dich kurz.",
+        "en" : "Create an action plan from the analysis: Repo | Package | current→latest | Impact | Recommendation. Keep it short."
+      }
     },
     "requiredCapabilities" : [ ]
   } ]

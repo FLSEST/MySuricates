@@ -1,6 +1,7 @@
 {
   "id" : "log-triage",
   "icon" : "\uD83E\uDEB5",
+  "i18n" : [ "de", "en" ],
   "name" : {
     "en" : "Log Triage (Cross-Repo)",
     "de" : "Log Triage (Cross-Repo)"
@@ -11,9 +12,12 @@
   },
   "category" : "CODE",
   "sortOrder" : 24,
-  "version" : "1.0.0",
+  "version" : "1.1.0",
   "model" : null,
-  "instructions" : "Triagiert Logs der letzten 24h (logs/*.log), gruppiert Fehler und liefert Empfehlungen.",
+  "instructions" : {
+    "de" : "Triagiert Logs der letzten 24h (logs/*.log), gruppiert Fehler und liefert Empfehlungen.",
+    "en" : "Triages the logs of the last 24h (logs/*.log), groups errors and gives recommendations."
+  },
   "blocks" : [ {
     "type" : "shell",
     "config" : {
@@ -26,14 +30,20 @@
       "params" : {
         "max_groups" : 5
       },
-      "input" : "Log-Auszug der letzten 24h aus mehreren Projekten:\n\n{{ previous_output }}\n\nGruppiere Fehler/Warnings, nenne vermutlich betroffene Services/Repos, moegliche Ursachen und empfohlene Checks. Markiere kritische Themen zuerst.",
+      "input" : {
+        "de" : "Log-Auszug der letzten 24h aus mehreren Projekten:\n\n{{ previous_output }}\n\nGruppiere Fehler/Warnings, nenne vermutlich betroffene Services/Repos, moegliche Ursachen und empfohlene Checks. Markiere kritische Themen zuerst.",
+        "en" : "Log excerpt of the last 24h from several projects:\n\n{{ previous_output }}\n\nGroup errors/warnings and name the services/repos that are probably affected, possible causes and recommended checks. Flag critical topics first."
+      },
       "capability" : "analyze"
     },
     "requiredCapabilities" : [ ]
   }, {
     "type" : "simple",
     "config" : {
-      "command" : "Fasse kurz zusammen: Anzahl gefundener Fehlergruppen, kritische Punkte, welche Repos/Services betroffen sind, empfohlene Sofortmassnahmen."
+      "command" : {
+        "de" : "Fasse kurz zusammen: Anzahl gefundener Fehlergruppen, kritische Punkte, welche Repos/Services betroffen sind, empfohlene Sofortmassnahmen.",
+        "en" : "Summarize briefly: number of error groups found, critical points, which repos/services are affected, recommended immediate actions."
+      }
     },
     "requiredCapabilities" : [ ]
   } ]

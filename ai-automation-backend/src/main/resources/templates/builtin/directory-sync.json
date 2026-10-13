@@ -1,5 +1,6 @@
 {
   "id" : "directory-sync",
+  "i18n" : [ "de", "en" ],
   "icon" : "\uD83D\uDD01",
   "name" : {
     "en" : "Directory Sync",
@@ -11,9 +12,12 @@
   },
   "category" : "DATA",
   "sortOrder" : 33,
-  "version" : "1.0.0",
+  "version" : "1.1.0",
   "model" : null,
-  "instructions" : "Synchronisiere Verzeichnisse mit rsync. Variablen: source, target, exclude_patterns (kommasepariert), delete_removed (true/false).",
+  "instructions" : {
+    "de" : "Synchronisiere Verzeichnisse mit rsync. Variablen: source, target, exclude_patterns (kommasepariert), delete_removed (true/false).",
+    "en" : "Synchronize directories with rsync. Variables: source, target, exclude_patterns (comma-separated), delete_removed (true/false)."
+  },
   "blocks" : [ {
     "type" : "shell",
     "config" : {

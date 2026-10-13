@@ -1,5 +1,9 @@
 {
   "id": "auto-fix-java",
+  "i18n": [
+    "de",
+    "en"
+  ],
   "icon": "☕",
   "name": {
     "en": "Auto-Fix Java",
@@ -11,15 +15,18 @@
   },
   "category": "CODE",
   "sortOrder": 45,
-  "version": "1.0.2",
+  "version": "1.1.0",
   "model": "sonnet",
-  "instructions": "Du bist ein automatischer Java-Code-Fixer. Deine Aufgabe ist es, Findings aus statischer Analyse sicher zu beheben.\n\nSICHERHEITSREGELN:\n- IMMER auf eigenem Branch arbeiten, nie auf main\n- Ein Commit pro Fix (atomar, reviewbar, revertierbar)\n- Keine Breaking Changes an oeffentlichen APIs\n- Keine Dateien loeschen die noch referenziert werden\n- Bei Unsicherheit: Fix ueberspringen statt riskieren\n- Build und Tests muessen nach allen Fixes bestehen\n\nJAVA-SPEZIFISCH:\n- Lombok-Annotationen beachten (@Data, @Builder, etc. generieren Methoden)\n- MapStruct-Mapper nicht manuell aendern (werden generiert)\n- Spring-Annotationen (@Service, @Repository, etc.) nicht entfernen\n- Bei Generics: Diamond-Operator nutzen wo moeglich (Java 7+)\n- Raw Types nur fixen wenn der Typ eindeutig ableitbar ist\n- @SuppressWarnings nur als letztes Mittel\n- Flyway-Migrationen NIEMALS aendern\n\nCOMMIT-KONVENTIONEN:\n- fix: <beschreibung>\n- refactor: <beschreibung>\n- style: <beschreibung> — fuer Formatting\n- chore: <beschreibung> — fuer Dependency-Updates\nArbeitsverzeichnis fuer diesen Run ist {{ execution_path }}. Verwende ausschliesslich diesen Run-Workspace fuer Builds und Code-Aenderungen. {{ project_path }} identifiziert nur das Originalprojekt. Kein automatischer Merge oder Push; Ergebnisse zur separaten Uebernahme behalten.",
+  "instructions": {
+    "de": "Du bist ein automatischer Java-Code-Fixer. Deine Aufgabe ist es, Findings aus statischer Analyse sicher zu beheben.\n\nSICHERHEITSREGELN:\n- IMMER auf eigenem Branch arbeiten, nie auf main\n- Ein Commit pro Fix (atomar, reviewbar, revertierbar)\n- Keine Breaking Changes an oeffentlichen APIs\n- Keine Dateien loeschen die noch referenziert werden\n- Bei Unsicherheit: Fix ueberspringen statt riskieren\n- Build und Tests muessen nach allen Fixes bestehen\n\nJAVA-SPEZIFISCH:\n- Lombok-Annotationen beachten (@Data, @Builder, etc. generieren Methoden)\n- MapStruct-Mapper nicht manuell aendern (werden generiert)\n- Spring-Annotationen (@Service, @Repository, etc.) nicht entfernen\n- Bei Generics: Diamond-Operator nutzen wo moeglich (Java 7+)\n- Raw Types nur fixen wenn der Typ eindeutig ableitbar ist\n- @SuppressWarnings nur als letztes Mittel\n- Flyway-Migrationen NIEMALS aendern\n\nCOMMIT-KONVENTIONEN:\n- fix: <beschreibung>\n- refactor: <beschreibung>\n- style: <beschreibung> — fuer Formatting\n- chore: <beschreibung> — fuer Dependency-Updates\nArbeitsverzeichnis fuer diesen Run ist {{ execution_path }}. Verwende ausschliesslich diesen Run-Workspace fuer Builds und Code-Aenderungen. {{ project_path }} identifiziert nur das Originalprojekt. Kein automatischer Merge oder Push; Ergebnisse zur separaten Uebernahme behalten.",
+    "en": "You are an automatic Java code fixer. Your task is to fix findings from static analysis safely.\n\nSAFETY RULES:\n- ALWAYS work on a separate branch, never on main\n- One commit per fix (atomic, reviewable, revertible)\n- No breaking changes to public APIs\n- Do not delete files that are still referenced\n- When in doubt: skip the fix rather than take a risk\n- Build and tests must pass after all fixes\n\nJAVA-SPECIFIC:\n- Mind the Lombok annotations (@Data, @Builder, etc. generate methods)\n- Do not change MapStruct mappers by hand (they are generated)\n- Do not remove Spring annotations (@Service, @Repository, etc.)\n- Generics: use the diamond operator where possible (Java 7+)\n- Only fix raw types if the type can be inferred unambiguously\n- @SuppressWarnings only as a last resort\n- NEVER change Flyway migrations\n\nCOMMIT CONVENTIONS:\n- fix: <description>\n- refactor: <description>\n- style: <description> — for formatting\n- chore: <description> — for dependency updates\nThe working directory for this run is {{ execution_path }}. Use only this run workspace for builds and code changes. {{ project_path }} only identifies the original project. No automatic merge or push; keep the results so they can be adopted separately."
+  },
   "blocks": [
     {
       "type": "shell",
       "config": {
         "on_failure": "stop",
-        "command": "git status --short\ngit log -1 --oneline\necho \"Run-Branch: $(git branch --show-current)\"",
+        "command": "git status --short\ngit log -1 --oneline\necho \"Run branch: $(git branch --show-current)\"",
         "workspace": {
           "mode": "isolated",
           "source": "commit",
@@ -42,7 +49,10 @@
       "type": "simple",
       "config": {
         "timeout_seconds": 600,
-        "command": "Analysiere die Scan-Ergebnisse und erstelle einen strukturierten Fix-Plan.\n\nSCAN-ERGEBNISSE:\n{{ previous_output }}\n\nDOMAIN-KONTEXT:\n{{ domain_context }}\n\nAUFGABE:\n1. Extrahiere alle Findings aus Compiler-Warnings, Checkstyle, PMD, SpotBugs und Dependency-Check\n2. Klassifiziere jedes Finding:\n\n   AUTO_FIXABLE (sicher automatisch behebbar):\n   - Unused imports (entfernen)\n   - Wildcard imports (durch spezifische Imports ersetzen)\n   - Missing @Override Annotation\n   - Raw types → Diamond operator / explizite Generics\n   - Unnecessary casts\n   - Missing serial version UID (wenn Serializable)\n   - Deprecated API Aufrufe (wenn Replacement klar ist)\n   - Checkstyle-Formatting (Einrueckung, Leerzeichen, Klammern)\n   - Unnoetige @SuppressWarnings entfernen\n   - String-Vergleich mit == statt .equals()\n   - Leere catch-Bloecke (mindestens Logger hinzufuegen)\n\n   MANUAL_REVIEW (zu komplex/riskant):\n   - API-Signatur-Aenderungen\n   - Architektur-Refactorings\n   - Dependency-Version-Updates (koennen Inkompatibilitaeten verursachen)\n   - Komplexe Logik-Aenderungen\n   - Lombok/MapStruct-Generierungsprobleme\n   - Flyway-Migrationen\n\n   INFORMATIONAL:\n   - Hinweise ohne konkreten Fix\n\n3. Sortiere AUTO_FIXABLE: Imports → Annotations → Types → Code-Fixes\n4. Gib den Fix-Plan aus:\n\nFIX_PLAN:\n1. [AUTO_FIXABLE] <Datei>:<Zeile> — <Issue> — <Was zu tun ist>\n2. ...\n\nSKIPPED (MANUAL_REVIEW):\n- <Datei>: <Grund>\n\nSKIPPED (INFORMATIONAL):\n- <Beschreibung>\n\nFalls keine Findings: FIX_PLAN: EMPTY - Keine fixbaren Findings gefunden."
+        "command": {
+          "de": "Analysiere die Scan-Ergebnisse und erstelle einen strukturierten Fix-Plan.\n\nSCAN-ERGEBNISSE:\n{{ previous_output }}\n\nDOMAIN-KONTEXT:\n{{ domain_context }}\n\nAUFGABE:\n1. Extrahiere alle Findings aus Compiler-Warnings, Checkstyle, PMD, SpotBugs und Dependency-Check\n2. Klassifiziere jedes Finding:\n\n   AUTO_FIXABLE (sicher automatisch behebbar):\n   - Unused imports (entfernen)\n   - Wildcard imports (durch spezifische Imports ersetzen)\n   - Missing @Override Annotation\n   - Raw types → Diamond operator / explizite Generics\n   - Unnecessary casts\n   - Missing serial version UID (wenn Serializable)\n   - Deprecated API Aufrufe (wenn Replacement klar ist)\n   - Checkstyle-Formatting (Einrueckung, Leerzeichen, Klammern)\n   - Unnoetige @SuppressWarnings entfernen\n   - String-Vergleich mit == statt .equals()\n   - Leere catch-Bloecke (mindestens Logger hinzufuegen)\n\n   MANUAL_REVIEW (zu komplex/riskant):\n   - API-Signatur-Aenderungen\n   - Architektur-Refactorings\n   - Dependency-Version-Updates (koennen Inkompatibilitaeten verursachen)\n   - Komplexe Logik-Aenderungen\n   - Lombok/MapStruct-Generierungsprobleme\n   - Flyway-Migrationen\n\n   INFORMATIONAL:\n   - Hinweise ohne konkreten Fix\n\n3. Sortiere AUTO_FIXABLE: Imports → Annotations → Types → Code-Fixes\n4. Gib den Fix-Plan aus:\n\nFIX_PLAN:\n1. [AUTO_FIXABLE] <Datei>:<Zeile> — <Issue> — <Was zu tun ist>\n2. ...\n\nSKIPPED (MANUAL_REVIEW):\n- <Datei>: <Grund>\n\nSKIPPED (INFORMATIONAL):\n- <Beschreibung>\n\nFalls keine Findings: FIX_PLAN: EMPTY - Keine fixbaren Findings gefunden.",
+          "en": "Analyze the scan results and create a structured fix plan.\n\nSCAN RESULTS:\n{{ previous_output }}\n\nDOMAIN CONTEXT:\n{{ domain_context }}\n\nTASK:\n1. Extract all findings from the compiler warnings, Checkstyle, PMD, SpotBugs and the dependency check\n2. Classify each finding:\n\n   AUTO_FIXABLE (can be fixed safely and automatically):\n   - Unused imports (remove)\n   - Wildcard imports (replace with specific imports)\n   - Missing @Override annotation\n   - Raw types → diamond operator / explicit generics\n   - Unnecessary casts\n   - Missing serial version UID (if Serializable)\n   - Deprecated API calls (if the replacement is clear)\n   - Checkstyle formatting (indentation, spaces, brackets)\n   - Remove unnecessary @SuppressWarnings\n   - String comparison with == instead of .equals()\n   - Empty catch blocks (add at least a logger)\n\n   MANUAL_REVIEW (too complex/risky):\n   - API signature changes\n   - Architecture refactorings\n   - Dependency version updates (can cause incompatibilities)\n   - Complex logic changes\n   - Lombok/MapStruct generation problems\n   - Flyway migrations\n\n   INFORMATIONAL:\n   - Notes without a concrete fix\n\n3. Sort AUTO_FIXABLE: imports → annotations → types → code fixes\n4. Output the fix plan:\n\nFIX_PLAN:\n1. [AUTO_FIXABLE] <file>:<line> — <issue> — <what to do>\n2. ...\n\nSKIPPED (MANUAL_REVIEW):\n- <file>: <reason>\n\nSKIPPED (INFORMATIONAL):\n- <description>\n\nIf there are no findings: FIX_PLAN: EMPTY - No fixable findings found."
+        }
       },
       "requiredCapabilities": []
     },
@@ -52,9 +62,15 @@
         "max_iterations": 25,
         "max_total_tokens": 400000,
         "iteration_timeout_seconds": 600,
-        "goal": "Arbeite den Fix-Plan aus dem vorherigen Schritt ab und committe jeden Fix einzeln.\n\nFIX-PLAN:\n{{ previous_output }}\n\nREGELN:\n1. Nur [AUTO_FIXABLE] Eintraege abarbeiten\n2. Falls FIX_PLAN EMPTY: 'NO_FIXES_NEEDED' ausgeben und beenden\n3. Ein Commit pro Fix — atomare Git-History\n4. Commit-Format: 'fix: <was behoben>' / 'style: <formatting>' / 'refactor: <was refactored>'\n5. SICHERHEIT:\n   - Keine API-Signaturen aendern (public/protected Methoden)\n   - Keine Dateien loeschen die noch importiert werden — pruefe Imports\n   - Lombok: @Data/@Builder/@AllArgsConstructor generieren Methoden — nicht duplizieren\n   - MapStruct: Mapper-Interfaces nicht manuell aendern\n   - Flyway: Migrations-Dateien (V*.sql) NIEMALS aendern\n   - Spring: @Autowired/@Service/@Repository nicht entfernen\n   - Bei Unsicherheit: Fix ueberspringen als SKIPPED\n6. WICHTIG: Jede ACTION wird von einem SEPARATEN Agenten ausgefuehrt.\n   Jede ACTION MUSS enthalten:\n   - ABSOLUTE Dateipfade\n   - Vollstaendigen Kontext was zu aendern ist\n   - Nach der Aenderung: git add <datei> && git commit -m '<message>'\n\nAUSGABE am Ende:\nFIXES_APPLIED:\n1. <Datei> — <Commit-Hash> — <Beschreibung>\n\nFIXES_SKIPPED:\n- <Datei> — <Grund>\n\nTOTAL: X Fixes applied, Y skipped",
+        "goal": {
+          "de": "Arbeite den Fix-Plan aus dem vorherigen Schritt ab und committe jeden Fix einzeln.\n\nFIX-PLAN:\n{{ previous_output }}\n\nREGELN:\n1. Nur [AUTO_FIXABLE] Eintraege abarbeiten\n2. Falls FIX_PLAN EMPTY: 'NO_FIXES_NEEDED' ausgeben und beenden\n3. Ein Commit pro Fix — atomare Git-History\n4. Commit-Format: 'fix: <was behoben>' / 'style: <formatting>' / 'refactor: <was refactored>'\n5. SICHERHEIT:\n   - Keine API-Signaturen aendern (public/protected Methoden)\n   - Keine Dateien loeschen die noch importiert werden — pruefe Imports\n   - Lombok: @Data/@Builder/@AllArgsConstructor generieren Methoden — nicht duplizieren\n   - MapStruct: Mapper-Interfaces nicht manuell aendern\n   - Flyway: Migrations-Dateien (V*.sql) NIEMALS aendern\n   - Spring: @Autowired/@Service/@Repository nicht entfernen\n   - Bei Unsicherheit: Fix ueberspringen als SKIPPED\n6. WICHTIG: Jede ACTION wird von einem SEPARATEN Agenten ausgefuehrt.\n   Jede ACTION MUSS enthalten:\n   - ABSOLUTE Dateipfade\n   - Vollstaendigen Kontext was zu aendern ist\n   - Nach der Aenderung: git add <datei> && git commit -m '<message>'\n\nAUSGABE am Ende:\nFIXES_APPLIED:\n1. <Datei> — <Commit-Hash> — <Beschreibung>\n\nFIXES_SKIPPED:\n- <Datei> — <Grund>\n\nTOTAL: X Fixes applied, Y skipped",
+          "en": "Work through the fix plan from the previous step and commit each fix separately.\n\nFIX-PLAN:\n{{ previous_output }}\n\nRULES:\n1. Work only on [AUTO_FIXABLE] entries\n2. If FIX_PLAN is EMPTY: output 'NO_FIXES_NEEDED' and stop\n3. One commit per fix — atomic git history\n4. Commit format: 'fix: <what was fixed>' / 'style: <formatting>' / 'refactor: <what was refactored>'\n5. SAFETY:\n   - Do not change API signatures (public/protected methods)\n   - Do not delete files that are still imported — check the imports\n   - Lombok: @Data/@Builder/@AllArgsConstructor generate methods — do not duplicate them\n   - MapStruct: do not change mapper interfaces by hand\n   - Flyway: NEVER change migration files (V*.sql)\n   - Spring: do not remove @Autowired/@Service/@Repository\n   - When in doubt: skip the fix as SKIPPED\n6. IMPORTANT: Each ACTION is carried out by a SEPARATE agent.\n   Every ACTION MUST contain:\n   - ABSOLUTE file paths\n   - The complete context of what to change\n   - After the change: git add <file> && git commit -m '<message>'\n\nOUTPUT at the end:\nFIXES_APPLIED:\n1. <file> — <commit hash> — <description>\n\nFIXES_SKIPPED:\n- <file> — <reason>\n\nTOTAL: X Fixes applied, Y skipped"
+        },
         "max_repeated_actions": 3,
-        "success_criteria": "Alle AUTO_FIXABLE Issues wurden als einzelne Commits committed oder begruendet uebersprungen.",
+        "success_criteria": {
+          "de": "Alle AUTO_FIXABLE Issues wurden als einzelne Commits committed oder begruendet uebersprungen.",
+          "en": "All AUTO_FIXABLE issues were committed as individual commits or skipped with a reason."
+        },
         "total_timeout_seconds": 5400,
         "require_approval": false
       },
@@ -91,7 +107,10 @@
         ],
         "timeout_minutes": 60,
         "variable_name": "pr_decision",
-        "question": "Review der Run-Ergebnisse bestaetigen. Uebernahme, Push und PR erfolgen danach separat."
+        "question": {
+          "de": "Review der Run-Ergebnisse bestaetigen. Uebernahme, Push und PR erfolgen danach separat.",
+          "en": "Confirm the review of the run results. Adoption, push and PR happen separately afterwards."
+        }
       },
       "requiredCapabilities": []
     },

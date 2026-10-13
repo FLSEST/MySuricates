@@ -1,5 +1,6 @@
 {
   "id" : "data-analysis",
+  "i18n" : [ "de", "en" ],
   "icon" : "\uD83D\uDCCA",
   "name" : {
     "en" : "Data Analysis",
@@ -11,9 +12,12 @@
   },
   "category" : "DATA",
   "sortOrder" : 4,
-  "version" : "1.0.0",
+  "version" : "1.1.0",
   "model" : null,
-  "instructions" : "Analysiere die Daten systematisch. Identifiziere Muster und Anomalien.",
+  "instructions" : {
+    "de" : "Analysiere die Daten systematisch. Identifiziere Muster und Anomalien.",
+    "en" : "Analyze the data systematically. Identify patterns and anomalies."
+  },
   "blocks" : [ {
     "type" : "skill-capability",
     "config" : {

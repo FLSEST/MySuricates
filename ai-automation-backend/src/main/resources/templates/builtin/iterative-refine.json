@@ -1,37 +1,53 @@
 {
   "id" : "iterative-refine",
   "icon" : "\uD83D\uDD04",
+  "i18n" : [ "de", "en" ],
   "name" : {
     "en" : "Iterative Refinement",
     "de" : "Iterative Verbesserung"
   },
   "description" : {
-    "en" : "Improve text in a loop until quality threshold is met",
+    "en" : "Improve a text in a loop until the quality threshold is met",
     "de" : "Text in einer Schleife verbessern bis die Qualität stimmt"
   },
   "category" : "CONTENT",
   "sortOrder" : 7,
-  "version" : "1.0.0",
+  "version" : "1.1.0",
   "model" : null,
-  "instructions" : "Verbessere den Text iterativ bis die Qualitaet mindestens 8/10 erreicht.",
+  "instructions" : {
+    "de" : "Verbessere den Text iterativ bis die Qualitaet mindestens 8/10 erreicht.",
+    "en" : "Improve the text iteratively until its quality reaches at least 8/10."
+  },
   "blocks" : [ {
     "type" : "simple",
     "config" : {
-      "command" : "Lies die Datei {{ filepath }} und gib den Inhalt aus."
+      "command" : {
+        "de" : "Lies die Datei {{ filepath }} und gib den Inhalt aus.",
+        "en" : "Read the file {{ filepath }} and output its content."
+      }
     },
     "requiredCapabilities" : [ ]
   }, {
     "type" : "while",
     "config" : {
       "max_iterations" : 3,
-      "command" : "Verbessere den Text. Fokussiere auf die groessten Schwaechen. Gib die vollstaendig ueberarbeitete Version aus.",
-      "condition_command" : "Bewerte die Qualitaet des Textes auf einer Skala von 1-10 (Klarheit, Vollstaendigkeit, Struktur). Antworte NUR mit \"true\" wenn unter 8, oder \"false\" wenn 8 oder hoeher."
+      "command" : {
+        "de" : "Verbessere den Text. Fokussiere auf die groessten Schwaechen. Gib die vollstaendig ueberarbeitete Version aus.",
+        "en" : "Improve the text. Focus on its biggest weaknesses. Output the fully revised version."
+      },
+      "condition_command" : {
+        "de" : "Bewerte die Qualitaet des Textes auf einer Skala von 1-10 (Klarheit, Vollstaendigkeit, Struktur). Antworte NUR mit \"true\" wenn unter 8, oder \"false\" wenn 8 oder hoeher.",
+        "en" : "Rate the quality of the text on a scale of 1-10 (clarity, completeness, structure). Answer ONLY with \"true\" if it is below 8, or \"false\" if it is 8 or higher."
+      }
     },
     "requiredCapabilities" : [ ]
   }, {
     "type" : "simple",
     "config" : {
-      "command" : "Erstelle eine Zusammenfassung: Was wurde verbessert? Wie ist die finale Qualitaetsbewertung?"
+      "command" : {
+        "de" : "Erstelle eine Zusammenfassung: Was wurde verbessert? Wie ist die finale Qualitaetsbewertung?",
+        "en" : "Write a summary: What was improved? What is the final quality rating?"
+      }
     },
     "requiredCapabilities" : [ ]
   } ]

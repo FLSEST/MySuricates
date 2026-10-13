@@ -1,5 +1,9 @@
 {
   "id": "doc-accuracy-check",
+  "i18n": [
+    "de",
+    "en"
+  ],
   "icon": "📋",
   "name": {
     "en": "Documentation Accuracy Check",
@@ -11,9 +15,12 @@
   },
   "category": "CODE",
   "sortOrder": 37,
-  "version": "1.1.0",
+  "version": "1.2.0",
   "model": "sonnet",
-  "instructions": "Vergleicht Dokumentation gegen Code: Build-Befehle, Projektstruktur, API-Endpunkte, Versionen, Feature-Listen.",
+  "instructions": {
+    "de": "Vergleicht Dokumentation gegen Code: Build-Befehle, Projektstruktur, API-Endpunkte, Versionen, Feature-Listen.",
+    "en": "Compares documentation against code: build commands, project structure, API endpoints, versions, feature lists."
+  },
   "blocks": [
     {
       "type": "shell",
@@ -27,7 +34,10 @@
       "type": "simple",
       "config": {
         "timeout_seconds": 600,
-        "command": "Vergleiche die Dokumentation systematisch gegen den tatsaechlichen Code:\n\n{{ previous_output }}\n\nPruefe:\n1. **Build-Befehle**: Stimmen dokumentierte Build/Run/Test-Befehle? Existieren die referenzierten Scripts?\n2. **Projektstruktur**: Stimmt die dokumentierte Verzeichnisstruktur mit der Realitaet ueberein? Fehlen Verzeichnisse oder sind zusaetzliche vorhanden?\n3. **API-Endpunkte**: Sind alle dokumentierten Endpunkte im Code vorhanden? Fehlen Endpunkte in der Doku?\n4. **Versionen**: Stimmen dokumentierte Versionen (Java, Node, Spring Boot, React etc.) mit pom.xml/package.json?\n5. **Feature-Listen**: Werden Features beschrieben die nicht (mehr) existieren? Fehlen implementierte Features in der Doku?\n6. **Konfiguration**: Stimmen dokumentierte Config-Keys, Ports, Defaults mit application.yml?\n7. **Produktname/Branding**: Wird der richtige Produktname konsistent verwendet?\n\nJeder Fund: Doku-Stelle, Code-Realitaet, Schweregrad (CRITICAL=falsche Befehle die Nutzer verwirren, HIGH=faktisch falsch, MEDIUM=unvollstaendig, LOW=kosmetisch)."
+        "command": {
+          "de": "Vergleiche die Dokumentation systematisch gegen den tatsaechlichen Code:\n\n{{ previous_output }}\n\nPruefe:\n1. **Build-Befehle**: Stimmen dokumentierte Build/Run/Test-Befehle? Existieren die referenzierten Scripts?\n2. **Projektstruktur**: Stimmt die dokumentierte Verzeichnisstruktur mit der Realitaet ueberein? Fehlen Verzeichnisse oder sind zusaetzliche vorhanden?\n3. **API-Endpunkte**: Sind alle dokumentierten Endpunkte im Code vorhanden? Fehlen Endpunkte in der Doku?\n4. **Versionen**: Stimmen dokumentierte Versionen (Java, Node, Spring Boot, React etc.) mit pom.xml/package.json?\n5. **Feature-Listen**: Werden Features beschrieben die nicht (mehr) existieren? Fehlen implementierte Features in der Doku?\n6. **Konfiguration**: Stimmen dokumentierte Config-Keys, Ports, Defaults mit application.yml?\n7. **Produktname/Branding**: Wird der richtige Produktname konsistent verwendet?\n\nJeder Fund: Doku-Stelle, Code-Realitaet, Schweregrad (CRITICAL=falsche Befehle die Nutzer verwirren, HIGH=faktisch falsch, MEDIUM=unvollstaendig, LOW=kosmetisch).",
+          "en": "Compare the documentation systematically against the actual code:\n\n{{ previous_output }}\n\nCheck:\n1. **Build commands**: Are the documented build/run/test commands correct? Do the referenced scripts exist?\n2. **Project structure**: Does the documented directory structure match reality? Are directories missing, or are there additional ones?\n3. **API endpoints**: Are all documented endpoints present in the code? Are endpoints missing from the docs?\n4. **Versions**: Do the documented versions (Java, Node, Spring Boot, React etc.) match pom.xml/package.json?\n5. **Feature lists**: Are features described that do not exist (anymore)? Are implemented features missing from the docs?\n6. **Configuration**: Do the documented config keys, ports and defaults match application.yml?\n7. **Product name/branding**: Is the correct product name used consistently?\n\nFor each finding: location in the docs, reality in the code, severity (CRITICAL=wrong commands that confuse users, HIGH=factually wrong, MEDIUM=incomplete, LOW=cosmetic)."
+        }
       },
       "requiredCapabilities": []
     },
@@ -35,10 +45,10 @@
       "type": "conditional",
       "config": {
         "shell_escape_variables": true,
-        "else_command": "echo 'Keine kritischen Dokumentationsfehler gefunden.'",
+        "else_command": "echo 'No critical documentation errors found.'",
         "execution_mode": "shell",
         "condition": "echo {{ previous_output }} | grep -qi 'CRITICAL'",
-        "then_command": "echo 'WARNUNG: Kritische Dokumentationsfehler gefunden! Falsche Build-Befehle oder Anleitungen koennen Nutzer direkt beeintraechtigen.'"
+        "then_command": "echo 'WARNING: Critical documentation errors found! Wrong build commands or instructions can affect users directly.'"
       },
       "requiredCapabilities": []
     },
@@ -46,7 +56,10 @@
       "type": "simple",
       "config": {
         "timeout_seconds": 600,
-        "command": "Erstelle den finalen Dokumentations-Report:\n\n{{ previous_output }}\n\n## Format:\n\n### Executive Summary\n- Gesamtbewertung Doku-Genauigkeit (1-10)\n- Anzahl Findings pro Schweregrad\n- Kritischster Fund\n\n### Findings\n| # | Schweregrad | Doku-Stelle | Dokumentiert | Tatsaechlich | Korrektur |\n\n### Korrektur-Vorschlaege\nFuer jeden Fund den konkreten Text, der in der Doku stehen sollte (Copy-Paste-fertig).\n\n### Fehlende Dokumentation\nImplementierte Features/Endpunkte die in keiner Doku erwaehnt werden."
+        "command": {
+          "de": "Erstelle den finalen Dokumentations-Report:\n\n{{ previous_output }}\n\n## Format:\n\n### Executive Summary\n- Gesamtbewertung Doku-Genauigkeit (1-10)\n- Anzahl Findings pro Schweregrad\n- Kritischster Fund\n\n### Findings\n| # | Schweregrad | Doku-Stelle | Dokumentiert | Tatsaechlich | Korrektur |\n\n### Korrektur-Vorschlaege\nFuer jeden Fund den konkreten Text, der in der Doku stehen sollte (Copy-Paste-fertig).\n\n### Fehlende Dokumentation\nImplementierte Features/Endpunkte die in keiner Doku erwaehnt werden.",
+          "en": "Create the final documentation report:\n\n{{ previous_output }}\n\n## Format:\n\n### Executive Summary\n- Overall rating of documentation accuracy (1-10)\n- Number of findings per severity\n- Most critical finding\n\n### Findings\n| # | Severity | Docs location | Documented | Actual | Correction |\n\n### Correction proposals\nFor each finding, the concrete text that should be in the docs (ready to copy and paste).\n\n### Missing documentation\nImplemented features/endpoints that no documentation mentions."
+        }
       },
       "requiredCapabilities": []
     },
@@ -54,7 +67,10 @@
       "type": "simple",
       "config": {
         "timeout_seconds": 300,
-        "command": "Wandle die Findings aus {{ previous_output }} in native TODO-Marker um. KEINE Dateien schreiben, KEINE API-Aufrufe, kein curl — nur Marker-Zeilen ausgeben; die Plattform legt die TODOs selbst an (AutoTodoService).\n\n## Bestehende offene TODOs (Duplikate vermeiden)\n{{ open_todos }}\n\n## Regeln\n- Pro umsetzbarem Finding genau eine Zeile im Format:\n  todo_item: <Titel im Imperativ> | <HIGH|MEDIUM|LOW> | <tag1,tag2> | <Kurzbeschreibung mit Fundstelle>\n- Maximal 10 todo_item-Zeilen, nur echte, umsetzbare Findings\n- Findings, die ein bestehendes offenes TODO bereits abdeckt, NICHT erneut ausgeben\n- Am Ende genau eine Zeile Gesamtbewertung:\n  gate_status: GREEN (keine Findings) | YELLOW (nur kleinere Findings) | RED (kritische Findings)"
+        "command": {
+          "de": "Wandle die Findings aus {{ previous_output }} in native TODO-Marker um. KEINE Dateien schreiben, KEINE API-Aufrufe, kein curl — nur Marker-Zeilen ausgeben; die Plattform legt die TODOs selbst an (AutoTodoService).\n\n## Bestehende offene TODOs (Duplikate vermeiden)\n{{ open_todos }}\n\n## Regeln\n- Pro umsetzbarem Finding genau eine Zeile im Format:\n  todo_item: <Titel im Imperativ> | <HIGH|MEDIUM|LOW> | <tag1,tag2> | <Kurzbeschreibung mit Fundstelle>\n- Maximal 10 todo_item-Zeilen, nur echte, umsetzbare Findings\n- Findings, die ein bestehendes offenes TODO bereits abdeckt, NICHT erneut ausgeben\n- Am Ende genau eine Zeile Gesamtbewertung:\n  gate_status: GREEN (keine Findings) | YELLOW (nur kleinere Findings) | RED (kritische Findings)",
+          "en": "Turn the findings from {{ previous_output }} into native TODO markers. Do NOT write any files, make NO API calls, no curl — output marker lines only; the platform creates the TODOs itself (AutoTodoService).\n\n## Existing open TODOs (avoid duplicates)\n{{ open_todos }}\n\n## Rules\n- Exactly one line per actionable finding, in this format:\n  todo_item: <title in the imperative> | <HIGH|MEDIUM|LOW> | <tag1,tag2> | <short description with location>\n- At most 10 todo_item lines, only real, actionable findings\n- Do NOT output findings that an existing open TODO already covers\n- At the end, exactly one line with the overall verdict:\n  gate_status: GREEN (no findings) | YELLOW (only minor findings) | RED (critical findings)"
+        }
       },
       "requiredCapabilities": []
     }

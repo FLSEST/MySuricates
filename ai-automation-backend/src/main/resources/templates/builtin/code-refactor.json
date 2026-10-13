@@ -1,19 +1,23 @@
 {
   "id" : "code-refactor",
+  "i18n" : [ "de", "en" ],
   "icon" : "⚙️",
   "name" : {
     "en" : "Code Analysis & Refactoring",
     "de" : "Code-Analyse & Refactoring"
   },
   "description" : {
-    "en" : "Scan project code, find issues, and create improved version",
+    "en" : "Scan the project code, find issues, and create an improved version",
     "de" : "Projekt-Code scannen, Probleme finden und verbesserte Version erstellen"
   },
   "category" : "CODE",
   "sortOrder" : 11,
-  "version" : "1.0.0",
+  "version" : "1.1.0",
   "model" : null,
-  "instructions" : "Analysiere den Code auf Bugs, Sicherheit und Qualitaet. Erstelle konkrete Verbesserungen.",
+  "instructions" : {
+    "de" : "Analysiere den Code auf Bugs, Sicherheit und Qualitaet. Erstelle konkrete Verbesserungen.",
+    "en" : "Analyze the code for bugs, security and quality. Produce concrete improvements."
+  },
   "blocks" : [ {
     "type" : "simple",
     "config" : {
@@ -23,19 +27,28 @@
   }, {
     "type" : "simple",
     "config" : {
-      "command" : "Schau dir die Code-Dateien im Projekt an. Lies die Datei {{ filepath }} und analysiere: 1) Bugs und logische Fehler 2) Sicherheitsprobleme 3) Performance 4) Code-Qualitaet. Strukturiere nach Schweregrad."
+      "command" : {
+        "de" : "Schau dir die Code-Dateien im Projekt an. Lies die Datei {{ filepath }} und analysiere: 1) Bugs und logische Fehler 2) Sicherheitsprobleme 3) Performance 4) Code-Qualitaet. Strukturiere nach Schweregrad.",
+        "en" : "Look at the code files in the project. Read the file {{ filepath }} and analyze: 1) bugs and logic errors 2) security problems 3) performance 4) code quality. Structure the result by severity."
+      }
     },
     "requiredCapabilities" : [ ]
   }, {
     "type" : "simple",
     "config" : {
-      "command" : "Erstelle fuer jedes Problem einen konkreten Verbesserungsvorschlag mit Code-Beispiel."
+      "command" : {
+        "de" : "Erstelle fuer jedes Problem einen konkreten Verbesserungsvorschlag mit Code-Beispiel.",
+        "en" : "For each problem, write a concrete improvement proposal with a code example."
+      }
     },
     "requiredCapabilities" : [ ]
   }, {
     "type" : "simple",
     "config" : {
-      "command" : "Wende alle Verbesserungen an und gib die refactored Version aus. Kommentiere die wesentlichen Aenderungen."
+      "command" : {
+        "de" : "Wende alle Verbesserungen an und gib die refactored Version aus. Kommentiere die wesentlichen Aenderungen.",
+        "en" : "Apply all improvements and output the refactored version. Comment on the main changes."
+      }
     },
     "requiredCapabilities" : [ ]
   } ]

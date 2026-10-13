@@ -1,5 +1,6 @@
 {
   "id" : "database-backup-verify",
+  "i18n" : [ "de", "en" ],
   "icon" : "\uD83D\uDDC4️",
   "name" : {
     "en" : "Database Backup & Verify",
@@ -11,9 +12,12 @@
   },
   "category" : "DATA",
   "sortOrder" : 31,
-  "version" : "1.0.1",
+  "version" : "1.1.0",
   "model" : null,
-  "instructions" : "Erstelle ein Datenbank-Backup mit Kompression und Checksumme. Variablen: db_type (postgres/mysql/sqlite), db_connection, backup_dir, retention_count.",
+  "instructions" : {
+    "de" : "Erstelle ein Datenbank-Backup mit Kompression und Checksumme. Variablen: db_type (postgres/mysql/sqlite), db_connection, backup_dir, retention_count.",
+    "en" : "Create a database backup with compression and checksum. Variables: db_type (postgres/mysql/sqlite), db_connection, backup_dir, retention_count."
+  },
   "blocks" : [ {
     "type" : "shell",
     "config" : {

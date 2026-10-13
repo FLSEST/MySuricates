@@ -1,19 +1,23 @@
 {
   "id" : "file-improve",
   "icon" : "✨",
+  "i18n" : [ "de", "en" ],
   "name" : {
     "en" : "File Analysis & Improvement",
     "de" : "Datei-Analyse & Verbesserung"
   },
   "description" : {
-    "en" : "Explore project, analyze a file, and create an improved version",
+    "en" : "Explore the project, analyze a file, and create an improved version",
     "de" : "Projekt erkunden, Datei analysieren und verbesserte Version erstellen"
   },
   "category" : "CONTENT",
   "sortOrder" : 5,
-  "version" : "1.0.0",
+  "version" : "1.1.0",
   "model" : null,
-  "instructions" : "Analysiere die Datei gruendlich und erstelle konkrete, umsetzbare Verbesserungsvorschlaege.",
+  "instructions" : {
+    "de" : "Analysiere die Datei gruendlich und erstelle konkrete, umsetzbare Verbesserungsvorschlaege.",
+    "en" : "Analyze the file thoroughly and produce concrete, actionable suggestions for improvement."
+  },
   "blocks" : [ {
     "type" : "simple",
     "config" : {
@@ -23,19 +27,28 @@
   }, {
     "type" : "simple",
     "config" : {
-      "command" : "Schau dir die Dateien in deinem Projekt an. Lies die Datei {{ filepath }} und analysiere ihren Inhalt. Liste konkret auf: 1) Staerken 2) Schwaechen 3) Fehlende Aspekte"
+      "command" : {
+        "de" : "Schau dir die Dateien in deinem Projekt an. Lies die Datei {{ filepath }} und analysiere ihren Inhalt. Liste konkret auf: 1) Staerken 2) Schwaechen 3) Fehlende Aspekte",
+        "en" : "Look at the files in your project. Read the file {{ filepath }} and analyze its content. List specifically: 1) strengths 2) weaknesses 3) missing aspects"
+      }
     },
     "requiredCapabilities" : [ ]
   }, {
     "type" : "simple",
     "config" : {
-      "command" : "Erstelle eine priorisierte Liste von Verbesserungsvorschlaegen. Sei konkret - keine vagen Hinweise, sondern umsetzbare Aenderungen."
+      "command" : {
+        "de" : "Erstelle eine priorisierte Liste von Verbesserungsvorschlaegen. Sei konkret - keine vagen Hinweise, sondern umsetzbare Aenderungen.",
+        "en" : "Create a prioritized list of suggestions for improvement. Be specific - no vague hints, but actionable changes."
+      }
     },
     "requiredCapabilities" : [ ]
   }, {
     "type" : "simple",
     "config" : {
-      "command" : "Wende die Verbesserungen an und gib die vollstaendig ueberarbeitete Version aus. Markiere die geaenderten Stellen."
+      "command" : {
+        "de" : "Wende die Verbesserungen an und gib die vollstaendig ueberarbeitete Version aus. Markiere die geaenderten Stellen.",
+        "en" : "Apply the improvements and output the fully revised version. Mark the changed passages."
+      }
     },
     "requiredCapabilities" : [ ]
   } ]

@@ -1,6 +1,7 @@
 {
   "id" : "log-rotate-cleanup",
   "icon" : "🗄️",
+  "i18n" : [ "de", "en" ],
   "name" : {
     "en" : "Log Rotation & Cleanup",
     "de" : "Log-Rotation & Bereinigung"
@@ -11,9 +12,12 @@
   },
   "category" : "INFRA",
   "sortOrder" : 48,
-  "version" : "1.0.0",
+  "version" : "1.1.0",
   "model" : null,
-  "instructions" : "Bereinige Log-Dateien. Variablen: log_dir (Verzeichnis), compress_days (ältere Logs komprimieren, default 7), delete_days (ältere Logs löschen, default 30), pattern (Datei-Muster, default '*.log').",
+  "instructions" : {
+    "de" : "Bereinige Log-Dateien. Variablen: log_dir (Verzeichnis), compress_days (ältere Logs komprimieren, default 7), delete_days (ältere Logs löschen, default 30), pattern (Datei-Muster, default '*.log').",
+    "en" : "Clean up log files. Variables: log_dir (directory), compress_days (compress older logs, default 7), delete_days (delete older logs, default 30), pattern (file pattern, default '*.log')."
+  },
   "blocks" : [ {
     "type" : "shell",
     "config" : {
@@ -23,7 +27,10 @@
   }, {
     "type" : "simple",
     "config" : {
-      "command" : "Fasse das Log-Rotation-Ergebnis zusammen. Berichte über komprimierte und gelöschte Dateien, den freigegebenen Speicherplatz und ob die Konfiguration (compress_days, delete_days) sinnvoll erscheint. Gib Empfehlungen bei auffälligen Befunden."
+      "command" : {
+        "de" : "Fasse das Log-Rotation-Ergebnis zusammen. Berichte über komprimierte und gelöschte Dateien, den freigegebenen Speicherplatz und ob die Konfiguration (compress_days, delete_days) sinnvoll erscheint. Gib Empfehlungen bei auffälligen Befunden.",
+        "en" : "Summarize the log rotation result. Report on compressed and deleted files, the freed disk space and whether the configuration (compress_days, delete_days) seems reasonable. Give recommendations for any notable findings."
+      }
     },
     "requiredCapabilities" : [ ]
   } ]

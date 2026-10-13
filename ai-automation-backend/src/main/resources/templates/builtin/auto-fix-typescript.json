@@ -1,5 +1,9 @@
 {
   "id": "auto-fix-typescript",
+  "i18n": [
+    "de",
+    "en"
+  ],
   "icon": "🟦",
   "name": {
     "en": "Auto-Fix TypeScript",
@@ -11,15 +15,18 @@
   },
   "category": "CODE",
   "sortOrder": 44,
-  "version": "1.0.2",
+  "version": "1.1.0",
   "model": "sonnet",
-  "instructions": "Du bist ein automatischer TypeScript/React-Code-Fixer. Deine Aufgabe ist es, Findings aus statischer Analyse sicher zu beheben.\n\nSICHERHEITSREGELN:\n- IMMER auf eigenem Branch arbeiten, nie auf main\n- Ein Commit pro Fix (atomar, reviewbar, revertierbar)\n- Keine Breaking Changes an exportierten APIs/Interfaces\n- Keine Dateien loeschen die noch importiert werden\n- Bei Unsicherheit: Fix ueberspringen statt riskieren\n- Lint, Build und Tests muessen nach allen Fixes bestehen\n\nTYPESCRIPT-SPEZIFISCH:\n- `any` nur durch spezifischen Typ ersetzen wenn er eindeutig ableitbar ist\n- Unused imports entfernen, aber benutzte Type-Imports behalten\n- ESLint auto-fixable Rules bevorzugt mit `--fix` beheben\n- React Hooks Dependencies nur aendern wenn die Logik klar ist\n- CSS/Tailwind Klassen nicht umsortieren (koennte Spezifitaet aendern)\n- i18n: Falls de.ts und en.ts existieren, BEIDE aktualisieren\n\nCOMMIT-KONVENTIONEN:\n- fix: <beschreibung>\n- refactor: <beschreibung>\n- style: <beschreibung> — fuer Formatting\n- chore: <beschreibung> — fuer Dependency-Updates\nArbeitsverzeichnis fuer diesen Run ist {{ execution_path }}. Verwende ausschliesslich diesen Run-Workspace fuer Builds und Code-Aenderungen. {{ project_path }} identifiziert nur das Originalprojekt. Kein automatischer Merge oder Push; Ergebnisse zur separaten Uebernahme behalten.",
+  "instructions": {
+    "de": "Du bist ein automatischer TypeScript/React-Code-Fixer. Deine Aufgabe ist es, Findings aus statischer Analyse sicher zu beheben.\n\nSICHERHEITSREGELN:\n- IMMER auf eigenem Branch arbeiten, nie auf main\n- Ein Commit pro Fix (atomar, reviewbar, revertierbar)\n- Keine Breaking Changes an exportierten APIs/Interfaces\n- Keine Dateien loeschen die noch importiert werden\n- Bei Unsicherheit: Fix ueberspringen statt riskieren\n- Lint, Build und Tests muessen nach allen Fixes bestehen\n\nTYPESCRIPT-SPEZIFISCH:\n- `any` nur durch spezifischen Typ ersetzen wenn er eindeutig ableitbar ist\n- Unused imports entfernen, aber benutzte Type-Imports behalten\n- ESLint auto-fixable Rules bevorzugt mit `--fix` beheben\n- React Hooks Dependencies nur aendern wenn die Logik klar ist\n- CSS/Tailwind Klassen nicht umsortieren (koennte Spezifitaet aendern)\n- i18n: Falls de.ts und en.ts existieren, BEIDE aktualisieren\n\nCOMMIT-KONVENTIONEN:\n- fix: <beschreibung>\n- refactor: <beschreibung>\n- style: <beschreibung> — fuer Formatting\n- chore: <beschreibung> — fuer Dependency-Updates\nArbeitsverzeichnis fuer diesen Run ist {{ execution_path }}. Verwende ausschliesslich diesen Run-Workspace fuer Builds und Code-Aenderungen. {{ project_path }} identifiziert nur das Originalprojekt. Kein automatischer Merge oder Push; Ergebnisse zur separaten Uebernahme behalten.",
+    "en": "You are an automatic TypeScript/React code fixer. Your task is to fix findings from static analysis safely.\n\nSAFETY RULES:\n- ALWAYS work on a separate branch, never on main\n- One commit per fix (atomic, reviewable, revertible)\n- No breaking changes to exported APIs/interfaces\n- Do not delete files that are still imported\n- When in doubt: skip the fix rather than take a risk\n- Lint, build and tests must pass after all fixes\n\nTYPESCRIPT-SPECIFIC:\n- Only replace `any` with a specific type if it can be inferred unambiguously\n- Remove unused imports, but keep type imports that are used\n- Prefer fixing auto-fixable ESLint rules with `--fix`\n- Only change React hook dependencies if the logic is clear\n- Do not reorder CSS/Tailwind classes (could change specificity)\n- i18n: if de.ts and en.ts exist, update BOTH\n\nCOMMIT CONVENTIONS:\n- fix: <description>\n- refactor: <description>\n- style: <description> — for formatting\n- chore: <description> — for dependency updates\nThe working directory for this run is {{ execution_path }}. Use only this run workspace for builds and code changes. {{ project_path }} only identifies the original project. No automatic merge or push; keep the results so they can be adopted separately."
+  },
   "blocks": [
     {
       "type": "shell",
       "config": {
         "on_failure": "stop",
-        "command": "git status --short\ngit log -1 --oneline\necho \"Run-Branch: $(git branch --show-current)\"",
+        "command": "git status --short\ngit log -1 --oneline\necho \"Run branch: $(git branch --show-current)\"",
         "workspace": {
           "mode": "isolated",
           "source": "commit",
@@ -42,7 +49,10 @@
       "type": "simple",
       "config": {
         "timeout_seconds": 600,
-        "command": "Analysiere die Scan-Ergebnisse und erstelle einen strukturierten Fix-Plan.\n\nSCAN-ERGEBNISSE:\n{{ previous_output }}\n\nDOMAIN-KONTEXT:\n{{ domain_context }}\n\nAUFGABE:\n1. Extrahiere alle Findings aus ESLint, TypeScript Compiler und npm audit\n2. Klassifiziere jedes Finding:\n\n   AUTO_FIXABLE (sicher automatisch behebbar):\n   - Unused imports / variables (entfernen)\n   - Missing return types bei offensichtlichem Typ\n   - `any` → spezifischer Typ (nur wenn eindeutig ableitbar)\n   - ESLint auto-fixable Rules (prefer-const, no-var, eqeqeq, etc.)\n   - Fehlende Semicolons / Formatting nach Projekt-Konventionen\n   - Unused variables die mit _ prefixed werden koennen\n   - Triviale TypeScript strict-mode Fixes (missing null checks bei offensichtlichen Stellen)\n   - console.log Entfernung (wenn nicht absichtlich)\n\n   MANUAL_REVIEW (zu komplex/riskant):\n   - React Hook Dependencies die Logik aendern koennten\n   - API-Interface/Type-Aenderungen die andere Dateien betreffen\n   - Complex type assertions / generics\n   - Architektur-Refactorings\n   - npm audit Findings die Major-Updates erfordern\n\n   INFORMATIONAL:\n   - Warnungen ohne konkreten Fix\n\n3. Sortiere AUTO_FIXABLE: Imports → Types → ESLint-Fixes → Code-Fixes\n4. Gib den Fix-Plan aus:\n\nFIX_PLAN:\n1. [AUTO_FIXABLE] <Datei>:<Zeile> — <Rule/Code> — <Was zu tun ist>\n2. ...\n\nSKIPPED (MANUAL_REVIEW):\n- <Datei>: <Grund>\n\nSKIPPED (INFORMATIONAL):\n- <Beschreibung>\n\nFalls keine Findings: FIX_PLAN: EMPTY - Keine fixbaren Findings gefunden."
+        "command": {
+          "de": "Analysiere die Scan-Ergebnisse und erstelle einen strukturierten Fix-Plan.\n\nSCAN-ERGEBNISSE:\n{{ previous_output }}\n\nDOMAIN-KONTEXT:\n{{ domain_context }}\n\nAUFGABE:\n1. Extrahiere alle Findings aus ESLint, TypeScript Compiler und npm audit\n2. Klassifiziere jedes Finding:\n\n   AUTO_FIXABLE (sicher automatisch behebbar):\n   - Unused imports / variables (entfernen)\n   - Missing return types bei offensichtlichem Typ\n   - `any` → spezifischer Typ (nur wenn eindeutig ableitbar)\n   - ESLint auto-fixable Rules (prefer-const, no-var, eqeqeq, etc.)\n   - Fehlende Semicolons / Formatting nach Projekt-Konventionen\n   - Unused variables die mit _ prefixed werden koennen\n   - Triviale TypeScript strict-mode Fixes (missing null checks bei offensichtlichen Stellen)\n   - console.log Entfernung (wenn nicht absichtlich)\n\n   MANUAL_REVIEW (zu komplex/riskant):\n   - React Hook Dependencies die Logik aendern koennten\n   - API-Interface/Type-Aenderungen die andere Dateien betreffen\n   - Complex type assertions / generics\n   - Architektur-Refactorings\n   - npm audit Findings die Major-Updates erfordern\n\n   INFORMATIONAL:\n   - Warnungen ohne konkreten Fix\n\n3. Sortiere AUTO_FIXABLE: Imports → Types → ESLint-Fixes → Code-Fixes\n4. Gib den Fix-Plan aus:\n\nFIX_PLAN:\n1. [AUTO_FIXABLE] <Datei>:<Zeile> — <Rule/Code> — <Was zu tun ist>\n2. ...\n\nSKIPPED (MANUAL_REVIEW):\n- <Datei>: <Grund>\n\nSKIPPED (INFORMATIONAL):\n- <Beschreibung>\n\nFalls keine Findings: FIX_PLAN: EMPTY - Keine fixbaren Findings gefunden.",
+          "en": "Analyze the scan results and create a structured fix plan.\n\nSCAN RESULTS:\n{{ previous_output }}\n\nDOMAIN CONTEXT:\n{{ domain_context }}\n\nTASK:\n1. Extract all findings from ESLint, the TypeScript compiler and npm audit\n2. Classify each finding:\n\n   AUTO_FIXABLE (can be fixed safely and automatically):\n   - Unused imports / variables (remove)\n   - Missing return types where the type is obvious\n   - `any` → specific type (only if it can be inferred unambiguously)\n   - Auto-fixable ESLint rules (prefer-const, no-var, eqeqeq, etc.)\n   - Missing semicolons / formatting according to the project conventions\n   - Unused variables that can be prefixed with _\n   - Trivial TypeScript strict-mode fixes (missing null checks in obvious places)\n   - Removing console.log (if not intentional)\n\n   MANUAL_REVIEW (too complex/risky):\n   - React hook dependencies that could change logic\n   - API interface/type changes that affect other files\n   - Complex type assertions / generics\n   - Architecture refactorings\n   - npm audit findings that require major updates\n\n   INFORMATIONAL:\n   - Warnings without a concrete fix\n\n3. Sort AUTO_FIXABLE: imports → types → ESLint fixes → code fixes\n4. Output the fix plan:\n\nFIX_PLAN:\n1. [AUTO_FIXABLE] <file>:<line> — <rule/code> — <what to do>\n2. ...\n\nSKIPPED (MANUAL_REVIEW):\n- <file>: <reason>\n\nSKIPPED (INFORMATIONAL):\n- <description>\n\nIf there are no findings: FIX_PLAN: EMPTY - No fixable findings found."
+        }
       },
       "requiredCapabilities": []
     },
@@ -52,9 +62,15 @@
         "max_iterations": 25,
         "max_total_tokens": 400000,
         "iteration_timeout_seconds": 600,
-        "goal": "Arbeite den Fix-Plan aus dem vorherigen Schritt ab und committe jeden Fix einzeln.\n\nFIX-PLAN:\n{{ previous_output }}\n\nREGELN:\n1. Nur [AUTO_FIXABLE] Eintraege abarbeiten\n2. Falls FIX_PLAN EMPTY: 'NO_FIXES_NEEDED' ausgeben und beenden\n3. Ein Commit pro Fix — atomare Git-History\n4. Commit-Format: 'fix: <was behoben>' / 'style: <formatting>' / 'refactor: <was refactored>'\n5. SICHERHEIT:\n   - Keine exportierten Interfaces/Types aendern die in anderen Dateien importiert werden\n   - Keine Dateien loeschen die noch importiert werden — pruefe Imports\n   - React Hooks: Nur Dependencies aendern wenn die Logik eindeutig korrekt bleibt\n   - i18n: Falls de.ts und en.ts existieren, BEIDE synchron halten\n   - Bei Unsicherheit: Fix ueberspringen als SKIPPED\n6. WICHTIG: Jede ACTION wird von einem SEPARATEN Agenten ausgefuehrt.\n   Jede ACTION MUSS enthalten:\n   - ABSOLUTE Dateipfade\n   - Vollstaendigen Kontext was zu aendern ist\n   - Nach der Aenderung: git add <datei> && git commit -m '<message>'\n\nAUSGABE am Ende:\nFIXES_APPLIED:\n1. <Datei> — <Commit-Hash> — <Beschreibung>\n\nFIXES_SKIPPED:\n- <Datei> — <Grund>\n\nTOTAL: X Fixes applied, Y skipped",
+        "goal": {
+          "de": "Arbeite den Fix-Plan aus dem vorherigen Schritt ab und committe jeden Fix einzeln.\n\nFIX-PLAN:\n{{ previous_output }}\n\nREGELN:\n1. Nur [AUTO_FIXABLE] Eintraege abarbeiten\n2. Falls FIX_PLAN EMPTY: 'NO_FIXES_NEEDED' ausgeben und beenden\n3. Ein Commit pro Fix — atomare Git-History\n4. Commit-Format: 'fix: <was behoben>' / 'style: <formatting>' / 'refactor: <was refactored>'\n5. SICHERHEIT:\n   - Keine exportierten Interfaces/Types aendern die in anderen Dateien importiert werden\n   - Keine Dateien loeschen die noch importiert werden — pruefe Imports\n   - React Hooks: Nur Dependencies aendern wenn die Logik eindeutig korrekt bleibt\n   - i18n: Falls de.ts und en.ts existieren, BEIDE synchron halten\n   - Bei Unsicherheit: Fix ueberspringen als SKIPPED\n6. WICHTIG: Jede ACTION wird von einem SEPARATEN Agenten ausgefuehrt.\n   Jede ACTION MUSS enthalten:\n   - ABSOLUTE Dateipfade\n   - Vollstaendigen Kontext was zu aendern ist\n   - Nach der Aenderung: git add <datei> && git commit -m '<message>'\n\nAUSGABE am Ende:\nFIXES_APPLIED:\n1. <Datei> — <Commit-Hash> — <Beschreibung>\n\nFIXES_SKIPPED:\n- <Datei> — <Grund>\n\nTOTAL: X Fixes applied, Y skipped",
+          "en": "Work through the fix plan from the previous step and commit each fix separately.\n\nFIX-PLAN:\n{{ previous_output }}\n\nRULES:\n1. Work only on [AUTO_FIXABLE] entries\n2. If FIX_PLAN is EMPTY: output 'NO_FIXES_NEEDED' and stop\n3. One commit per fix — atomic git history\n4. Commit format: 'fix: <what was fixed>' / 'style: <formatting>' / 'refactor: <what was refactored>'\n5. SAFETY:\n   - Do not change exported interfaces/types that are imported in other files\n   - Do not delete files that are still imported — check the imports\n   - React hooks: only change dependencies if the logic clearly stays correct\n   - i18n: if de.ts and en.ts exist, keep BOTH in sync\n   - When in doubt: skip the fix as SKIPPED\n6. IMPORTANT: Each ACTION is carried out by a SEPARATE agent.\n   Every ACTION MUST contain:\n   - ABSOLUTE file paths\n   - The complete context of what to change\n   - After the change: git add <file> && git commit -m '<message>'\n\nOUTPUT at the end:\nFIXES_APPLIED:\n1. <file> — <commit hash> — <description>\n\nFIXES_SKIPPED:\n- <file> — <reason>\n\nTOTAL: X Fixes applied, Y skipped"
+        },
         "max_repeated_actions": 3,
-        "success_criteria": "Alle AUTO_FIXABLE Issues wurden als einzelne Commits committed oder begruendet uebersprungen.",
+        "success_criteria": {
+          "de": "Alle AUTO_FIXABLE Issues wurden als einzelne Commits committed oder begruendet uebersprungen.",
+          "en": "All AUTO_FIXABLE issues were committed as individual commits or skipped with a reason."
+        },
         "total_timeout_seconds": 5400,
         "require_approval": false
       },
@@ -91,7 +107,10 @@
         ],
         "timeout_minutes": 60,
         "variable_name": "pr_decision",
-        "question": "Review der Run-Ergebnisse bestaetigen. Uebernahme, Push und PR erfolgen danach separat."
+        "question": {
+          "de": "Review der Run-Ergebnisse bestaetigen. Uebernahme, Push und PR erfolgen danach separat.",
+          "en": "Confirm the review of the run results. Adoption, push and PR happen separately afterwards."
+        }
       },
       "requiredCapabilities": []
     },

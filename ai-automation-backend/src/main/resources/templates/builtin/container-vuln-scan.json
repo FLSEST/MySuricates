@@ -1,5 +1,6 @@
 {
   "id" : "container-vuln-scan",
+  "i18n" : [ "de", "en" ],
   "icon" : "\uD83D\uDC33",
   "name" : {
     "en" : "Container Vulnerability Scan",
@@ -11,9 +12,12 @@
   },
   "category" : "CODE",
   "sortOrder" : 30,
-  "version" : "1.2.0",
+  "version" : "1.3.0",
   "model" : null,
-  "instructions" : "Scanne ein Docker Image auf CVEs mit Trivy. Variablen: image_name, severity_threshold (CRITICAL/HIGH/MEDIUM).",
+  "instructions" : {
+    "de" : "Scanne ein Docker Image auf CVEs mit Trivy. Variablen: image_name, severity_threshold (CRITICAL/HIGH/MEDIUM).",
+    "en" : "Scan a Docker image for CVEs with Trivy. Variables: image_name, severity_threshold (CRITICAL/HIGH/MEDIUM)."
+  },
   "blocks" : [ {
     "type" : "shell",
     "config" : {

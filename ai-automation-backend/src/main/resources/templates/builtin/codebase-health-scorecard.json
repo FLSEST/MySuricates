@@ -1,5 +1,9 @@
 {
   "id": "codebase-health-scorecard",
+  "i18n": [
+    "de",
+    "en"
+  ],
   "icon": "🏥",
   "name": {
     "en": "Codebase Health Scorecard",
@@ -11,9 +15,12 @@
   },
   "category": "CODE",
   "sortOrder": 38,
-  "version": "1.1.0",
+  "version": "1.2.0",
   "model": "sonnet",
-  "instructions": "Ganzheitliche Codebase-Bewertung in 6 Dimensionen: Testabdeckung, Komplexitaet, Fehlerbehandlung, Security, Tech Debt, Architektur.",
+  "instructions": {
+    "de": "Ganzheitliche Codebase-Bewertung in 6 Dimensionen: Testabdeckung, Komplexitaet, Fehlerbehandlung, Security, Tech Debt, Architektur.",
+    "en": "Holistic codebase assessment in 6 dimensions: test coverage, complexity, error handling, security, tech debt, architecture."
+  },
   "blocks": [
     {
       "type": "shell",
@@ -27,7 +34,10 @@
       "type": "simple",
       "config": {
         "timeout_seconds": 600,
-        "command": "Bewerte die Codebase-Gesundheit anhand der Metriken:\n\n{{ previous_output }}\n\nBewerte jede Dimension auf einer Skala von 1-10 mit konkreten Belegen:\n\n1. **Testabdeckung** (Gewicht 20%): Test/Source-Ratio, Verteilung der Test-Typen, untestete Bereiche\n2. **Code-Komplexitaet** (Gewicht 15%): Grosse Dateien, God Classes, Verschachtelungstiefe\n3. **Fehlerbehandlung** (Gewicht 15%): Leere Catch-Bloecke, konsistentes Error-Handling, Logging\n4. **Security-Hygiene** (Gewicht 20%): Hardcoded Secrets, Input-Validierung, Dependency-Alter\n5. **Tech Debt** (Gewicht 15%): TODOs/FIXMEs, Deprecated-Nutzung, Workarounds, auskommentierter Code\n6. **Architektur-Klarheit** (Gewicht 15%): Schichtentrennung, Benennungskonsistenz, Package-Struktur\n\nFuer jede Dimension: Score, 2-3 konkrete Belege aus den Daten, groesster Verbesserungshebel."
+        "command": {
+          "de": "Bewerte die Codebase-Gesundheit anhand der Metriken:\n\n{{ previous_output }}\n\nBewerte jede Dimension auf einer Skala von 1-10 mit konkreten Belegen:\n\n1. **Testabdeckung** (Gewicht 20%): Test/Source-Ratio, Verteilung der Test-Typen, untestete Bereiche\n2. **Code-Komplexitaet** (Gewicht 15%): Grosse Dateien, God Classes, Verschachtelungstiefe\n3. **Fehlerbehandlung** (Gewicht 15%): Leere Catch-Bloecke, konsistentes Error-Handling, Logging\n4. **Security-Hygiene** (Gewicht 20%): Hardcoded Secrets, Input-Validierung, Dependency-Alter\n5. **Tech Debt** (Gewicht 15%): TODOs/FIXMEs, Deprecated-Nutzung, Workarounds, auskommentierter Code\n6. **Architektur-Klarheit** (Gewicht 15%): Schichtentrennung, Benennungskonsistenz, Package-Struktur\n\nFuer jede Dimension: Score, 2-3 konkrete Belege aus den Daten, groesster Verbesserungshebel.",
+          "en": "Rate the health of the codebase based on the metrics:\n\n{{ previous_output }}\n\nRate each dimension on a scale of 1-10 with concrete evidence:\n\n1. **Test coverage** (weight 20%): test/source ratio, distribution of test types, untested areas\n2. **Code complexity** (weight 15%): large files, god classes, nesting depth\n3. **Error handling** (weight 15%): empty catch blocks, consistent error handling, logging\n4. **Security hygiene** (weight 20%): hardcoded secrets, input validation, dependency age\n5. **Tech debt** (weight 15%): TODOs/FIXMEs, use of deprecated APIs, workarounds, commented-out code\n6. **Architecture clarity** (weight 15%): layer separation, naming consistency, package structure\n\nFor each dimension: score, 2-3 concrete pieces of evidence from the data, the biggest lever for improvement."
+        }
       },
       "requiredCapabilities": []
     },
@@ -35,7 +45,10 @@
       "type": "simple",
       "config": {
         "timeout_seconds": 600,
-        "command": "Erstelle die finale Scorecard:\n\n{{ previous_output }}\n\n## Format:\n\n### Health Scorecard\n| Dimension | Score | Gewicht | Gewichtet | Trend-Indikator |\n|-----------|-------|---------|-----------|----------------|\n| ... | X/10 | XX% | X.X | (geschaetzt) |\n| **Gesamt** | | | **X.X/10** | |\n\n### Top-3 Staerken\nWas die Codebase gut macht.\n\n### Top-3 Risiken\nWo der groesste Handlungsbedarf besteht.\n\n### Improvement Roadmap\n| Prioritaet | Massnahme | Betroffene Dimension | Erwarteter Impact | Aufwand |\n\nMaximal 8-10 Massnahmen, nach Impact/Aufwand-Verhaeltnis sortiert."
+        "command": {
+          "de": "Erstelle die finale Scorecard:\n\n{{ previous_output }}\n\n## Format:\n\n### Health Scorecard\n| Dimension | Score | Gewicht | Gewichtet | Trend-Indikator |\n|-----------|-------|---------|-----------|----------------|\n| ... | X/10 | XX% | X.X | (geschaetzt) |\n| **Gesamt** | | | **X.X/10** | |\n\n### Top-3 Staerken\nWas die Codebase gut macht.\n\n### Top-3 Risiken\nWo der groesste Handlungsbedarf besteht.\n\n### Improvement Roadmap\n| Prioritaet | Massnahme | Betroffene Dimension | Erwarteter Impact | Aufwand |\n\nMaximal 8-10 Massnahmen, nach Impact/Aufwand-Verhaeltnis sortiert.",
+          "en": "Create the final scorecard:\n\n{{ previous_output }}\n\n## Format:\n\n### Health Scorecard\n| Dimension | Score | Weight | Weighted | Trend indicator |\n|-----------|-------|---------|-----------|----------------|\n| ... | X/10 | XX% | X.X | (estimated) |\n| **Total** | | | **X.X/10** | |\n\n### Top 3 strengths\nWhat the codebase does well.\n\n### Top 3 risks\nWhere action is needed most.\n\n### Improvement Roadmap\n| Priority | Action | Affected dimension | Expected impact | Effort |\n\nAt most 8-10 actions, sorted by impact/effort ratio."
+        }
       },
       "requiredCapabilities": []
     },
@@ -43,7 +56,10 @@
       "type": "simple",
       "config": {
         "timeout_seconds": 300,
-        "command": "Wandle die Findings aus {{ previous_output }} in native TODO-Marker um. KEINE Dateien schreiben, KEINE API-Aufrufe, kein curl — nur Marker-Zeilen ausgeben; die Plattform legt die TODOs selbst an (AutoTodoService).\n\n## Bestehende offene TODOs (Duplikate vermeiden)\n{{ open_todos }}\n\n## Regeln\n- Pro umsetzbarem Finding genau eine Zeile im Format:\n  todo_item: <Titel im Imperativ> | <HIGH|MEDIUM|LOW> | <tag1,tag2> | <Kurzbeschreibung mit Fundstelle>\n- Maximal 10 todo_item-Zeilen, nur echte, umsetzbare Findings\n- Findings, die ein bestehendes offenes TODO bereits abdeckt, NICHT erneut ausgeben\n- Am Ende genau eine Zeile Gesamtbewertung:\n  gate_status: GREEN (keine Findings) | YELLOW (nur kleinere Findings) | RED (kritische Findings)"
+        "command": {
+          "de": "Wandle die Findings aus {{ previous_output }} in native TODO-Marker um. KEINE Dateien schreiben, KEINE API-Aufrufe, kein curl — nur Marker-Zeilen ausgeben; die Plattform legt die TODOs selbst an (AutoTodoService).\n\n## Bestehende offene TODOs (Duplikate vermeiden)\n{{ open_todos }}\n\n## Regeln\n- Pro umsetzbarem Finding genau eine Zeile im Format:\n  todo_item: <Titel im Imperativ> | <HIGH|MEDIUM|LOW> | <tag1,tag2> | <Kurzbeschreibung mit Fundstelle>\n- Maximal 10 todo_item-Zeilen, nur echte, umsetzbare Findings\n- Findings, die ein bestehendes offenes TODO bereits abdeckt, NICHT erneut ausgeben\n- Am Ende genau eine Zeile Gesamtbewertung:\n  gate_status: GREEN (keine Findings) | YELLOW (nur kleinere Findings) | RED (kritische Findings)",
+          "en": "Convert the findings from {{ previous_output }} into native TODO markers. Do NOT write any files, make NO API calls, no curl — only output marker lines; the platform creates the TODOs itself (AutoTodoService).\n\n## Existing open TODOs (avoid duplicates)\n{{ open_todos }}\n\n## Rules\n- Exactly one line per actionable finding, in the format:\n  todo_item: <title in the imperative> | <HIGH|MEDIUM|LOW> | <tag1,tag2> | <short description with location>\n- At most 10 todo_item lines, only real, actionable findings\n- Do NOT output findings that an existing open TODO already covers\n- At the end, exactly one line with the overall rating:\n  gate_status: GREEN (no findings) | YELLOW (only minor findings) | RED (critical findings)"
+        }
       },
       "requiredCapabilities": []
     }

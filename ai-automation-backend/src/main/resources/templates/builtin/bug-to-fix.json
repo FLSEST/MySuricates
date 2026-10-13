@@ -1,5 +1,6 @@
 {
   "id" : "bug-to-fix",
+  "i18n" : [ "de", "en" ],
   "icon" : "\uD83D\uDC1B",
   "name" : {
     "en" : "Bug Report → Fix + Tests",
@@ -11,27 +12,42 @@
   },
   "category" : "CODE",
   "sortOrder" : 22,
-  "version" : "1.0.0",
+  "version" : "1.1.0",
   "model" : null,
-  "instructions" : "Analysiere den Bug, schreibe einen reproduzierenden Test, behebe den Fehler und verifiziere.",
+  "instructions" : {
+    "de" : "Analysiere den Bug, schreibe einen reproduzierenden Test, behebe den Fehler und verifiziere.",
+    "en" : "Analyze the bug, write a test that reproduces it, fix the bug and verify the fix."
+  },
   "blocks" : [ {
     "type" : "simple",
     "config" : {
-      "command" : "Lies {{ filepath }} und analysiere den Code. Suche nach dem beschriebenen Bug: {{ bug_description }}. Identifiziere die betroffene Funktion/Stelle und erklaere die Ursache."
+      "command" : {
+        "de" : "Lies {{ filepath }} und analysiere den Code. Suche nach dem beschriebenen Bug: {{ bug_description }}. Identifiziere die betroffene Funktion/Stelle und erklaere die Ursache.",
+        "en" : "Read {{ filepath }} and analyze the code. Look for the described bug: {{ bug_description }}. Identify the affected function/location and explain the cause."
+      }
     },
     "requiredCapabilities" : [ ]
   }, {
     "type" : "agentic",
     "config" : {
       "max_iterations" : 8,
-      "success_criteria" : "Alle Tests bestehen nach dem Fix.",
-      "goal" : "Behebe den Bug in {{ filepath }}. Bug: '{{ bug_description }}'. Vorgehen: (1) Verstehe den bestehenden Code und das Bug-Verhalten, (2) Schreibe zuerst einen Test der den Bug reproduziert (der Test muss fehlschlagen), (3) Implementiere den Fix, (4) Fuehre den Test erneut aus — er muss jetzt bestehen, (5) Fuehre alle existierenden Tests aus um sicherzustellen dass nichts kaputt geht."
+      "success_criteria" : {
+        "de" : "Alle Tests bestehen nach dem Fix.",
+        "en" : "All tests pass after the fix."
+      },
+      "goal" : {
+        "de" : "Behebe den Bug in {{ filepath }}. Bug: '{{ bug_description }}'. Vorgehen: (1) Verstehe den bestehenden Code und das Bug-Verhalten, (2) Schreibe zuerst einen Test der den Bug reproduziert (der Test muss fehlschlagen), (3) Implementiere den Fix, (4) Fuehre den Test erneut aus — er muss jetzt bestehen, (5) Fuehre alle existierenden Tests aus um sicherzustellen dass nichts kaputt geht.",
+        "en" : "Fix the bug in {{ filepath }}. Bug: '{{ bug_description }}'. Approach: (1) understand the existing code and the buggy behavior, (2) first write a test that reproduces the bug (the test must fail), (3) implement the fix, (4) run the test again — it must pass now, (5) run all existing tests to make sure nothing breaks."
+      }
     },
     "requiredCapabilities" : [ ]
   }, {
     "type" : "simple",
     "config" : {
-      "command" : "Erstelle einen Bug-Fix-Report: (1) Ursache des Bugs, (2) Was wurde geaendert (mit Diff-Ueberblick), (3) Welche Tests wurden hinzugefuegt, (4) Wie kann man verifizieren dass der Fix korrekt ist."
+      "command" : {
+        "de" : "Erstelle einen Bug-Fix-Report: (1) Ursache des Bugs, (2) Was wurde geaendert (mit Diff-Ueberblick), (3) Welche Tests wurden hinzugefuegt, (4) Wie kann man verifizieren dass der Fix korrekt ist.",
+        "en" : "Write a bug fix report: (1) cause of the bug, (2) what was changed (with a diff overview), (3) which tests were added, (4) how to verify that the fix is correct."
+      }
     },
     "requiredCapabilities" : [ ]
   } ]

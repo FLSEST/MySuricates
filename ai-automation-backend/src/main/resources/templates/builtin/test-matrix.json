@@ -1,5 +1,6 @@
 {
   "id": "test-matrix",
+  "i18n": ["de", "en"],
   "icon": "✅",
   "name": {
     "en": "Test Matrix (Multi-Repo)",
@@ -11,9 +12,12 @@
   },
   "category": "CODE",
   "sortOrder": 25,
-  "version": "1.0.2",
+  "version": "1.1.0",
   "model": null,
-  "instructions": "Fuehrt tests build-abhängig (npm/mvn/gradle/pytest) über alle Repos im Projektpfad aus, sammelt Logs bei Fehlschlag und erzeugt eine kurze Entscheidungs-Matrix.\nArbeitsverzeichnis fuer diesen Run ist {{ execution_path }}. Verwende ausschliesslich diesen Run-Workspace fuer Builds und Code-Aenderungen. {{ project_path }} identifiziert nur das Originalprojekt. Kein automatischer Merge oder Push; Ergebnisse zur separaten Uebernahme behalten.",
+  "instructions": {
+    "de": "Fuehrt tests build-abhängig (npm/mvn/gradle/pytest) über alle Repos im Projektpfad aus, sammelt Logs bei Fehlschlag und erzeugt eine kurze Entscheidungs-Matrix.\nArbeitsverzeichnis fuer diesen Run ist {{ execution_path }}. Verwende ausschliesslich diesen Run-Workspace fuer Builds und Code-Aenderungen. {{ project_path }} identifiziert nur das Originalprojekt. Kein automatischer Merge oder Push; Ergebnisse zur separaten Uebernahme behalten.",
+    "en": "Runs the tests per build tool (npm/mvn/gradle/pytest) across all repos in the project path, collects logs on failure and produces a short decision matrix.\nThe working directory for this run is {{ execution_path }}. Use only this run workspace for builds and code changes. {{ project_path }} only identifies the original project. No automatic merge or push; keep the results so they can be adopted separately."
+  },
   "blocks": [
     {
       "type": "shell",
@@ -48,7 +52,10 @@
         "params": {
           "summarize_failures": true
         },
-        "input": "Testergebnisse mehrerer Repos:\n\n{{ previous_output }}\n\nFasse fehlgeschlagene Repos/Tests zusammen. Nenne pro Failure: Repo, vermutete Ursache (aus Logauszug), empfohlene Fix-Richtung. Wenn alle gruen: kurzer OK-Report.",
+        "input": {
+          "de": "Testergebnisse mehrerer Repos:\n\n{{ previous_output }}\n\nFasse fehlgeschlagene Repos/Tests zusammen. Nenne pro Failure: Repo, vermutete Ursache (aus Logauszug), empfohlene Fix-Richtung. Wenn alle gruen: kurzer OK-Report.",
+          "en": "Test results of several repos:\n\n{{ previous_output }}\n\nSummarize the failed repos/tests. For each failure, name: repo, suspected cause (from the log excerpt), recommended direction for a fix. If all are green: a short OK report."
+        },
         "capability": "analyze"
       },
       "requiredCapabilities": []
@@ -57,7 +64,10 @@
       "type": "simple",
       "config": {
         "timeout_seconds": 600,
-        "command": "Basierend auf den bisherigen Ergebnissen: Erstelle NUR eine Markdown-Tabelle als Test-Matrix mit den Spalten: Repo | Stack | Ergebnis (OK/FAIL/SKIP) | Dauer | Empfehlung. Lies KEINE Dateien und fuehre KEINE Befehle aus — nutze ausschliesslich die Daten aus {{ previous_output }}. Antworte direkt mit der Tabelle."
+        "command": {
+          "de": "Basierend auf den bisherigen Ergebnissen: Erstelle NUR eine Markdown-Tabelle als Test-Matrix mit den Spalten: Repo | Stack | Ergebnis (OK/FAIL/SKIP) | Dauer | Empfehlung. Lies KEINE Dateien und fuehre KEINE Befehle aus — nutze ausschliesslich die Daten aus {{ previous_output }}. Antworte direkt mit der Tabelle.",
+          "en": "Based on the results so far: create ONLY a Markdown table as the test matrix with the columns: Repo | Stack | Result (OK/FAIL/SKIP) | Duration | Recommendation. Do NOT read any files and do NOT run any commands — use only the data from {{ previous_output }}. Reply directly with the table."
+        }
       },
       "requiredCapabilities": []
     }

@@ -1,5 +1,6 @@
 {
   "id" : "pr-review-summary",
+  "i18n" : [ "de", "en" ],
   "icon" : "👀",
   "name" : {
     "en" : "PR Review Summary",
@@ -11,9 +12,12 @@
   },
   "category" : "TEAM",
   "sortOrder" : 51,
-  "version" : "1.0.0",
+  "version" : "1.1.0",
   "model" : null,
-  "instructions" : "Analysiere Pull Requests. Variablen: base_branch (default 'main'), feature_branch (Name des Feature-Branch), max_diff_lines (default 500).",
+  "instructions" : {
+    "de" : "Analysiere Pull Requests. Variablen: base_branch (default 'main'), feature_branch (Name des Feature-Branch), max_diff_lines (default 500).",
+    "en" : "Analyze pull requests. Variables: base_branch (default 'main'), feature_branch (name of the feature branch), max_diff_lines (default 500)."
+  },
   "blocks" : [ {
     "type" : "shell",
     "config" : {
@@ -23,7 +27,10 @@
   }, {
     "type" : "simple",
     "config" : {
-      "command" : "Erstelle ein strukturiertes Code-Review für den Pull Request basierend auf dem Diff. Bewerte:\n\n1. **Zusammenfassung** (Was macht dieser PR? 2-3 Sätze)\n2. **Risikobewertung** (LOW/MEDIUM/HIGH mit Begründung)\n3. **Stärken** (was ist gut gelöst?)\n4. **Kritische Probleme** (Bugs, Sicherheitslücken, Breaking Changes)\n5. **Verbesserungsvorschläge** (Style, Performance, Testabdeckung)\n6. **Empfehlung** (Approve / Request Changes / Needs Discussion)\n\nSei konkret: Zeilennummern und Dateinamen nennen wo sinnvoll."
+      "command" : {
+        "de" : "Erstelle ein strukturiertes Code-Review für den Pull Request basierend auf dem Diff. Bewerte:\n\n1. **Zusammenfassung** (Was macht dieser PR? 2-3 Sätze)\n2. **Risikobewertung** (LOW/MEDIUM/HIGH mit Begründung)\n3. **Stärken** (was ist gut gelöst?)\n4. **Kritische Probleme** (Bugs, Sicherheitslücken, Breaking Changes)\n5. **Verbesserungsvorschläge** (Style, Performance, Testabdeckung)\n6. **Empfehlung** (Approve / Request Changes / Needs Discussion)\n\nSei konkret: Zeilennummern und Dateinamen nennen wo sinnvoll.",
+        "en" : "Write a structured code review of the pull request based on the diff. Assess:\n\n1. **Summary** (What does this PR do? 2-3 sentences)\n2. **Risk assessment** (LOW/MEDIUM/HIGH with reasoning)\n3. **Strengths** (what is solved well?)\n4. **Critical issues** (bugs, security vulnerabilities, breaking changes)\n5. **Suggestions for improvement** (style, performance, test coverage)\n6. **Recommendation** (Approve / Request Changes / Needs Discussion)\n\nBe specific: name line numbers and file names where useful."
+      }
     },
     "requiredCapabilities" : [ ]
   } ]

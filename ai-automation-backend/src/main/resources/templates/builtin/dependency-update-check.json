@@ -1,5 +1,6 @@
 {
   "id" : "dependency-update-check",
+  "i18n" : [ "de", "en" ],
   "icon" : "\uD83D\uDCE6",
   "name" : {
     "en" : "Dependency Update Check",
@@ -11,9 +12,12 @@
   },
   "category" : "CODE",
   "sortOrder" : 28,
-  "version" : "1.0.0",
+  "version" : "1.1.0",
   "model" : null,
-  "instructions" : "Pruefe Abhaengigkeiten auf Updates und Sicherheitsluecken. Variablen: project_path, package_manager (npm/mvn/gradle).",
+  "instructions" : {
+    "de" : "Pruefe Abhaengigkeiten auf Updates und Sicherheitsluecken. Variablen: project_path, package_manager (npm/mvn/gradle).",
+    "en" : "Check dependencies for updates and security vulnerabilities. Variables: project_path, package_manager (npm/mvn/gradle)."
+  },
   "blocks" : [ {
     "type" : "shell",
     "config" : {

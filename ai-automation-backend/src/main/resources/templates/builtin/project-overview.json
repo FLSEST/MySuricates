@@ -1,5 +1,6 @@
 {
   "id" : "project-overview",
+  "i18n" : [ "de", "en" ],
   "icon" : "\uD83D\uDDC2️",
   "name" : {
     "en" : "Project Overview & Synthesis",
@@ -11,9 +12,12 @@
   },
   "category" : "CODE",
   "sortOrder" : 8,
-  "version" : "1.0.0",
+  "version" : "1.1.0",
   "model" : null,
-  "instructions" : "Erstelle eine umfassende Projektanalyse mit konkreten Empfehlungen.",
+  "instructions" : {
+    "de" : "Erstelle eine umfassende Projektanalyse mit konkreten Empfehlungen.",
+    "en" : "Create a comprehensive project analysis with concrete recommendations."
+  },
   "blocks" : [ {
     "type" : "simple",
     "config" : {
@@ -23,19 +27,28 @@
   }, {
     "type" : "simple",
     "config" : {
-      "command" : "Verschaffe dir einen Ueberblick ueber das Projekt. Lies die wichtigsten Dateien (README, Konfigurationsdateien, Hauptdateien). Beschreibe: 1) Zweck des Projekts 2) Struktur 3) Verwendete Technologien"
+      "command" : {
+        "de" : "Verschaffe dir einen Ueberblick ueber das Projekt. Lies die wichtigsten Dateien (README, Konfigurationsdateien, Hauptdateien). Beschreibe: 1) Zweck des Projekts 2) Struktur 3) Verwendete Technologien",
+        "en" : "Get an overview of the project. Read the most important files (README, configuration files, main files). Describe: 1) Purpose of the project 2) Structure 3) Technologies used"
+      }
     },
     "requiredCapabilities" : [ ]
   }, {
     "type" : "simple",
     "config" : {
-      "command" : "Analysiere die Projektqualitaet: Was ist gut umgesetzt? Wo gibt es Verbesserungspotenzial? Fehlt Dokumentation?"
+      "command" : {
+        "de" : "Analysiere die Projektqualitaet: Was ist gut umgesetzt? Wo gibt es Verbesserungspotenzial? Fehlt Dokumentation?",
+        "en" : "Analyze the project's quality: What is implemented well? Where is there room for improvement? Is documentation missing?"
+      }
     },
     "requiredCapabilities" : [ ]
   }, {
     "type" : "simple",
     "config" : {
-      "command" : "Erstelle eine strukturierte Zusammenfassung des Projekts mit konkreten Empfehlungen fuer naechste Schritte."
+      "command" : {
+        "de" : "Erstelle eine strukturierte Zusammenfassung des Projekts mit konkreten Empfehlungen fuer naechste Schritte.",
+        "en" : "Create a structured summary of the project with concrete recommendations for next steps."
+      }
     },
     "requiredCapabilities" : [ ]
   } ]

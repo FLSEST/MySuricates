@@ -1,19 +1,23 @@
 {
   "id" : "folder-backup",
   "icon" : "\uD83D\uDCBE",
+  "i18n" : [ "de", "en" ],
   "name" : {
     "en" : "Folder Backup (tar.gz)",
     "de" : "Ordner-Backup (tar.gz)"
   },
   "description" : {
-    "en" : "Backup multiple folders via shell into compressed archives with checksums",
+    "en" : "Back up multiple folders via shell into compressed archives with checksums",
     "de" : "Mehrere Ordner per Shell in komprimierte Archive sichern, inklusive Checksummen"
   },
   "category" : "DATA",
   "sortOrder" : 26,
-  "version" : "1.0.1",
+  "version" : "1.1.0",
   "model" : null,
-  "instructions" : "Sichere alle Unterordner des aktuellen Projektverzeichnisses (ausser backup) in komprimierte Tar-Archive mit Zeitstempel nach backup/. Keine KI-Beteiligung, reine Shell-Ausfuehrung.",
+  "instructions" : {
+    "de" : "Sichere alle Unterordner des aktuellen Projektverzeichnisses (ausser backup) in komprimierte Tar-Archive mit Zeitstempel nach backup/. Keine KI-Beteiligung, reine Shell-Ausfuehrung.",
+    "en" : "Back up all subfolders of the current project directory (except backup) into compressed, timestamped tar archives in backup/. No AI involvement, pure shell execution."
+  },
   "blocks" : [ {
     "type" : "shell",
     "config" : {
@@ -41,7 +45,10 @@
   }, {
     "type" : "simple",
     "config" : {
-      "command" : "Pruefe das Backup-Verzeichnis backup. Liste die erstellten Archive mit Groesse und Checksumme. Markiere, falls ein Ordner nicht gesichert wurde."
+      "command" : {
+        "de" : "Pruefe das Backup-Verzeichnis backup. Liste die erstellten Archive mit Groesse und Checksumme. Markiere, falls ein Ordner nicht gesichert wurde.",
+        "en" : "Check the backup directory backup. List the created archives with size and checksum. Flag any folder that was not backed up."
+      }
     },
     "requiredCapabilities" : [ ]
   } ]

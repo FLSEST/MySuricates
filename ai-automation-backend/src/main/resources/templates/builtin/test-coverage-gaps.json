@@ -1,5 +1,6 @@
 {
   "id": "test-coverage-gaps",
+  "i18n": ["de", "en"],
   "icon": "🧪",
   "name": {
     "en": "Test Coverage Gaps",
@@ -11,9 +12,12 @@
   },
   "category": "CODE",
   "sortOrder": 40,
-  "version": "1.0.0",
+  "version": "1.1.0",
   "model": "sonnet",
-  "instructions": "Identifiziert ungetestete Klassen, berechnet Coverage-Ratio und priorisiert Test-Luecken nach Kritikalitaet.",
+  "instructions": {
+    "de": "Identifiziert ungetestete Klassen, berechnet Coverage-Ratio und priorisiert Test-Luecken nach Kritikalitaet.",
+    "en": "Identifies untested classes, calculates the coverage ratio and prioritizes test gaps by criticality."
+  },
   "blocks": [
     {
       "type": "shell",
@@ -27,7 +31,10 @@
       "type": "simple",
       "config": {
         "timeout_seconds": 600,
-        "command": "Analysiere die Test-Coverage-Daten:\n\n{{ previous_output }}\n\nBewerte systematisch:\n1. **Ungetestete Services/Controller**: Welche Klassen mit Business-Logik haben KEINEN zugehoerigen Test? Priorisiere nach: Groesse (LOC), Komplexitaet (Anzahl public methods), Kritikalitaet (Controller > Service > Utility)\n2. **Duenne Tests**: Test-Dateien mit nur 1-2 Test-Methoden fuer grosse Klassen — wo ist die Test-Tiefe unzureichend?\n3. **Fehlende Test-Typen**: Gibt es nur Unit-Tests aber keine Integration-Tests? Fehlen Edge-Case-Tests?\n4. **Test-Qualitaet**: Tests die nur den Happy Path pruefen, fehlende Assertions, Test-Namen die nichts aussagen\n5. **Kritische Luecken**: Welche untesteten Bereiche stellen das groesste Risiko dar (Security, Datenpersistenz, externe Integrationen)?\n\nFuer jeden Fund: Datei, Schweregrad (CRITICAL/HIGH/MEDIUM/LOW), was genau getestet werden sollte."
+        "command": {
+          "de": "Analysiere die Test-Coverage-Daten:\n\n{{ previous_output }}\n\nBewerte systematisch:\n1. **Ungetestete Services/Controller**: Welche Klassen mit Business-Logik haben KEINEN zugehoerigen Test? Priorisiere nach: Groesse (LOC), Komplexitaet (Anzahl public methods), Kritikalitaet (Controller > Service > Utility)\n2. **Duenne Tests**: Test-Dateien mit nur 1-2 Test-Methoden fuer grosse Klassen — wo ist die Test-Tiefe unzureichend?\n3. **Fehlende Test-Typen**: Gibt es nur Unit-Tests aber keine Integration-Tests? Fehlen Edge-Case-Tests?\n4. **Test-Qualitaet**: Tests die nur den Happy Path pruefen, fehlende Assertions, Test-Namen die nichts aussagen\n5. **Kritische Luecken**: Welche untesteten Bereiche stellen das groesste Risiko dar (Security, Datenpersistenz, externe Integrationen)?\n\nFuer jeden Fund: Datei, Schweregrad (CRITICAL/HIGH/MEDIUM/LOW), was genau getestet werden sollte.",
+          "en": "Analyze the test coverage data:\n\n{{ previous_output }}\n\nAssess systematically:\n1. **Untested services/controllers**: Which classes with business logic have NO matching test? Prioritize by: size (LOC), complexity (number of public methods), criticality (Controller > Service > Utility)\n2. **Thin tests**: Test files with only 1-2 test methods for large classes — where is the test depth insufficient?\n3. **Missing test types**: Are there only unit tests but no integration tests? Are edge-case tests missing?\n4. **Test quality**: Tests that only check the happy path, missing assertions, test names that say nothing\n5. **Critical gaps**: Which untested areas pose the greatest risk (security, data persistence, external integrations)?\n\nFor each finding: file, severity (CRITICAL/HIGH/MEDIUM/LOW), what exactly should be tested."
+        }
       },
       "requiredCapabilities": []
     },
@@ -35,7 +42,10 @@
       "type": "simple",
       "config": {
         "timeout_seconds": 600,
-        "command": "Erstelle den Coverage-Gap-Report:\n\n{{ previous_output }}\n\n## Format:\n\n### Executive Summary\n- Gesamt-Coverage-Ratio (Dateien mit Tests / Gesamt)\n- Anzahl kritisch untesteter Klassen\n- Bewertung der Test-Qualitaet (1-10)\n\n### Coverage-Matrix\n| Modul/Package | Source Files | Test Files | Coverage | Kritischste Luecke |\n\n### Top-10 Prioritaeten\n| # | Datei | LOC | Schweregrad | Was testen | Geschaetzter Aufwand |\n\n### Quick Wins\nKleine Klassen/Utilities die mit wenig Aufwand getestet werden koennen.\n\n### Empfohlene Test-Strategie\nWelche Test-Typen (Unit, Integration, E2E) fuer welche Module priorisiert werden sollten."
+        "command": {
+          "de": "Erstelle den Coverage-Gap-Report:\n\n{{ previous_output }}\n\n## Format:\n\n### Executive Summary\n- Gesamt-Coverage-Ratio (Dateien mit Tests / Gesamt)\n- Anzahl kritisch untesteter Klassen\n- Bewertung der Test-Qualitaet (1-10)\n\n### Coverage-Matrix\n| Modul/Package | Source Files | Test Files | Coverage | Kritischste Luecke |\n\n### Top-10 Prioritaeten\n| # | Datei | LOC | Schweregrad | Was testen | Geschaetzter Aufwand |\n\n### Quick Wins\nKleine Klassen/Utilities die mit wenig Aufwand getestet werden koennen.\n\n### Empfohlene Test-Strategie\nWelche Test-Typen (Unit, Integration, E2E) fuer welche Module priorisiert werden sollten.",
+          "en": "Create the coverage gap report:\n\n{{ previous_output }}\n\n## Format:\n\n### Executive Summary\n- Overall coverage ratio (files with tests / total)\n- Number of critically untested classes\n- Rating of the test quality (1-10)\n\n### Coverage Matrix\n| Module/Package | Source Files | Test Files | Coverage | Most Critical Gap |\n\n### Top 10 Priorities\n| # | File | LOC | Severity | What to Test | Estimated Effort |\n\n### Quick Wins\nSmall classes/utilities that can be tested with little effort.\n\n### Recommended Test Strategy\nWhich test types (unit, integration, E2E) should be prioritized for which modules."
+        }
       },
       "requiredCapabilities": []
     },
@@ -43,7 +53,10 @@
       "type": "simple",
       "config": {
         "timeout_seconds": 300,
-        "command": "Wandle die Findings aus {{ previous_output }} in native TODO-Marker um. KEINE Dateien schreiben, KEINE API-Aufrufe, kein curl — nur Marker-Zeilen ausgeben; die Plattform legt die TODOs selbst an (AutoTodoService).\n\n## Bestehende offene TODOs (Duplikate vermeiden)\n{{ open_todos }}\n\n## Regeln\n- Pro umsetzbarem Finding genau eine Zeile im Format:\n  todo_item: <Titel im Imperativ> | <HIGH|MEDIUM|LOW> | <tag1,tag2> | <Kurzbeschreibung mit Fundstelle>\n- Maximal 10 todo_item-Zeilen, nur echte, umsetzbare Findings\n- Findings, die ein bestehendes offenes TODO bereits abdeckt, NICHT erneut ausgeben\n- Am Ende genau eine Zeile Gesamtbewertung:\n  gate_status: GREEN (keine Findings) | YELLOW (nur kleinere Findings) | RED (kritische Findings)"
+        "command": {
+          "de": "Wandle die Findings aus {{ previous_output }} in native TODO-Marker um. KEINE Dateien schreiben, KEINE API-Aufrufe, kein curl — nur Marker-Zeilen ausgeben; die Plattform legt die TODOs selbst an (AutoTodoService).\n\n## Bestehende offene TODOs (Duplikate vermeiden)\n{{ open_todos }}\n\n## Regeln\n- Pro umsetzbarem Finding genau eine Zeile im Format:\n  todo_item: <Titel im Imperativ> | <HIGH|MEDIUM|LOW> | <tag1,tag2> | <Kurzbeschreibung mit Fundstelle>\n- Maximal 10 todo_item-Zeilen, nur echte, umsetzbare Findings\n- Findings, die ein bestehendes offenes TODO bereits abdeckt, NICHT erneut ausgeben\n- Am Ende genau eine Zeile Gesamtbewertung:\n  gate_status: GREEN (keine Findings) | YELLOW (nur kleinere Findings) | RED (kritische Findings)",
+          "en": "Turn the findings from {{ previous_output }} into native TODO markers. Do NOT write any files, make NO API calls, no curl — only output marker lines; the platform creates the TODOs itself (AutoTodoService).\n\n## Existing open TODOs (avoid duplicates)\n{{ open_todos }}\n\n## Rules\n- For each actionable finding, exactly one line in the format:\n  todo_item: <title in the imperative> | <HIGH|MEDIUM|LOW> | <tag1,tag2> | <short description with location>\n- At most 10 todo_item lines, only real, actionable findings\n- Do NOT output again any finding that an existing open TODO already covers\n- At the end, exactly one line with the overall assessment:\n  gate_status: GREEN (no findings) | YELLOW (only minor findings) | RED (critical findings)"
+        }
       },
       "requiredCapabilities": []
     }

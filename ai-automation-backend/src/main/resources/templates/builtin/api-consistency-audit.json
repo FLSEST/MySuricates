@@ -1,5 +1,9 @@
 {
   "id": "api-consistency-audit",
+  "i18n": [
+    "de",
+    "en"
+  ],
   "icon": "🔍",
   "name": {
     "en": "API Consistency Audit",
@@ -11,9 +15,12 @@
   },
   "category": "CODE",
   "sortOrder": 35,
-  "version": "1.1.0",
+  "version": "1.2.0",
   "model": "sonnet",
-  "instructions": "Prueft REST-APIs auf Konsistenz: Namenskonventionen, DTOs vs Maps, Pagination, Response-Wrapper, Fehlerbehandlung.",
+  "instructions": {
+    "de": "Prueft REST-APIs auf Konsistenz: Namenskonventionen, DTOs vs Maps, Pagination, Response-Wrapper, Fehlerbehandlung.",
+    "en": "Checks REST APIs for consistency: naming conventions, DTOs vs. maps, pagination, response wrappers, error handling."
+  },
   "blocks": [
     {
       "type": "shell",
@@ -27,7 +34,10 @@
       "type": "simple",
       "config": {
         "timeout_seconds": 600,
-        "command": "Analysiere die gesammelten API-Daten:\n\n{{ previous_output }}\n\nPruefe systematisch:\n1. **Namenskonventionen**: Sind Endpunkt-Pfade konsistent (kebab-case vs camelCase vs snake_case)? HTTP-Methoden korrekt (GET=lesen, POST=erstellen, PUT=ersetzen, PATCH=teilupdate, DELETE=loeschen)?\n2. **DTOs vs Maps**: Welche Endpunkte geben Map<String,Object> oder aehnliche untypisierte Strukturen zurueck statt dedizierter DTOs/Response-Klassen?\n3. **Pagination**: Welche Listen-Endpunkte (die Collections zurueckgeben) haben KEINE Pagination? Gibt es ein einheitliches Pagination-Pattern?\n4. **Response-Wrapper**: Gibt es ein einheitliches Response-Format oder mischt der Code nackte Entities mit gewrappten Responses?\n5. **Fehlerbehandlung**: Gibt es einen zentralen ExceptionHandler? Sind Error-Responses konsistent strukturiert (error code, message, details)?\n6. **Fehlende REST-Patterns**: HATEOAS-Links, Versionierung, Content-Type-Handling?\n\nListe jeden Fund mit Datei:Zeile, Schweregrad (CRITICAL/HIGH/MEDIUM/LOW) und konkretem Verbesserungsvorschlag."
+        "command": {
+          "de": "Analysiere die gesammelten API-Daten:\n\n{{ previous_output }}\n\nPruefe systematisch:\n1. **Namenskonventionen**: Sind Endpunkt-Pfade konsistent (kebab-case vs camelCase vs snake_case)? HTTP-Methoden korrekt (GET=lesen, POST=erstellen, PUT=ersetzen, PATCH=teilupdate, DELETE=loeschen)?\n2. **DTOs vs Maps**: Welche Endpunkte geben Map<String,Object> oder aehnliche untypisierte Strukturen zurueck statt dedizierter DTOs/Response-Klassen?\n3. **Pagination**: Welche Listen-Endpunkte (die Collections zurueckgeben) haben KEINE Pagination? Gibt es ein einheitliches Pagination-Pattern?\n4. **Response-Wrapper**: Gibt es ein einheitliches Response-Format oder mischt der Code nackte Entities mit gewrappten Responses?\n5. **Fehlerbehandlung**: Gibt es einen zentralen ExceptionHandler? Sind Error-Responses konsistent strukturiert (error code, message, details)?\n6. **Fehlende REST-Patterns**: HATEOAS-Links, Versionierung, Content-Type-Handling?\n\nListe jeden Fund mit Datei:Zeile, Schweregrad (CRITICAL/HIGH/MEDIUM/LOW) und konkretem Verbesserungsvorschlag.",
+          "en": "Analyze the collected API data:\n\n{{ previous_output }}\n\nCheck systematically:\n1. **Naming conventions**: Are the endpoint paths consistent (kebab-case vs camelCase vs snake_case)? Are the HTTP methods correct (GET=read, POST=create, PUT=replace, PATCH=partial update, DELETE=delete)?\n2. **DTOs vs maps**: Which endpoints return Map<String,Object> or similar untyped structures instead of dedicated DTOs/response classes?\n3. **Pagination**: Which list endpoints (those that return collections) have NO pagination? Is there a uniform pagination pattern?\n4. **Response wrappers**: Is there a uniform response format, or does the code mix bare entities with wrapped responses?\n5. **Error handling**: Is there a central ExceptionHandler? Are error responses structured consistently (error code, message, details)?\n6. **Missing REST patterns**: HATEOAS links, versioning, content-type handling?\n\nList every finding with file:line, severity (CRITICAL/HIGH/MEDIUM/LOW) and a concrete improvement proposal."
+        }
       },
       "requiredCapabilities": []
     },
@@ -35,7 +45,10 @@
       "type": "simple",
       "config": {
         "timeout_seconds": 600,
-        "command": "Erstelle aus der Analyse einen strukturierten Report:\n\n{{ previous_output }}\n\n## Format:\n\n### Executive Summary\n- Gesamtbewertung der API-Konsistenz (1-10)\n- Anzahl Findings pro Schweregrad\n\n### Findings-Tabelle\n| # | Schweregrad | Kategorie | Datei:Zeile | Problem | Empfehlung |\n\n### Aktionsplan\nPriorisierte Liste von Verbesserungen, gruppiert nach Aufwand (Quick Wins / Mittelfristig / Langfristig).\n\nHalte den Report kompakt und actionable."
+        "command": {
+          "de": "Erstelle aus der Analyse einen strukturierten Report:\n\n{{ previous_output }}\n\n## Format:\n\n### Executive Summary\n- Gesamtbewertung der API-Konsistenz (1-10)\n- Anzahl Findings pro Schweregrad\n\n### Findings-Tabelle\n| # | Schweregrad | Kategorie | Datei:Zeile | Problem | Empfehlung |\n\n### Aktionsplan\nPriorisierte Liste von Verbesserungen, gruppiert nach Aufwand (Quick Wins / Mittelfristig / Langfristig).\n\nHalte den Report kompakt und actionable.",
+          "en": "Turn the analysis into a structured report:\n\n{{ previous_output }}\n\n## Format:\n\n### Executive Summary\n- Overall rating of the API consistency (1-10)\n- Number of findings per severity\n\n### Findings table\n| # | Severity | Category | File:Line | Problem | Recommendation |\n\n### Action plan\nPrioritized list of improvements, grouped by effort (quick wins / medium term / long term).\n\nKeep the report compact and actionable."
+        }
       },
       "requiredCapabilities": []
     },
@@ -43,7 +56,10 @@
       "type": "simple",
       "config": {
         "timeout_seconds": 300,
-        "command": "Wandle die Findings aus {{ previous_output }} in native TODO-Marker um. KEINE Dateien schreiben, KEINE API-Aufrufe, kein curl — nur Marker-Zeilen ausgeben; die Plattform legt die TODOs selbst an (AutoTodoService).\n\n## Bestehende offene TODOs (Duplikate vermeiden)\n{{ open_todos }}\n\n## Regeln\n- Pro umsetzbarem Finding genau eine Zeile im Format:\n  todo_item: <Titel im Imperativ> | <HIGH|MEDIUM|LOW> | <tag1,tag2> | <Kurzbeschreibung mit Fundstelle>\n- Maximal 10 todo_item-Zeilen, nur echte, umsetzbare Findings\n- Findings, die ein bestehendes offenes TODO bereits abdeckt, NICHT erneut ausgeben\n- Am Ende genau eine Zeile Gesamtbewertung:\n  gate_status: GREEN (keine Findings) | YELLOW (nur kleinere Findings) | RED (kritische Findings)"
+        "command": {
+          "de": "Wandle die Findings aus {{ previous_output }} in native TODO-Marker um. KEINE Dateien schreiben, KEINE API-Aufrufe, kein curl — nur Marker-Zeilen ausgeben; die Plattform legt die TODOs selbst an (AutoTodoService).\n\n## Bestehende offene TODOs (Duplikate vermeiden)\n{{ open_todos }}\n\n## Regeln\n- Pro umsetzbarem Finding genau eine Zeile im Format:\n  todo_item: <Titel im Imperativ> | <HIGH|MEDIUM|LOW> | <tag1,tag2> | <Kurzbeschreibung mit Fundstelle>\n- Maximal 10 todo_item-Zeilen, nur echte, umsetzbare Findings\n- Findings, die ein bestehendes offenes TODO bereits abdeckt, NICHT erneut ausgeben\n- Am Ende genau eine Zeile Gesamtbewertung:\n  gate_status: GREEN (keine Findings) | YELLOW (nur kleinere Findings) | RED (kritische Findings)",
+          "en": "Convert the findings from {{ previous_output }} into native TODO markers. Do NOT write any files, make NO API calls, no curl — only output marker lines; the platform creates the TODOs itself (AutoTodoService).\n\n## Existing open TODOs (avoid duplicates)\n{{ open_todos }}\n\n## Rules\n- Exactly one line per actionable finding, in the format:\n  todo_item: <title in the imperative> | <HIGH|MEDIUM|LOW> | <tag1,tag2> | <short description with location>\n- At most 10 todo_item lines, only real, actionable findings\n- Do NOT output findings that an existing open TODO already covers\n- At the end, exactly one line with the overall rating:\n  gate_status: GREEN (no findings) | YELLOW (only minor findings) | RED (critical findings)"
+        }
       },
       "requiredCapabilities": []
     }

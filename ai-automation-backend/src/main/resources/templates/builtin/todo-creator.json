@@ -1,25 +1,32 @@
 {
   "id": "todo-creator",
+  "i18n": ["de", "en"],
   "icon": "✅",
   "name": {
     "en": "TODO Creator",
     "de": "TODO-Creator"
   },
   "description": {
-    "en": "Decompose task description into atomic TODOs and create via API",
+    "en": "Break a task description down into atomic TODOs and create them via the API",
     "de": "Aufgabenbeschreibung in atomare TODOs zerlegen und via API anlegen"
   },
   "category": "TRANSFORM",
   "sortOrder": 42,
-  "version": "1.0.0",
+  "version": "1.1.0",
   "model": null,
-  "instructions": "Zerlege Aufgabenbeschreibungen in atomare TODOs und lege sie automatisch via API an. Variablen: task_description (Aufgabe), project_context (Kontext), project_id (Ziel-Projekt-ID).",
+  "instructions": {
+    "de": "Zerlege Aufgabenbeschreibungen in atomare TODOs und lege sie automatisch via API an. Variablen: task_description (Aufgabe), project_context (Kontext), project_id (Ziel-Projekt-ID).",
+    "en": "Break task descriptions down into atomic TODOs and create them automatically via the API. Variables: task_description (task), project_context (context), project_id (target project ID)."
+  },
   "blocks": [
     {
       "type": "simple",
       "config": {
         "timeout_seconds": 600,
-        "command": "Analysiere die folgende Aufgabe und zerlege sie in atomare, umsetzbare Teilschritte.\n\n## Aufgabe\n{{ task_description }}\n\n## Projektkontext\n{{ project_context }}\n\nErstelle fuer jeden Teilschritt:\n- **title**: Kurzer Titel im Imperativ (z.B. 'API-Endpunkt fuer User-Export implementieren')\n- **description**: Markdown mit Kontext, Akzeptanzkriterien, technischen Hinweisen\n- **priority**: HIGH (blockierend/kritisch), MEDIUM (bald noetig), LOW (nice-to-have)\n- **tags**: Passende Tags aus: backend, frontend, architektur, security, performance, ux, ui, feature, bug, testing, documentation\n\nRegeln:\n- Jedes TODO muss in sich abgeschlossen und unabhaengig umsetzbar sein\n- Abhaengigkeiten zwischen TODOs in der Description erwaehnen\n- Realistische Priorisierung — nicht alles ist HIGH\n- Maximal 10 TODOs pro Aufgabe\n\nAntworte als JSON-Array:\n```json\n[{\"title\": \"...\", \"description\": \"...\", \"priority\": \"HIGH|MEDIUM|LOW\", \"tags\": [\"...\"]}]\n```"
+        "command": {
+          "de": "Analysiere die folgende Aufgabe und zerlege sie in atomare, umsetzbare Teilschritte.\n\n## Aufgabe\n{{ task_description }}\n\n## Projektkontext\n{{ project_context }}\n\nErstelle fuer jeden Teilschritt:\n- **title**: Kurzer Titel im Imperativ (z.B. 'API-Endpunkt fuer User-Export implementieren')\n- **description**: Markdown mit Kontext, Akzeptanzkriterien, technischen Hinweisen\n- **priority**: HIGH (blockierend/kritisch), MEDIUM (bald noetig), LOW (nice-to-have)\n- **tags**: Passende Tags aus: backend, frontend, architektur, security, performance, ux, ui, feature, bug, testing, documentation\n\nRegeln:\n- Jedes TODO muss in sich abgeschlossen und unabhaengig umsetzbar sein\n- Abhaengigkeiten zwischen TODOs in der Description erwaehnen\n- Realistische Priorisierung — nicht alles ist HIGH\n- Maximal 10 TODOs pro Aufgabe\n\nAntworte als JSON-Array:\n```json\n[{\"title\": \"...\", \"description\": \"...\", \"priority\": \"HIGH|MEDIUM|LOW\", \"tags\": [\"...\"]}]\n```",
+          "en": "Analyze the following task and break it down into atomic, actionable sub-steps.\n\n## Task\n{{ task_description }}\n\n## Project context\n{{ project_context }}\n\nFor each sub-step, create:\n- **title**: Short title in the imperative (e.g. 'Implement API endpoint for user export')\n- **description**: Markdown with context, acceptance criteria, technical notes\n- **priority**: HIGH (blocking/critical), MEDIUM (needed soon), LOW (nice-to-have)\n- **tags**: Suitable tags from: backend, frontend, architecture, security, performance, ux, ui, feature, bug, testing, documentation\n\nRules:\n- Each TODO must be self-contained and implementable on its own\n- Mention dependencies between TODOs in the description\n- Realistic prioritization — not everything is HIGH\n- At most 10 TODOs per task\n\nAnswer as a JSON array:\n```json\n[{\"title\": \"...\", \"description\": \"...\", \"priority\": \"HIGH|MEDIUM|LOW\", \"tags\": [\"...\"]}]\n```"
+        }
       },
       "requiredCapabilities": []
     },
@@ -27,7 +34,10 @@
       "type": "simple",
       "config": {
         "timeout_seconds": 300,
-        "command": "Wandle die Findings aus {{ previous_output }} in native TODO-Marker um. KEINE Dateien schreiben, KEINE API-Aufrufe, kein curl — nur Marker-Zeilen ausgeben; die Plattform legt die TODOs selbst an (AutoTodoService).\n\n## Bestehende offene TODOs (Duplikate vermeiden)\n{{ open_todos }}\n\n## Regeln\n- Pro umsetzbarem Finding genau eine Zeile im Format:\n  todo_item: <Titel im Imperativ> | <HIGH|MEDIUM|LOW> | <tag1,tag2> | <Kurzbeschreibung mit Fundstelle>\n- Maximal 10 todo_item-Zeilen, nur echte, umsetzbare Findings\n- Findings, die ein bestehendes offenes TODO bereits abdeckt, NICHT erneut ausgeben\n- Am Ende genau eine Zeile Gesamtbewertung:\n  gate_status: GREEN (keine Findings) | YELLOW (nur kleinere Findings) | RED (kritische Findings)"
+        "command": {
+          "de": "Wandle die Findings aus {{ previous_output }} in native TODO-Marker um. KEINE Dateien schreiben, KEINE API-Aufrufe, kein curl — nur Marker-Zeilen ausgeben; die Plattform legt die TODOs selbst an (AutoTodoService).\n\n## Bestehende offene TODOs (Duplikate vermeiden)\n{{ open_todos }}\n\n## Regeln\n- Pro umsetzbarem Finding genau eine Zeile im Format:\n  todo_item: <Titel im Imperativ> | <HIGH|MEDIUM|LOW> | <tag1,tag2> | <Kurzbeschreibung mit Fundstelle>\n- Maximal 10 todo_item-Zeilen, nur echte, umsetzbare Findings\n- Findings, die ein bestehendes offenes TODO bereits abdeckt, NICHT erneut ausgeben\n- Am Ende genau eine Zeile Gesamtbewertung:\n  gate_status: GREEN (keine Findings) | YELLOW (nur kleinere Findings) | RED (kritische Findings)",
+          "en": "Turn the findings from {{ previous_output }} into native TODO markers. Do NOT write any files, make NO API calls, no curl — only output marker lines; the platform creates the TODOs itself (AutoTodoService).\n\n## Existing open TODOs (avoid duplicates)\n{{ open_todos }}\n\n## Rules\n- For each actionable finding, exactly one line in the format:\n  todo_item: <title in the imperative> | <HIGH|MEDIUM|LOW> | <tag1,tag2> | <short description with location>\n- At most 10 todo_item lines, only real, actionable findings\n- Do NOT output again any finding that an existing open TODO already covers\n- At the end, exactly one line with the overall assessment:\n  gate_status: GREEN (no findings) | YELLOW (only minor findings) | RED (critical findings)"
+        }
       },
       "requiredCapabilities": []
     },
@@ -35,7 +45,10 @@
       "type": "simple",
       "config": {
         "timeout_seconds": 300,
-        "command": "Erstelle eine Zusammenfassung der angelegten TODOs basierend auf {{ previous_output }}.\n\nFormat:\n## TODO-Creator Ergebnis\n\n**Anzahl angelegte TODOs:** X\n\n| # | Titel | Prioritaet | Tags |\n|---|-------|-----------|------|\n| 1 | ... | HIGH/MEDIUM/LOW | ... |\n\nFasse kurz zusammen, welche Bereiche abgedeckt sind und ob Abhaengigkeiten beachtet werden muessen."
+        "command": {
+          "de": "Erstelle eine Zusammenfassung der angelegten TODOs basierend auf {{ previous_output }}.\n\nFormat:\n## TODO-Creator Ergebnis\n\n**Anzahl angelegte TODOs:** X\n\n| # | Titel | Prioritaet | Tags |\n|---|-------|-----------|------|\n| 1 | ... | HIGH/MEDIUM/LOW | ... |\n\nFasse kurz zusammen, welche Bereiche abgedeckt sind und ob Abhaengigkeiten beachtet werden muessen.",
+          "en": "Write a summary of the created TODOs based on {{ previous_output }}.\n\nFormat:\n## TODO Creator Result\n\n**Number of TODOs created:** X\n\n| # | Title | Priority | Tags |\n|---|-------|----------|------|\n| 1 | ... | HIGH/MEDIUM/LOW | ... |\n\nBriefly summarize which areas are covered and whether dependencies need to be considered."
+        }
       },
       "requiredCapabilities": []
     }

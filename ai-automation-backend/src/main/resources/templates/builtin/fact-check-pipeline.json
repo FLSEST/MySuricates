@@ -1,6 +1,7 @@
 {
   "id" : "fact-check-pipeline",
   "icon" : "✅",
+  "i18n" : [ "de", "en" ],
   "name" : {
     "en" : "Fact-Check Pipeline",
     "de" : "Faktencheck-Pipeline"
@@ -11,33 +12,54 @@
   },
   "category" : "RESEARCH",
   "sortOrder" : 9,
-  "version" : "1.0.0",
+  "version" : "1.1.0",
   "model" : null,
-  "instructions" : "Pruefe alle Fakten sorgfaeltig und erstelle bei Fehlern einen detaillierten Korrekturbericht.",
+  "instructions" : {
+    "de" : "Pruefe alle Fakten sorgfaeltig und erstelle bei Fehlern einen detaillierten Korrekturbericht.",
+    "en" : "Check all facts carefully and, if there are errors, write a detailed correction report."
+  },
   "blocks" : [ {
     "type" : "simple",
     "config" : {
-      "command" : "Lies die Datei {{ filepath }} und gib den Inhalt aus."
+      "command" : {
+        "de" : "Lies die Datei {{ filepath }} und gib den Inhalt aus.",
+        "en" : "Read the file {{ filepath }} and output its content."
+      }
     },
     "requiredCapabilities" : [ ]
   }, {
     "type" : "simple",
     "config" : {
-      "command" : "Extrahiere alle faktischen Behauptungen, Zahlen und Statistiken. Nummeriere jede Behauptung."
+      "command" : {
+        "de" : "Extrahiere alle faktischen Behauptungen, Zahlen und Statistiken. Nummeriere jede Behauptung.",
+        "en" : "Extract all factual claims, figures and statistics. Number each claim."
+      }
     },
     "requiredCapabilities" : [ ]
   }, {
     "type" : "simple",
     "config" : {
-      "command" : "Pruefe jede Behauptung. Markiere als KORREKT, UNKLAR oder FALSCH mit Begruendung."
+      "command" : {
+        "de" : "Pruefe jede Behauptung. Markiere als KORREKT, UNKLAR oder FALSCH mit Begruendung.",
+        "en" : "Check each claim. Mark it as CORRECT, UNCLEAR or FALSE, with a reason."
+      }
     },
     "requiredCapabilities" : [ ]
   }, {
     "type" : "conditional",
     "config" : {
-      "else_command" : "echo \"Alle Fakten geprueft - keine Fehler gefunden.\"",
-      "condition" : "Basierend auf folgendem Pruefergebnis:\n{{ previous_output }}\n\nWurden Behauptungen als FALSCH oder UNKLAR markiert? Antworte nur mit true oder false.",
-      "then_command" : "Erstelle einen Korrekturbericht mit den richtigen Informationen fuer jede fehlerhafte Behauptung."
+      "else_command" : {
+        "de" : "echo \"Alle Fakten geprueft - keine Fehler gefunden.\"",
+        "en" : "echo \"All facts checked - no errors found.\""
+      },
+      "condition" : {
+        "de" : "Basierend auf folgendem Pruefergebnis:\n{{ previous_output }}\n\nWurden Behauptungen als FALSCH oder UNKLAR markiert? Antworte nur mit true oder false.",
+        "en" : "Based on the following check result:\n{{ previous_output }}\n\nWere any claims marked FALSE or UNCLEAR? Answer only with true or false."
+      },
+      "then_command" : {
+        "de" : "Erstelle einen Korrekturbericht mit den richtigen Informationen fuer jede fehlerhafte Behauptung.",
+        "en" : "Write a correction report with the correct information for each incorrect claim."
+      }
     },
     "requiredCapabilities" : [ ]
   } ]

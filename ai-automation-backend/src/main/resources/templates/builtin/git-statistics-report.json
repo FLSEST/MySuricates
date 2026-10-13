@@ -1,6 +1,7 @@
 {
   "id" : "git-statistics-report",
   "icon" : "\uD83D\uDCC8",
+  "i18n" : [ "de", "en" ],
   "name" : {
     "en" : "Git Statistics Report",
     "de" : "Git-Statistik-Report"
@@ -11,9 +12,12 @@
   },
   "category" : "CODE",
   "sortOrder" : 32,
-  "version" : "1.0.1",
+  "version" : "1.1.0",
   "model" : null,
-  "instructions" : "Erstelle einen Git-Statistik-Report. Variablen: project_path, since (z.B. '3 months ago').",
+  "instructions" : {
+    "de" : "Erstelle einen Git-Statistik-Report. Variablen: project_path, since (z.B. '3 months ago').",
+    "en" : "Create a Git statistics report. Variables: project_path, since (e.g. '3 months ago')."
+  },
   "blocks" : [ {
     "type" : "shell",
     "config" : {

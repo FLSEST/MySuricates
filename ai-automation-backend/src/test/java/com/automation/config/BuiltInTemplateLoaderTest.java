@@ -75,23 +75,13 @@ class BuiltInTemplateLoaderTest {
     }
 
     /**
-     * Templates bilingual in their steps, each for a reason. {@code goal-guard} (TODO 259f4f66) is
-     * installed by the platform itself (goal page switch) in the UI language, so its step names and
-     * tile labels come in both languages; everything else ships single-language.
+     * Every shipped template and blueprint is bilingual in its steps (TODO 82f16b41): a workflow created from it
+     * comes in the UI language. A new template without the marker would hand English users German steps.
      */
-    static final java.util.Set<String> BILINGUAL_TEMPLATES = java.util.Set.of("goal-guard");
-
     @Test
-    void templatesAreSingleLanguage_blueprintsBilingual() {
-        assertThat(templates.stream().filter(t -> t.getKind() == TemplateKind.TEMPLATE)
-                        .filter(t -> !BILINGUAL_TEMPLATES.contains(t.getId())))
-                .allSatisfy(t -> assertThat(t.getI18nSource()).as(t.getId()).isNull());
-        assertThat(templates.stream().filter(t -> BILINGUAL_TEMPLATES.contains(t.getId())))
-                .as("every listed bilingual template ships and carries its source")
-                .hasSize(BILINGUAL_TEMPLATES.size())
-                .allSatisfy(t -> assertThat(t.getI18nSource()).as(t.getId()).isNotBlank());
-        assertThat(templates.stream().filter(t -> t.getKind() == TemplateKind.BLUEPRINT))
-                .allSatisfy(t -> assertThat(t.getI18nSource()).as(t.getId()).isNotBlank());
+    void templatesAndBlueprints_areBilingual() {
+        assertThat(templates).as("shipped templates and blueprints").isNotEmpty();
+        assertThat(templates).allSatisfy(t -> assertThat(t.getI18nSource()).as(t.getId()).isNotBlank());
     }
 
     @Test

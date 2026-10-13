@@ -1,5 +1,6 @@
 {
   "id" : "topic-deep-dive",
+  "i18n" : [ "de", "en" ],
   "icon" : "\uD83D\uDCA1",
   "name" : {
     "en" : "Topic Deep Dive",
@@ -11,9 +12,12 @@
   },
   "category" : "RESEARCH",
   "sortOrder" : 12,
-  "version" : "1.0.0",
+  "version" : "1.1.0",
   "model" : null,
-  "instructions" : "Recherchiere das Thema im Projektkontext und erstelle einen fundierten, strukturierten Report.",
+  "instructions" : {
+    "de" : "Recherchiere das Thema im Projektkontext und erstelle einen fundierten, strukturierten Report.",
+    "en" : "Research the topic in the context of the project and create a well-founded, structured report."
+  },
   "blocks" : [ {
     "type" : "simple",
     "config" : {
@@ -23,19 +27,28 @@
   }, {
     "type" : "simple",
     "config" : {
-      "command" : "Schau dir das Projekt an und recherchiere das Thema \"{{ topic }}\" im Kontext dieses Projekts. Identifiziere die wichtigsten Aspekte und aktuelle Entwicklungen."
+      "command" : {
+        "de" : "Schau dir das Projekt an und recherchiere das Thema \"{{ topic }}\" im Kontext dieses Projekts. Identifiziere die wichtigsten Aspekte und aktuelle Entwicklungen.",
+        "en" : "Look at the project and research the topic \"{{ topic }}\" in the context of this project. Identify the most important aspects and current developments."
+      }
     },
     "requiredCapabilities" : [ ]
   }, {
     "type" : "simple",
     "config" : {
-      "command" : "Erstelle eine detaillierte Gliederung fuer einen Report zu diesem Thema."
+      "command" : {
+        "de" : "Erstelle eine detaillierte Gliederung fuer einen Report zu diesem Thema.",
+        "en" : "Create a detailed outline for a report on this topic."
+      }
     },
     "requiredCapabilities" : [ ]
   }, {
     "type" : "simple",
     "config" : {
-      "command" : "Schreibe den vollstaendigen Report. Jeder Abschnitt soll fundiert und gut strukturiert sein. Fuege am Ende ein Quellenverzeichnis hinzu."
+      "command" : {
+        "de" : "Schreibe den vollstaendigen Report. Jeder Abschnitt soll fundiert und gut strukturiert sein. Fuege am Ende ein Quellenverzeichnis hinzu.",
+        "en" : "Write the complete report. Each section should be well-founded and well structured. Add a list of sources at the end."
+      }
     },
     "requiredCapabilities" : [ ]
   } ]

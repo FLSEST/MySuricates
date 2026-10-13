@@ -1,5 +1,6 @@
 {
   "id" : "document-review",
+  "i18n" : [ "de", "en" ],
   "icon" : "\uD83D\uDCC4",
   "name" : {
     "en" : "Document Review",
@@ -11,9 +12,12 @@
   },
   "category" : "CONTENT",
   "sortOrder" : 1,
-  "version" : "1.0.0",
+  "version" : "1.1.0",
   "model" : null,
-  "instructions" : "Pruefe das Dokument gruendlich. Achte auf Grammatik, Fakten und erstelle eine praegnante Zusammenfassung.",
+  "instructions" : {
+    "de" : "Pruefe das Dokument gruendlich. Achte auf Grammatik, Fakten und erstelle eine praegnante Zusammenfassung.",
+    "en" : "Review the document thoroughly. Pay attention to grammar and facts, and write a concise summary."
+  },
   "blocks" : [ {
     "type" : "skill-capability",
     "config" : {
