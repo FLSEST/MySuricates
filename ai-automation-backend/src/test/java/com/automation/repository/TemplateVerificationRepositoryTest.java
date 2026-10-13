@@ -63,6 +63,23 @@ class TemplateVerificationRepositoryTest {
     }
 
     @Test
+    void findByTemplateIdIn_returnsTheVerificationsOfEveryGivenTemplateOnly() {
+        String first = saveTemplate().getId();
+        String second = saveTemplate().getId();
+        String other = saveTemplate().getId();
+        TemplateVerification a = persistVerification(first, saveProject().getId());
+        TemplateVerification b = persistVerification(first, saveProject().getId());
+        TemplateVerification c = persistVerification(second, saveProject().getId());
+        persistVerification(other, saveProject().getId());
+
+        List<TemplateVerification> found = repository.findByTemplateIdIn(
+                List.of(first, second, "missing-" + System.nanoTime()));
+
+        assertThat(found).extracting(TemplateVerification::getId)
+                .containsExactlyInAnyOrder(a.getId(), b.getId(), c.getId());
+    }
+
+    @Test
     void findByTemplateIdAndProjectId_returnsVerification_whenBothMatch() {
         String templateId = saveTemplate().getId();
         String projectId = saveProject().getId();

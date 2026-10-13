@@ -66,40 +66,42 @@ public class TemplateVerificationService {
 
     @Transactional(readOnly = true)
     public WorkflowTemplateResponse enrichWithVerifications(WorkflowTemplateResponse response) {
-        Map<String, String> projectNames = projectRepository.findAll().stream()
-                .collect(Collectors.toMap(p -> p.getId(), p -> p.getName(), (a, b) -> a));
+        return response.withVerifications(toInfos(getVerifications(response.id()), projectNames()));
+    }
 
-        List<TemplateVerification> verifications = getVerifications(response.id());
-        List<TemplateVerificationInfo> infos = verifications.stream()
+    @Transactional(readOnly = true)
+    public List<WorkflowTemplateResponse> enrichAllWithVerifications(List<WorkflowTemplateResponse> responses) {
+        if (responses.isEmpty()) {
+            return List.of();
+        }
+        Map<String, String> projectNames = projectNames();
+        // One query for the whole list instead of one per template: with a single pooled connection
+        // the per-template queries ran one after another.
+        List<String> templateIds = responses.stream().map(WorkflowTemplateResponse::id).distinct().toList();
+        Map<String, List<TemplateVerification>> byTemplate = verificationRepository.findByTemplateIdIn(templateIds)
+                .stream()
+                .collect(Collectors.groupingBy(TemplateVerification::getTemplateId));
+
+        return responses.stream()
+                .map(response -> response.withVerifications(
+                        toInfos(byTemplate.getOrDefault(response.id(), List.of()), projectNames)))
+                .toList();
+    }
+
+    private Map<String, String> projectNames() {
+        return projectRepository.findAll().stream()
+                .collect(Collectors.toMap(p -> p.getId(), p -> p.getName(), (a, b) -> a));
+    }
+
+    private static List<TemplateVerificationInfo> toInfos(List<TemplateVerification> verifications,
+                                                          Map<String, String> projectNames) {
+        return verifications.stream()
                 .map(v -> new TemplateVerificationInfo(
                         v.getProjectId(),
                         projectNames.getOrDefault(v.getProjectId(), "Unknown"),
                         v.getLastRunId(),
                         v.getVerifiedAt()
                 ))
-                .toList();
-
-        return response.withVerifications(infos);
-    }
-
-    @Transactional(readOnly = true)
-    public List<WorkflowTemplateResponse> enrichAllWithVerifications(List<WorkflowTemplateResponse> responses) {
-        Map<String, String> projectNames = projectRepository.findAll().stream()
-                .collect(Collectors.toMap(p -> p.getId(), p -> p.getName(), (a, b) -> a));
-
-        return responses.stream()
-                .map(response -> {
-                    List<TemplateVerification> verifications = getVerifications(response.id());
-                    List<TemplateVerificationInfo> infos = verifications.stream()
-                            .map(v -> new TemplateVerificationInfo(
-                                    v.getProjectId(),
-                                    projectNames.getOrDefault(v.getProjectId(), "Unknown"),
-                                    v.getLastRunId(),
-                                    v.getVerifiedAt()
-                            ))
-                            .toList();
-                    return response.withVerifications(infos);
-                })
                 .toList();
     }
 }

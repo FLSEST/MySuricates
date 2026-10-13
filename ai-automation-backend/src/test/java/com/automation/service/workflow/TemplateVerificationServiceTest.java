@@ -15,6 +15,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.Instant;
+import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -202,8 +203,7 @@ class TemplateVerificationServiceTest {
                 .templateId("tpl-1").projectId("p1").lastRunId("r1").verifiedAt(Instant.now()).build();
         TemplateVerification v2 = TemplateVerification.builder()
                 .templateId("tpl-2").projectId("p1").lastRunId("r2").verifiedAt(Instant.now()).build();
-        when(verificationRepository.findByTemplateId("tpl-1")).thenReturn(List.of(v1));
-        when(verificationRepository.findByTemplateId("tpl-2")).thenReturn(List.of(v2));
+        when(verificationRepository.findByTemplateIdIn(anyCollection())).thenReturn(List.of(v1, v2));
 
         Instant now = Instant.now();
         var resp1 = new WorkflowTemplateResponse("tpl-1", Map.of("de", "T1"), Map.of(), "i", "c",
@@ -220,8 +220,52 @@ class TemplateVerificationServiceTest {
     }
 
     @Test
+    void enrichAllWithVerifications_loadsEveryTemplateInOneQueryWithTheSameResultAsOneByOne() {
+        Project project = new Project();
+        project.setId("p1");
+        project.setName("MyProject");
+        when(projectRepository.findAll()).thenReturn(List.of(project));
+
+        Instant at = Instant.parse("2026-10-01T10:00:00Z");
+        TemplateVerification first = TemplateVerification.builder()
+                .templateId("tpl-1").projectId("p1").lastRunId("r1").verifiedAt(at).build();
+        TemplateVerification second = TemplateVerification.builder()
+                .templateId("tpl-1").projectId("gone").lastRunId("r2").verifiedAt(at.plusSeconds(60)).build();
+        TemplateVerification third = TemplateVerification.builder()
+                .templateId("tpl-3").projectId("p1").lastRunId("r3").verifiedAt(at.plusSeconds(120)).build();
+        // tpl-2 has no verification at all
+        when(verificationRepository.findByTemplateIdIn(anyCollection())).thenReturn(List.of(first, third, second));
+        when(verificationRepository.findByTemplateId("tpl-1")).thenReturn(List.of(first, second));
+        when(verificationRepository.findByTemplateId("tpl-2")).thenReturn(List.of());
+        when(verificationRepository.findByTemplateId("tpl-3")).thenReturn(List.of(third));
+
+        List<WorkflowTemplateResponse> responses = List.of(template("tpl-1"), template("tpl-2"), template("tpl-3"));
+        List<WorkflowTemplateResponse> oneByOne = responses.stream().map(service::enrichWithVerifications).toList();
+        clearInvocations(verificationRepository);
+
+        List<WorkflowTemplateResponse> enriched = service.enrichAllWithVerifications(responses);
+
+        assertThat(enriched).isEqualTo(oneByOne);
+        assertThat(enriched.get(0).verifications()).extracting(v -> v.lastRunId()).containsExactly("r1", "r2");
+        assertThat(enriched.get(0).verifications().get(1).projectName()).isEqualTo("Unknown");
+        assertThat(enriched.get(1).verifications()).isEmpty();
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<Collection<String>> ids = ArgumentCaptor.forClass(Collection.class);
+        verify(verificationRepository, times(1)).findByTemplateIdIn(ids.capture());
+        assertThat(ids.getValue()).containsExactlyInAnyOrder("tpl-1", "tpl-2", "tpl-3");
+        verify(verificationRepository, never()).findByTemplateId(anyString());
+    }
+
+    @Test
     void enrichAllWithVerifications_emptyList_returnsEmpty() {
         var enriched = service.enrichAllWithVerifications(List.of());
         assertThat(enriched).isEmpty();
+        verifyNoInteractions(verificationRepository);
+    }
+
+    private static WorkflowTemplateResponse template(String id) {
+        Instant now = Instant.parse("2026-10-01T09:00:00Z");
+        return new WorkflowTemplateResponse(id, Map.of("de", id), Map.of(), "i", "c",
+                List.of(), null, null, true, 0, "TESTED", List.of(), "1.0", now, now, null, List.of(), false);
     }
 }
