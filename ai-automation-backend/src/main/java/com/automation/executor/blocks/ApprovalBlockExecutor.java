@@ -8,7 +8,6 @@ import com.automation.executor.ApprovalRequest;
 import com.automation.executor.BlockExecutor;
 import com.automation.executor.ExecutionContext;
 import com.automation.executor.blocks.StepActors.Actor;
-import com.automation.executor.blocks.StepActors.AiAnswer;
 import com.automation.service.workflow.ExecutionBroadcaster;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -61,81 +60,94 @@ public class ApprovalBlockExecutor implements BlockExecutor {
 
         // Who answers (TODO dca0c03e): a person as always, an AI call in the role, or both (shadow)
         Actor actor = StepActors.resolve(config, context);
-        if (actor != Actor.HUMAN && !actors.enabled()) {
-            return buildResult(stepIndex, start, question, StepActors.disabledMessage("approval", actor),
-                    StepStatus.FAILED, null);
+        String refusal = actors.refusal(actor, "approval");
+        if (refusal != null) {
+            return buildResult(stepIndex, start, question, refusal, StepStatus.FAILED, null);
         }
 
-        String answer = presetAnswer(mode, autoAnswer, question, context);
-        Map<String, Object> metadata = null;
-        boolean answeredByAi = false;
-        if (answer == null) {
-            ApprovalRequest request = ApprovalRequest.builder()
-                    .blockId("approval-" + stepIndex)
-                    .question(question)
-                    .options(options)
-                    .rejectOptions(rejectOptions)
-                    .stepIndex(stepIndex)
-                    .timeoutMinutes(timeoutMinutes)
-                    .build();
-            AiAnswer proposal = null;
-            String proposalText = null;
-            if (actor != Actor.HUMAN) {
-                proposal = actors.answer(block, context, stepIndex, approvalTask(question, options));
-                if (actor == Actor.AI) {
-                    if (proposal.failed()) {
-                        return buildResult(stepIndex, start, question, StepActors.failedCallOutput(proposal),
-                                StepStatus.FAILED, StepActors.aiMetadata(actor, proposal));
-                    }
-                    try {
-                        answer = request.acceptedAnswer(proposal.text());
-                    } catch (IllegalArgumentException e) {
-                        return buildResult(stepIndex, start, question, "AI actor answered '" + proposal.text()
-                                + "', which is none of the options " + options, StepStatus.FAILED,
-                                StepActors.aiMetadata(actor, proposal));
-                    }
-                    log.info("Approval answered '{}' by the AI actor for question: {}", answer, question);
-                    metadata = StepActors.aiMetadata(actor, proposal);
-                    answeredByAi = true;
-                } else {
-                    // Shadow: the proposal is recorded as given, valid or not — the person decides either way
-                    proposalText = proposal.failed() ? "" : proposal.text();
-                    request = request.toBuilder().question(StepActors.withProposal(question, proposalText)).build();
-                }
-            }
-            if (answer == null) {
-                CompletableFuture<String> pending = ask(request, context);
-                try {
-                    answer = context.awaitApproval(pending, timeoutMinutes, TimeUnit.MINUTES);
-                } catch (TimeoutException e) {
-                    log.warn("Approval timed out for question: {}", question);
-                    return buildResult(stepIndex, start, question, "Timed out waiting for approval",
-                            StepStatus.FAILED, unanswered(actor, proposal, proposalText));
-                } catch (Exception e) {
-                    log.warn("Approval interrupted for question: {}", question);
-                    return buildResult(stepIndex, start, question, "Approval cancelled: " + e.getMessage(),
-                            StepStatus.FAILED, unanswered(actor, proposal, proposalText));
-                }
-                Map<String, Object> resolved = new HashMap<>();
-                resolved.put("stepIndex", stepIndex);
-                resolved.put("answer", answer);
-                broadcaster.broadcastLogMessage(context.getWorkflowRunId(), "approval_resolved", resolved);
-                metadata = actor == Actor.SHADOW
-                        ? StepActors.shadowMetadata(proposal, proposalText, sameOption(answer, proposalText))
-                        : Map.of(StepActors.ANSWERED_BY, Actor.HUMAN.key());
-            }
+        String preset = presetAnswer(mode, autoAnswer, question, context);
+        Outcome outcome = preset != null
+                ? new Outcome(preset, null, null, false)
+                : obtain(block, context, stepIndex, actor, ApprovalRequest.builder()
+                        .blockId("approval-" + stepIndex)
+                        .question(question)
+                        .options(options)
+                        .rejectOptions(rejectOptions)
+                        .stepIndex(stepIndex)
+                        .timeoutMinutes(timeoutMinutes)
+                        .build());
+        if (outcome.failure() != null) {
+            return buildResult(stepIndex, start, question, outcome.failure(), StepStatus.FAILED, outcome.metadata());
         }
+        String answer = outcome.answer();
 
         // Handle "Yes always" — remember for future steps in this run. Only a person's answer counts: an AI
         // actor's "Yes always" would otherwise answer a later approval cast as human without asking anyone.
-        if ("Yes always".equalsIgnoreCase(answer) && !answeredByAi) {
+        if ("Yes always".equalsIgnoreCase(answer) && !outcome.byAi()) {
             context.rememberApproval(question, answer);
         }
-
-        // Store answer as context variable
         context.setVariable(variableName, answer);
+        return finish(stepIndex, start, question, answer, rejectAnswers, onNo, outcome.metadata());
+    }
 
-        // Determine step status based on answer and on_no config
+    /**
+     * The answer of a step nobody preset, or why there is none.
+     *
+     * @param failure the step output when the step fails before an answer (AI actor, timeout, cancel)
+     * @param byAi    the AI actor answered — its "Yes always" is not remembered
+     */
+    private record Outcome(String answer, String failure, Map<String, Object> metadata, boolean byAi) {}
+
+    /** The AI actor answers, or a person does (in shadow mode with the AI's proposal below the question). */
+    private Outcome obtain(BlockDefinition block, ExecutionContext context, int stepIndex, Actor actor,
+                           ApprovalRequest request) {
+        String question = request.getQuestion();
+        List<String> options = request.getOptions();
+        ActorDecision decision = actors.decide(actor, block, context, stepIndex, approvalTask(question, options),
+                text -> offeredOption(request, text));
+        if (decision.failed()) {
+            return new Outcome(null, decision.failure(), decision.aiMetadata(), false);
+        }
+        if (decision.answeredByAi()) {
+            log.info("Approval answered '{}' by the AI actor for question: {}", decision.answer(), question);
+            return new Outcome(decision.answer(), null, decision.aiMetadata(), true);
+        }
+        return askPerson(request.toBuilder().question(decision.shown(question)).build(), question, context, decision);
+    }
+
+    /** Asks the person and waits; timeout and cancel fail the step but keep a shadow step's AI call. */
+    private Outcome askPerson(ApprovalRequest request, String question, ExecutionContext context,
+                              ActorDecision decision) {
+        CompletableFuture<String> pending = ask(request, context);
+        String answer;
+        try {
+            answer = context.awaitApproval(pending, request.getTimeoutMinutes(), TimeUnit.MINUTES);
+        } catch (TimeoutException e) {
+            log.warn("Approval timed out for question: {}", question);
+            return new Outcome(null, "Timed out waiting for approval", decision.unanswered(), false);
+        } catch (Exception e) {
+            log.warn("Approval interrupted for question: {}", question);
+            return new Outcome(null, "Approval cancelled: " + e.getMessage(), decision.unanswered(), false);
+        }
+        Map<String, Object> resolved = new HashMap<>();
+        resolved.put("stepIndex", request.getStepIndex());
+        resolved.put("answer", answer);
+        broadcaster.broadcastLogMessage(context.getWorkflowRunId(), "approval_resolved", resolved);
+        return new Outcome(answer, null, decision.afterPerson(sameOption(answer, decision.proposalText())), false);
+    }
+
+    /** The AI actor's answer as one of the offered options (their spelling), or why it is none of them. */
+    private static String offeredOption(ApprovalRequest request, String text) {
+        try {
+            return request.acceptedAnswer(text);
+        } catch (IllegalArgumentException e) {
+            throw new IllegalArgumentException("none of the options " + request.getOptions(), e);
+        }
+    }
+
+    /** The step result for an answer: a rejection follows {@code on_no}, anything else is approved. */
+    private StepResult finish(int stepIndex, Instant start, String question, String answer, List<String> rejectAnswers,
+                              String onNo, Map<String, Object> metadata) {
         if (ApprovalRejection.isRejection(answer, rejectAnswers)) {
             return switch (onNo) {
                 case "fail" -> buildResult(stepIndex, start, question,
@@ -146,7 +158,6 @@ public class ApprovalBlockExecutor implements BlockExecutor {
                         "Approval denied (continuing): " + answer, StepStatus.COMPLETED, metadata);
             };
         }
-
         return buildResult(stepIndex, start, question, "Approved: " + answer, StepStatus.COMPLETED, metadata);
     }
 
@@ -156,11 +167,6 @@ public class ApprovalBlockExecutor implements BlockExecutor {
         options.forEach(option -> task.append("- ").append(option).append('\n'));
         return task.append("\nReply with exactly one of the allowed answers, spelled as listed, and nothing else.")
                 .toString();
-    }
-
-    /** A shadow step nobody answered keeps the paid AI call and the proposal; other actors carry nothing. */
-    private static Map<String, Object> unanswered(Actor actor, AiAnswer proposal, String proposalText) {
-        return actor == Actor.SHADOW ? StepActors.unansweredShadowMetadata(proposal, proposalText) : null;
     }
 
     /** Options compare case-insensitively, like {@link ApprovalRequest#acceptedAnswer}. */

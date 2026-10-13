@@ -18,6 +18,7 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.Locale;
 import java.util.Map;
+import java.util.function.UnaryOperator;
 
 /**
  * Casting of a decision step (TODO dca0c03e): who answers an {@code approval} or {@code human-input} block.
@@ -109,6 +110,40 @@ public class StepActors {
 
     public boolean enabled() {
         return modules.isEnabled(ModuleCatalog.AI_ACTORS);
+    }
+
+    /**
+     * The step output that refuses an AI actor while the module is off, or null when the step may run: with the
+     * module off, {@code ai} and {@code shadow} fail clearly instead of silently asking a person.
+     */
+    public String refusal(Actor actor, String blockType) {
+        return actor != Actor.HUMAN && !enabled() ? disabledMessage(blockType, actor) : null;
+    }
+
+    /**
+     * Runs the actor's part of a step (java.design 1c23f026/a635c43d): nothing for a person; one AI call for
+     * {@code shadow}, whose text becomes the proposal ("" after a failed call); one AI call for {@code ai}, whose
+     * text {@code check} turns into the answer a person would give — or throws {@link IllegalArgumentException}
+     * with the reason, which fails the step like a failed call does.
+     */
+    public ActorDecision decide(Actor actor, BlockDefinition block, ExecutionContext context, int stepIndex,
+                                String task, UnaryOperator<String> check) {
+        if (actor == Actor.HUMAN) {
+            return ActorDecision.person();
+        }
+        AiAnswer call = answer(block, context, stepIndex, task);
+        if (actor == Actor.SHADOW) {
+            // The proposal is recorded as given, valid or not — the person decides either way
+            return new ActorDecision(actor, null, null, call, call.failed() ? "" : call.text());
+        }
+        if (call.failed()) {
+            return new ActorDecision(actor, null, failedCallOutput(call), call, null);
+        }
+        try {
+            return new ActorDecision(actor, check.apply(call.text()), null, call, null);
+        } catch (IllegalArgumentException e) {
+            return new ActorDecision(actor, null, "AI actor answered '" + call.text() + "': " + e.getMessage(), call, null);
+        }
     }
 
     /** The step output when the module is off and the block asked for an AI actor. */

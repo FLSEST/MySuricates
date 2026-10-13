@@ -89,6 +89,15 @@ final class HumanInputAnswers {
         }
     }
 
+    /** {@link #validate} for {@link StepActors#decide}: the normalized answer, or the reason as an exception. */
+    static String checked(String text, HumanInputBlockExecutor.Settings settings) {
+        Validated validated = validate(text, settings);
+        if (!validated.valid()) {
+            throw new IllegalArgumentException(validated.error());
+        }
+        return validated.answer();
+    }
+
     /**
      * Whether a person's answer equals the AI's proposal. The proposal is first normalized the way an AI
      * actor's answer would be ({@link #validate}: checkbox {@code yes} becomes {@code true}, a select takes the
