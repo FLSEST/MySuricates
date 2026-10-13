@@ -3,14 +3,19 @@ package com.automation.service.system;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.condition.EnabledOnOs;
+import org.junit.jupiter.api.condition.OS;
 import org.junit.jupiter.api.io.TempDir;
 
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.Duration;
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.junit.jupiter.api.Assertions.assertTimeoutPreemptively;
 
 class FileBrowserServiceTest {
 
@@ -172,6 +177,53 @@ class FileBrowserServiceTest {
             assertThatThrownBy(() -> service.openPath("/tmp/nonexistent_xyz_" + System.nanoTime()))
                     .isInstanceOf(IllegalArgumentException.class)
                     .hasMessageContaining("does not exist");
+        }
+    }
+
+    /** Runs a shell stand-in for xdg-open; the path is appended as {@code $1}. */
+    @Nested
+    @EnabledOnOs({OS.LINUX, OS.MAC})
+    class OpenerProcessTests {
+
+        /** Well above the 3 s opener timeout, well below the 20 s the stand-ins keep running. */
+        private static final Duration REQUEST_BOUND = Duration.ofSeconds(10);
+
+        private FileBrowserService withOpener(String script) {
+            return new FileBrowserService(List.of("sh", "-c", script, "sh"));
+        }
+
+        @Test
+        void anApplicationThatInheritsTheOutputDoesNotHoldTheRequest(@TempDir Path tempDir) {
+            // Like an editor xdg-open starts: the opener exits at once, its child keeps the output open.
+            FileBrowserService opener = withOpener("sleep 20 &");
+
+            assertTimeoutPreemptively(REQUEST_BOUND, () -> opener.openPath(tempDir.toString()));
+        }
+
+        @Test
+        void anOpenerThatDoesNotExitIsLeftRunningAfterTheTimeout(@TempDir Path tempDir) {
+            FileBrowserService opener = withOpener("exec sleep 20");
+
+            assertTimeoutPreemptively(REQUEST_BOUND, () -> opener.openPath(tempDir.toString()));
+        }
+
+        @Test
+        void aFailingOpenerIsReportedWithItsExitCode(@TempDir Path tempDir) {
+            FileBrowserService opener = withOpener("echo 'no application for this type' >&2; exit 4");
+
+            assertThatThrownBy(() -> opener.openPath(tempDir.toString()))
+                    .isInstanceOf(IOException.class)
+                    .hasMessageContaining("exit code 4");
+        }
+
+        @Test
+        void aSuccessfulOpenerReceivesThePath(@TempDir Path tempDir) throws Exception {
+            Path marker = tempDir.resolve("opened.txt");
+            FileBrowserService opener = withOpener("printf '%s' \"$1\" > '" + marker + "'");
+
+            opener.openPath(tempDir.toString());
+
+            assertThat(Files.readString(marker)).isEqualTo(tempDir.toString());
         }
     }
 }

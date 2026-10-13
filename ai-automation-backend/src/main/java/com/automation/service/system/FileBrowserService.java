@@ -4,7 +4,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.io.IOException;
-import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.*;
@@ -18,9 +17,22 @@ public class FileBrowserService {
     private static final Set<String> BLOCKED_PREFIXES = Set.of(
             "/etc", "/proc", "/sys", "/dev", "/var/run"
     );
+    /** How long the request waits for the opener's exit code; an opener still running then is left alone. */
+    private static final long OPEN_TIMEOUT_SECONDS = 3;
 
     public record DirectoryEntry(String name, String path) {}
     public record BrowseResult(String current, String parent, List<DirectoryEntry> directories) {}
+
+    /** The opener program the path is appended to; tests swap in a stand-in. */
+    private final List<String> openCommand;
+
+    public FileBrowserService() {
+        this(List.of("xdg-open"));
+    }
+
+    FileBrowserService(List<String> openCommand) {
+        this.openCommand = List.copyOf(openCommand);
+    }
 
     public BrowseResult browseDirectory(String path) throws IOException {
         Path dirPath;
@@ -78,15 +90,16 @@ public class FileBrowserService {
             throw new IllegalArgumentException("Path does not exist: " + normalized);
         }
 
-        ProcessBuilder pb = new ProcessBuilder("xdg-open", normalized);
+        List<String> command = new ArrayList<>(openCommand);
+        command.add(normalized);
+        ProcessBuilder pb = new ProcessBuilder(command);
+        // Discard instead of reading to EOF: the application xdg-open starts may inherit the output and keep
+        // it open until it exits, so a read would hold the request that long and the timeout below never applied.
         pb.redirectErrorStream(true);
+        pb.redirectOutput(ProcessBuilder.Redirect.DISCARD);
         Process process = pb.start();
 
-        try (InputStream is = process.getInputStream()) {
-            is.readAllBytes();
-        }
-
-        boolean exited = process.waitFor(3, TimeUnit.SECONDS);
+        boolean exited = process.waitFor(OPEN_TIMEOUT_SECONDS, TimeUnit.SECONDS);
         if (exited && process.exitValue() != 0) {
             log.warn("xdg-open exited with code {} for path: {}", process.exitValue(), normalized);
             throw new IOException("Failed to open path (exit code " + process.exitValue() + ")");
