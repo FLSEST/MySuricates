@@ -24,7 +24,10 @@
     "",
     "Kennzahl-Regeln (ein Befund je Messwert) haben als festes subject den FAKT-Namen, den ihr Prompt",
     "unter 'Kennzahl-Befunde' nennt (Performance-Audit, Health-Check; TODO 87a1dac0) — sonst driftete das subject zwischen 'Datenbank',",
-    "'DB-Groesse' und 'database_bytes', und jeder Lauf legte einen neuen Befund an."
+    "'DB-Groesse' und 'database_bytes', und jeder Lauf legte einen neuen Befund an.",
+    "",
+    "Die java.*-Audits (workflow-pool/java-audit-*.json, java-review-changes.json, TODO 51357b6c) nehmen ihre",
+    "Keys aus dem ALLOWED-Rahmen ihres Gate-Blocks; Prompt und Gate nennen dieselbe Liste."
   ],
   "mysuricates.test-coverage": [
     "test-coverage.untested-class",
@@ -109,5 +112,100 @@
     "docs.unlinked-from-index",
     "docs.unmaintained",
     "docs.superseded-by"
+  ],
+  "java.concurrency": [
+    "java.concurrency.blocking-in-lock",
+    "java.concurrency.check-then-act",
+    "java.concurrency.double-checked-locking",
+    "java.concurrency.executor-leak",
+    "java.concurrency.future-common-pool",
+    "java.concurrency.future-unhandled",
+    "java.concurrency.lock-map-growth",
+    "java.concurrency.lock-scope",
+    "java.concurrency.proxy-bypass",
+    "java.concurrency.shared-mutable-state",
+    "java.concurrency.threadlocal",
+    "java.observation"
+  ],
+  "java.idioms": [
+    "java.exception.finally",
+    "java.exception.flow-control",
+    "java.exception.lost-cause",
+    "java.exception.raw-type",
+    "java.exception.swallowed",
+    "java.exception.too-broad",
+    "java.idiom.boolean-parameter",
+    "java.idiom.equality",
+    "java.idiom.long-parameter-list",
+    "java.idiom.optional-get",
+    "java.idiom.regex-in-loop",
+    "java.idiom.resource-leak",
+    "java.idiom.string-concat-in-loop",
+    "java.idiom.switch-fallthrough",
+    "java.idiom.unused-code",
+    "java.logging.console",
+    "java.logging.format",
+    "java.logging.log-and-rethrow",
+    "java.logging.sensitive-data",
+    "java.observation"
+  ],
+  "java.persistence": [
+    "java.observation",
+    "java.persistence.cascade",
+    "java.persistence.eager-fetch",
+    "java.persistence.entity-lombok",
+    "java.persistence.lost-update",
+    "java.persistence.missing-transaction",
+    "java.persistence.n-plus-one",
+    "java.persistence.osiv",
+    "java.persistence.proxy-bypass",
+    "java.persistence.query-injection",
+    "java.persistence.slow-call-in-transaction",
+    "java.persistence.unbounded-query"
+  ],
+  "java.api": [
+    "java.api.entity-exposed",
+    "java.api.error-format",
+    "java.api.missing-doc",
+    "java.api.path-style",
+    "java.api.status-code",
+    "java.api.untyped-response",
+    "java.api.unvalidated-input",
+    "java.api.verb-semantics",
+    "java.observation"
+  ],
+  "java.build": [
+    "java.build.conflict",
+    "java.build.insecure-repository",
+    "java.build.outdated",
+    "java.build.reproducibility",
+    "java.build.scope",
+    "java.build.unsupported-line",
+    "java.build.vulnerability",
+    "java.observation"
+  ],
+  "java.design": [
+    "java.design.complex-method",
+    "java.design.deep-nesting",
+    "java.design.hidden-dependency",
+    "java.design.long-method",
+    "java.design.misleading-name",
+    "java.design.refused-bequest",
+    "java.design.scattered-switch",
+    "java.design.simplifiable-logic",
+    "java.design.type-switch",
+    "java.observation"
+  ],
+  "java.review": [
+    "java.observation",
+    "java.review.api-contract",
+    "java.review.bug",
+    "java.review.concurrency",
+    "java.review.error-handling",
+    "java.review.missing-test",
+    "java.review.persistence",
+    "java.review.project-rule",
+    "java.review.readability",
+    "java.review.security"
   ]
 }

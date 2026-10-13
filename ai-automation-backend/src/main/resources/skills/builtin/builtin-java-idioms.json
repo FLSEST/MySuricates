@@ -1,0 +1,37 @@
+{
+  "id" : "builtin-java-idioms",
+  "sortOrder" : 21,
+  "version" : "1.0.0",
+  "name" : "Java review: idioms, error handling & logging",
+  "icon" : "🧹",
+  "description" : "Criteria for judging PMD and pattern candidates on error handling, logging and Java idioms. Source: decebals/claude-code-java (MIT) plus lessons learned in MySuricates.",
+  "category" : "CODE",
+  "capabilities" : [
+    {
+      "name" : "review_idioms",
+      "description" : "Judge the candidates of the idioms, error handling & logging fact sheet in the Java source and report findings with ruleKey and severity",
+      "inputSchema" : {
+        "properties" : {
+          "fact_sheet" : {
+            "type" : "string"
+          },
+          "source_dir" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "outputSchema" : {
+        "properties" : {
+          "findings" : {
+            "type" : "array"
+          },
+          "report" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      }
+    }
+  ]
+}

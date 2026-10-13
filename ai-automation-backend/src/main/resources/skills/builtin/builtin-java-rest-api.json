@@ -1,0 +1,37 @@
+{
+  "id" : "builtin-java-rest-api",
+  "sortOrder" : 23,
+  "version" : "1.0.0",
+  "name" : "Java review: REST API contract & documentation",
+  "icon" : "🔌",
+  "description" : "Criteria for judging candidates from a Spring controller inventory. Source: decebals/claude-code-java (MIT) + MySuricates experience.",
+  "category" : "CODE",
+  "capabilities" : [
+    {
+      "name" : "review_rest_api",
+      "description" : "Judge the candidates of the REST API contract & documentation fact sheet in the Java source and report findings with ruleKey and severity",
+      "inputSchema" : {
+        "properties" : {
+          "fact_sheet" : {
+            "type" : "string"
+          },
+          "source_dir" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "outputSchema" : {
+        "properties" : {
+          "findings" : {
+            "type" : "array"
+          },
+          "report" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      }
+    }
+  ]
+}

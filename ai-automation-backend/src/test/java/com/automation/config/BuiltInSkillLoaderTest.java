@@ -24,7 +24,7 @@ class BuiltInSkillLoaderTest {
 
     @Test
     void loadAll_returnsAllNineteenBuiltInSkills() {
-        assertThat(skills).hasSize(19);
+        assertThat(skills).hasSize(26);
     }
 
     @Test

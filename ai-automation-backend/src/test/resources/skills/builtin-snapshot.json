@@ -1656,5 +1656,313 @@
     "prompt" : "You write marketing copy for SaaS-Factory generated apps. Given a spec (target users, brand tone, primary color, features), produce:\n\n1. **Hero**: a 6-10 word headline + a 1-2 sentence subheadline. Speak to the user's pain, then the relief — never feature-list in the hero.\n2. **3-5 Feature blocks**: each a short title (3-5 words), one-line description (~15 words), and a single concrete benefit. Map to the spec's features but rephrase from the user's POV.\n3. **CTA**: a primary button label (≤4 words) and a single supporting micro-line about risk-reversal (e.g. \"no credit card needed\").\n4. **Meta tags**: SEO title (≤60 chars), meta description (≤155 chars), OG-title (≤60), OG-description (≤155).\n5. **OG-image prompt**: a 1-2 sentence text-to-image prompt that captures the app's identity, ready for a downstream image generator.\n\nRules:\n- Match the brand tone exactly (if `tone: \"pragmatisch, ehrlich, ermutigend\"`, that's how you write — no \"transform your life\" boilerplate).\n- Target the user persona literally (`target_users`). If they're \"Berufstätige im Übergang\", talk to that person — not \"everyone\".\n- Avoid AI-tells: no \"unleash\", \"leverage\", \"seamless\", \"elevate\", \"in today's fast-paced world\", \"Imagine a world where\", etc.\n- Output structured JSON, no prose explanations.",
     "sortOrder" : 19,
     "version" : "1.0.0"
+  },
+  {
+    "builtin" : true,
+    "capabilities" : [
+      {
+        "async" : false,
+        "description" : "Judge the candidates of the concurrency fact sheet in the Java source and report findings with ruleKey and severity",
+        "handlerClass" : null,
+        "inputSchema" : {
+          "properties" : {
+            "fact_sheet" : {
+              "type" : "string"
+            },
+            "source_dir" : {
+              "type" : "string"
+            }
+          },
+          "type" : "object"
+        },
+        "name" : "review_concurrency",
+        "outputSchema" : {
+          "properties" : {
+            "findings" : {
+              "type" : "array"
+            },
+            "report" : {
+              "type" : "string"
+            }
+          },
+          "type" : "object"
+        },
+        "skillBackReference" : "builtin-java-concurrency",
+        "writes" : false
+      }
+    ],
+    "category" : "CODE",
+    "configSchema" : { },
+    "description" : "Criteria for judging concurrency candidates in Java (locks, virtual threads, @Async, CompletableFuture). Source: decebals/claude-code-java (MIT) plus lessons learned in MySuricates.",
+    "icon" : "🧵",
+    "id" : "builtin-java-concurrency",
+    "name" : "Java review: concurrency",
+    "prompt" : "# Java review: concurrency\n\nExpertise for judging measured candidates (synchronized, locks, virtual threads, @Async,\nCompletableFuture, shared state). Source: skill `concurrency-review` from\ndecebals/claude-code-java (MIT), shortened and extended with lessons learned in MySuricates.\n\n## Basic stance\n- A candidate only becomes a finding when you can show in the source **which sequence** goes wrong:\n  which thread, which shared state, which wait. \"Could be unsafe\" is not a finding.\n- Check **who runs the code**: request thread, scheduler, own executor, virtual thread.\n  Code that runs only once at startup or only in a single thread carries hardly any concurrency risk.\n- Also read the called methods when the candidate names a detour (\"via x()\").\n\n## Blocking under a lock\n- A short, pure memory access under `synchronized` is fine.\n- Finding: I/O, process start, Docker, HTTP, database or file access, `sleep`, `wait`, `join`,\n  `Future.get` inside `synchronized` or while a lock is held. All other threads that want the same\n  lock wait for the whole duration of the I/O.\n- **Virtual threads on Java 21–23** (JEP 491 only fixes this in Java 24): a virtual thread that blocks\n  inside `synchronized` or **waits for an occupied monitor** occupies its carrier thread\n  (pinning). There are as many carriers as CPU cores. If enough virtual threads wait for the same\n  monitor, the whole scheduler stalls, including unrelated work such as requests or DB access.\n  Severity: HIGH if `carrier_pinning_relevant: yes` and the code path can run on virtual threads\n  (web requests with `spring.threads.virtual.enabled=true`, tasks in `newVirtualThreadPerTaskExecutor`,\n  `Thread.ofVirtual`). Otherwise MEDIUM (the lock hold time serializes, throughput).\n- Fixes in this order: move the I/O out of the critical section; `ReentrantLock` instead of\n  `synchronized` (does not pin); Java ≥ 24. For \"once per key\", a `ConcurrentHashMap`\n  with `computeIfAbsent` on a `CompletableFuture` can replace the lock.\n\n## Lock scope and lock object\n- `synchronized` methods lock `this`; if the instance is reachable from outside, foreign code can take\n  the same lock. A finding only if the locked region becomes needlessly broad or blocks as a result.\n- A lock on a non-final field, on strings or on boxed values is a finding.\n- Lock maps (`locks.computeIfAbsent(key, k -> new Object())`) from which nothing is ever removed grow\n  with every key. LOW if the set of keys is small and bounded (e.g. projects); MEDIUM if the keys come\n  from user input or runtime IDs.\n\n## ThreadLocal\n- With `set` and `remove` in the `finally` of the same flow: fine, also on virtual threads.\n- Finding: `remove` is missing or not in `finally` (leak on pool threads, state jumps to the next\n  task); ThreadLocal as a **cache** for expensive objects when the code runs on virtual threads\n  (every virtual thread rebuilds the cache).\n- A value that is meant to reach child threads does not arrive there with `ThreadLocal`.\n- `ScopedValue` is a preview feature in Java 21: do not recommend it as a fix for production code.\n\n## Spring @Async (and @Transactional by the same principle)\n- A call from the same class bypasses the proxy: the method runs **synchronously** in the caller's\n  thread (or without a transaction). A finding if the caller relies on asynchrony.\n- `@Async` on non-public methods has no effect.\n- Return type `void`: exceptions only end up in the `AsyncUncaughtExceptionHandler`.\n- `SecurityContext`, MDC and other ThreadLocals do not arrive in the async thread.\n\n## CompletableFuture\n- `supplyAsync`/`runAsync` without an executor runs in `ForkJoinPool.commonPool` (size = cores − 1).\n  Blocking work there starves the other users of the pool (parallel streams). A finding if the work\n  blocks (I/O, process, Docker); pure computation is fine.\n- Without `exceptionally`/`handle`/`whenComplete` and without a later `join`/`get`, an exception is\n  lost silently. Before reporting it, check whether the future is stored and evaluated later.\n- Waiting without a timeout (`join()`, `get()`) on external work can hang forever; set `orTimeout`.\n\n## Executors and threads\n- Self-created executor services without `shutdown`/`close` leave threads behind as soon as the\n  instance is replaced. For a single Spring bean that lives as long as the app, this is LOW.\n- `@Bean` methods that return an executor are closed by Spring itself (inferred destroy method).\n\n## Shared mutable state\n- Static `HashMap`/`ArrayList` etc. that are still modified after class loading are a finding when\n  several threads access them. Filled only in the static initializer and only read afterwards: fine\n  (better `Map.of`/`List.copyOf`, then LOW as a hint).\n- Check-then-act (`containsKey` + `put`) on a **shared** map is a finding; on a local variable or a\n  method parameter it is not. Fix: `computeIfAbsent`/`putIfAbsent`/`merge`.\n- `ConcurrentHashMap.compute*` lambdas must not modify the same map.\n- Double-checked locking needs `volatile`.\n- `SimpleDateFormat`, `DecimalFormat` and similar are not thread-safe; `DateTimeFormatter` is.\n\n## Not a finding\n- `volatile` flags for stop signals; `AtomicInteger`/`AtomicLong` counters.\n- A local `HashMap` inside a method.\n- `synchronized` around a few memory operations without calls to the outside.\n- Deliberate one-time startup runs (seeder, migration, `ApplicationReadyEvent`).\n\n## Severity\n| Severity | Criterion |\n|---|---|\n| CRITICAL | Data loss or deadlock that occurs in normal operation |\n| HIGH | Stall or misbehavior under realistic load (e.g. pinning on virtual threads) |\n| MEDIUM | Throughput or robustness problem that only appears under pressure or on errors |\n| LOW | Hygiene: bounded growth, missing `shutdown` on a long-lived bean, matter of style |",
+    "sortOrder" : 20,
+    "version" : "1.0.0"
+  },
+  {
+    "builtin" : true,
+    "capabilities" : [
+      {
+        "async" : false,
+        "description" : "Judge the candidates of the idioms, error handling & logging fact sheet in the Java source and report findings with ruleKey and severity",
+        "handlerClass" : null,
+        "inputSchema" : {
+          "properties" : {
+            "fact_sheet" : {
+              "type" : "string"
+            },
+            "source_dir" : {
+              "type" : "string"
+            }
+          },
+          "type" : "object"
+        },
+        "name" : "review_idioms",
+        "outputSchema" : {
+          "properties" : {
+            "findings" : {
+              "type" : "array"
+            },
+            "report" : {
+              "type" : "string"
+            }
+          },
+          "type" : "object"
+        },
+        "skillBackReference" : "builtin-java-idioms",
+        "writes" : false
+      }
+    ],
+    "category" : "CODE",
+    "configSchema" : { },
+    "description" : "Criteria for judging PMD and pattern candidates on error handling, logging and Java idioms. Source: decebals/claude-code-java (MIT) plus lessons learned in MySuricates.",
+    "icon" : "🧹",
+    "id" : "builtin-java-idioms",
+    "name" : "Java review: idioms, error handling & logging",
+    "prompt" : "# Java review: idioms, error handling & logging\n\nExpertise for judging measured candidates from PMD and source patterns. Source: the skills\n`java-code-review`, `clean-code`, `logging-patterns` and `performance-smell-detection` from\ndecebals/claude-code-java (MIT), shortened and extended with lessons learned in MySuricates.\n\n## Basic stance\n- A PMD hit is a candidate. It only becomes a finding once a **consequence** is visible in the source:\n  a lost error cause, a swallowed error, a resource leak, wrong behaviour, misleading logs.\n- Many rules have known false alarms (see each section). Read the location before you judge.\n- Hits of the same kind in one file form **one** finding; name the lines in the evidence.\n\n## Error handling\n- **Lost cause** (`lost_cause`, script): `throw new X(...)` in a `catch`, without the caught exception as the\n  cause, without its message and without logging it. The information is completely gone. Finding MEDIUM; HIGH\n  where errors have to be analysed later (execution, integration, security). False alarm: the cause contains\n  secrets (usually a comment then says so). Validation idioms (parse error → user-facing message) are already\n  filtered out. `AvoidLosingExceptionInformation` (PMD) is the rare case \"a call on the exception that has no\n  effect\".\n- **Swallowed** (`empty_catch`, script): an empty `catch` without a comment (also with a variable named `ignored`),\n  and an empty `catch` with a comment that catches **broadly** (`Exception`, `Throwable`, `RuntimeException`). A\n  comment names the intended case (\"not JSON\"), but a broad type also swallows every other one, for example an NPE\n  from the `try` block. So check what else in the `try` can throw besides the intended case, and what happens\n  afterwards. Finding LOW; MEDIUM if a swallowed error turns into wrong behaviour (input is passed on as data,\n  state is left half-changed). The script does not measure narrowly typed empty `catch` blocks with a comment.\n- **Interrupt lost** (`interrupt_lost`, script): `catch (InterruptedException)` without\n  `Thread.currentThread().interrupt()` and without rethrowing; converting it into another exception also loses\n  the flag. Finding MEDIUM (cancellation from outside has no effect).\n- **Too broad** (`AvoidCatchingThrowable`, `AvoidCatchingNPE`): `catch (Throwable)` is justifiable only at thread\n  boundaries with a log; elsewhere it also catches `OutOfMemoryError`. `catch (NullPointerException)` almost\n  always hides a bug. `catch (Exception)` at boundaries (scheduler loop, background job, request boundary) is\n  deliberate and is not measured here.\n- **Raw types** (`AvoidThrowingRawExceptionTypes`, `SignatureDeclareThrowsException`): `throw new RuntimeException`\n  or `throws Exception` on a public API. Finding LOW–MEDIUM; fix: a domain-specific type.\n- **Exception as flow control** (`ExceptionAsFlowControl`, `AvoidRethrowingException`,\n  `AvoidThrowingNewInstanceOfSameException`): catching and immediately rethrowing without added value; throwing\n  and catching an exception within the same `try`. Mostly LOW.\n- **finally** (`ReturnFromFinallyBlock`, `DoNotThrowExceptionInFinally`): swallows the actual exception.\n  Finding MEDIUM.\n\n## Logging\n- **Wrong placeholders** (`InvalidLogMessageFormat`): the number of `{}` does not match the arguments. A real\n  bug (MEDIUM). Exception: a last argument of type Throwable is allowed and is logged as a stack trace.\n- **Log and rethrow** (`log_and_rethrow`): the same error appears twice in the log, often with a stack trace.\n  Finding LOW if the boundary further up logs anyway. No finding if this place adds context that is missing\n  further up, or if a different exception is thrown with the cause and is not logged further up.\n- **System.out / printStackTrace** in server code: finding LOW (bypasses logging, no level, no context).\n  In CLI tools or `main` methods: no finding.\n- **Secrets in the log** (`sensitive_log_arg`): tokens, keys, passwords, Authorization headers, whole request\n  bodies. Finding HIGH if the value itself is logged; no finding for a file path, length, hash or\n  \"present: yes/no\".\n- Several loggers or the wrong class in the logger (`ProperLogger`, `MoreThanOneLogger`): LOW.\n\n## Null and Optional\n- **`Optional.get()` without a check** (`optional_get`): a finding if no `isPresent`/`isEmpty` guards the call;\n  fix: `orElseThrow` with a meaningful exception.\n\n## Resources\n- **Not closed** (`CloseResource`, `UseTryWithResources`): streams, readers, `Process` streams, connections,\n  `Files.lines`/`Files.list`/`Files.walk` (these return streams that must be closed!).\n  Finding MEDIUM; HIGH if it happens in a loop or on every request.\n  False alarm: the resource is returned and closed by the caller, or a framework closes it.\n\n## Dead code\n- **Unused** (`UnusedPrivateMethod`, `UnusedPrivateField`, `UnusedLocalVariable`, `UnusedAssignment`,\n  `UnusedFormalParameter`): before reporting, check whether reflection or a framework uses the location:\n  `@EventListener`, `@Scheduled`, `@PostConstruct`, `@PreDestroy`, `@JsonCreator`, `@JsonProperty`, JPA callbacks\n  (`@PrePersist` …), MapStruct methods, Lombok accessors, tests via package visibility. Real dead code:\n  LOW. An overwritten, unused assignment can be a logic error: then MEDIUM.\n\n## Equality and comparisons\n- `equals` without `hashCode` (or the other way round) on classes that end up in sets/maps: MEDIUM.\n- `==` on objects or strings (`CompareObjectsWithEquals`, `UseEqualsToCompareStrings`): a finding, except for\n  enums, a deliberate identity check (comment) or sentinel objects.\n- A fall-through `switch` without a comment (`ImplicitSwitchFallThrough`): MEDIUM.\n\n## API shape\n- **Boolean parameters** (`boolean_parameter`): public methods with a flag whose meaning is not readable at the\n  call site (`execute(req, true)`). Check the callers: if literals are passed, it is a finding LOW with a\n  suggestion (enum, two methods, parameter object). A flag that always comes from a variable of the same name,\n  or an established name (`readOnly`, `force`), is no finding.\n- **Long parameter lists** (`long_parameter_list`): from 6 parameters on a public method, from 8 otherwise.\n  Finding **at most LOW**. MEDIUM only if you prove an actual mix-up at a concrete caller, or a bug that resulted\n  from one (file:line). Parameters of the same type next to each other are not enough on their own.\n  Report the same group on several methods as one finding (missing parameter object). Factory methods of\n  DTOs/records are no finding.\n\n## Minor performance issues\n- **Regex per loop iteration** (`regex_in_loop`): `String.matches`/`replaceAll`/`split` with a regex and\n  `Pattern.compile` compile anew on every call. Finding LOW, MEDIUM in hot paths (per line of a large output,\n  per request). Fix: `private static final Pattern`.\n- **String concatenation in loops** (`UseStringBufferForStringAppends`): LOW, MEDIUM for large amounts of data.\n\n## Severity\n| Severity | Criterion |\n|---|---|\n| CRITICAL | Security vulnerability or data loss |\n| HIGH | Bug likely, secret in the log, resource leak per request |\n| MEDIUM | Error hidden or hard to analyse (lost cause, swallowed exception) |\n| LOW | Maintainability and style (dead code, raw types, parameter shape) |",
+    "sortOrder" : 21,
+    "version" : "1.0.0"
+  },
+  {
+    "builtin" : true,
+    "capabilities" : [
+      {
+        "async" : false,
+        "description" : "Judge the candidates of the persistence & transactions fact sheet in the Java source and report findings with ruleKey and severity",
+        "handlerClass" : null,
+        "inputSchema" : {
+          "properties" : {
+            "fact_sheet" : {
+              "type" : "string"
+            },
+            "source_dir" : {
+              "type" : "string"
+            }
+          },
+          "type" : "object"
+        },
+        "name" : "review_persistence",
+        "outputSchema" : {
+          "properties" : {
+            "findings" : {
+              "type" : "array"
+            },
+            "report" : {
+              "type" : "string"
+            }
+          },
+          "type" : "object"
+        },
+        "skillBackReference" : "builtin-java-persistence",
+        "writes" : false
+      }
+    ],
+    "category" : "CODE",
+    "configSchema" : { },
+    "description" : "Criteria for judging JPA/Spring Data candidates (transactions, N+1, entities). Source: decebals/claude-code-java (MIT) plus MySuricates experience.",
+    "icon" : "🗄️",
+    "id" : "builtin-java-persistence",
+    "name" : "Java review: persistence & transactions",
+    "prompt" : "# Java review: persistence & transactions\n\nExpertise for judging measured candidates in JPA/Hibernate and Spring Data code. Source: the skills\n`jpa-patterns` and `spring-boot-patterns` from decebals/claude-code-java (MIT), shortened and extended with\nlessons learned from running a Spring application on SQLite with a single connection and OSIV disabled.\n\n## Basic stance\n- A finding means: you can name a sequence that leads to wrong data, to an exception at runtime or to\n  measurably more database work. \"Could be inefficient\" is not enough.\n- Read the context too: does the code run per request, per run, in a loop or once at startup? How large is\n  the table realistically (configuration vs. run-time data)?\n- The FAKT lines `open_in_view` and `connection_pool_max` co-determine the severity.\n\n## Slow calls inside transactions (`transactional_slow_call`)\n- HTTP, process start, Docker, AI/CLI calls, `sleep`, waiting on futures inside `@Transactional` or inside\n  a `TransactionTemplate` callback hold the connection and the locks for the whole duration.\n- Severity: HIGH with a small pool (`connection_pool_max` ≤ 2, e.g. SQLite) or when the path runs per request;\n  otherwise MEDIUM. Fix: short DB sections via `TransactionTemplate`, slow work before or after them.\n\n## Proxy pitfalls (`transactional_self_call`, `transactional_ineffective`)\n- A call from within the same class bypasses the proxy: the target's annotation has no effect. A finding only\n  if the caller itself has **no** transaction and the target needs one (it writes, needs several reads to be\n  consistent, or `readOnly` for lazy loading). If the target only reads one row via a repository (which is\n  transactional itself), it is not a finding.\n- `@Transactional` on `private`/`final`/`static` methods has no effect.\n\n## N+1 (`repository_in_loop`)\n- A read access per loop iteration: finding MEDIUM if the loop runs over run-time data or user input;\n  LOW for small fixed sets. Not a finding: one-off startup runs (seeders, migrations), wait loops with sleep,\n  loops that stop as soon as something is found.\n- Fix: a batch query (`findAllById`, `WHERE x IN`), `JOIN FETCH`, `@EntityGraph`, `@BatchSize`.\n\n## Loading whole tables (`find_all_unbounded`)\n- `findAll()` without a Pageable loads every row including EAGER relations. A finding if the table grows\n  with use (runs, logs, events, results) **and** the call lies on a frequent path. Configuration tables\n  (projects, switches, templates) are not a finding.\n\n## Queries built by string concatenation (`query_string_concat`)\n- Concatenated JPQL/SQL with values from inputs: finding HIGH (injection). Only fixed building blocks\n  (column names from an allowlist): not a finding, but a hint to use parameters.\n\n## Modifying queries without a transaction (`modifying_without_tx`)\n- `@Modifying` methods need a running transaction, otherwise `TransactionRequiredException`. Check the\n  callers: if every one of them has a transaction, it is not a finding (at most a LOW hint to put the\n  annotation on the repository method). One caller without a transaction: MEDIUM.\n\n## Entities\n- **Lombok** (`entity_lombok`): `@Data`/`@EqualsAndHashCode` over all fields includes relations and lazy fields:\n  `LazyInitializationException`, endless recursion with bidirectional relations, the hash changes after\n  `persist` (the entity vanishes from a `HashSet`). `@ToString` over lazy fields loads them or throws.\n  Finding MEDIUM; not a finding with `onlyExplicitlyIncluded` on the ID, or for entities without relations\n  and with an immutable business key.\n- **EAGER** (`eager_fetch`): every query loads the relation along with it, lists included. A finding if the\n  relation is a collection or drags along large blobs; `@ManyToOne` EAGER to a small master-data entity is\n  usually intended, especially with OSIV disabled (then LAZY outside the transaction would be an error).\n- **Cascade REMOVE/ALL towards the parent** (`cascade_remove_to_parent`): deleting a child deletes the parent\n  along with its siblings. Finding HIGH.\n- **Optimistic locking**: `entities_with_version` = 0 is a context fact, not a finding on its own. A finding\n  only if you find a concrete read-modify-write sequence with concurrent writers.\n\n## OSIV\n- `open_in_view` not set (default true): the connection stays occupied for the whole request; with a small\n  pool this is a bottleneck. Finding MEDIUM if `connection_pool_max` is small at the same time.\n\n## Severity\n| Severity | Criterion |\n|---|---|\n| CRITICAL | Data loss (cascade deletes other data), injection with user input |\n| HIGH | Exception or standstill in normal operation (connection held with a small pool, transaction missing) |\n| MEDIUM | Measurably more DB work on a frequent path, Lombok pitfalls on entities |\n| LOW | Hygiene, small fixed sets, hints |",
+    "sortOrder" : 22,
+    "version" : "1.0.0"
+  },
+  {
+    "builtin" : true,
+    "capabilities" : [
+      {
+        "async" : false,
+        "description" : "Judge the candidates of the REST API contract & documentation fact sheet in the Java source and report findings with ruleKey and severity",
+        "handlerClass" : null,
+        "inputSchema" : {
+          "properties" : {
+            "fact_sheet" : {
+              "type" : "string"
+            },
+            "source_dir" : {
+              "type" : "string"
+            }
+          },
+          "type" : "object"
+        },
+        "name" : "review_rest_api",
+        "outputSchema" : {
+          "properties" : {
+            "findings" : {
+              "type" : "array"
+            },
+            "report" : {
+              "type" : "string"
+            }
+          },
+          "type" : "object"
+        },
+        "skillBackReference" : "builtin-java-rest-api",
+        "writes" : false
+      }
+    ],
+    "category" : "CODE",
+    "configSchema" : { },
+    "description" : "Criteria for judging candidates from a Spring controller inventory. Source: decebals/claude-code-java (MIT) + MySuricates experience.",
+    "icon" : "🔌",
+    "id" : "builtin-java-rest-api",
+    "name" : "Java review: REST API contract & documentation",
+    "prompt" : "# Java review: REST API contract & documentation\n\nExpertise for judging measured candidates from a controller inventory (Spring MVC). Source: the skills\n`api-contract-review` and `spring-boot-patterns` from decebals/claude-code-java (MIT), shortened and extended\nwith experience from MySuricates.\n\n## Basic stance\n- The contract is what a client sees: path, verb, status code, shape of request and response, error format.\n  A finding means: a client gets something wrong, unstable or unchecked, or an internal change breaks it\n  without anyone noticing.\n- Check exceptions deliberately: internal endpoints (plugin, UI-only), webhooks with a foreign format, upload/download.\n\n## Entities exposed (`entity_exposed`)\n- A JPA entity as response or `@RequestBody` couples the contract to the database schema: renaming a column\n  breaks clients, lazy fields throw during serialisation (especially with OSIV off), internal fields (tokens,\n  counters) leak, mass assignment via `@RequestBody` sets fields the client must not set.\n- Finding MEDIUM (response) or HIGH (`@RequestBody` with writable security or owner fields).\n  Fix: response/request DTO with a mapper.\n\n## HTTP semantics\n- **Verb does not fit** (`verb_mismatch`): GET with a side effect is a finding (caches, prefetch and crawlers\n  trigger it). POST for reading is only a finding if it is not a complex search query.\n- **Create without 201** (`post_without_created`): LOW; MEDIUM only if clients rely on 201/`Location`.\n- An error with status 200 and an error object in the body is a finding if you see it while reading (as an observation).\n\n## Input (`request_body_unvalidated`)\n- `@RequestBody` without `@Valid`: the Bean Validation annotations on the DTO do not take effect. Finding if the DTO\n  has constraints (`@NotBlank`, `@Size` …) or the values go unchecked into file paths, commands, queries or\n  storage. Without constraints on the DTO and with a check in the service: no finding (an optional LOW note).\n\n## Response shape (`untyped_response`)\n- `Map<String, Object>`/`Object`/`JsonNode` as response has no fixed contract: keys change without anyone\n  noticing, generated documentation and clients have to guess. Finding LOW; MEDIUM for central, frequently used\n  endpoints. No finding for deliberately free shapes (passthrough of foreign JSON data, configuration objects\n  with a free schema) if the Javadoc says so.\n\n## Paths (`path_style`)\n- Consistently kebab-case, nouns, resources in the plural. Upper-case letters or underscores: LOW. A segment\n  such as `PI` (one provider among several) that really is a path parameter: point to `{providerId}`.\n\n## Documentation (`handler_without_javadoc`)\n- A handler without Javadoc is missing from the generated reference and does not explain its purpose. LOW.\n\n## Error format\n- `exception_advice_classes` = 0 with several controllers: errors arrive in Spring's default form and inconsistently.\n  With exactly one `@RestControllerAdvice` the format is central: no finding.\n\n## Severity\n| Severity | Criterion |\n|---|---|\n| CRITICAL | Security hole through the contract (mass assignment on roles/ownership, data of other users) |\n| HIGH | Client-visible error in normal operation, unchecked input into sensitive operations |\n| MEDIUM | Contract coupled to the schema, GET with a side effect, central untyped response |\n| LOW | Style, documentation, status code subtleties |",
+    "sortOrder" : 23,
+    "version" : "1.0.0"
+  },
+  {
+    "builtin" : true,
+    "capabilities" : [
+      {
+        "async" : false,
+        "description" : "Judge the candidates of the build & dependencies fact sheet in the Java source and report findings with ruleKey and severity",
+        "handlerClass" : null,
+        "inputSchema" : {
+          "properties" : {
+            "fact_sheet" : {
+              "type" : "string"
+            },
+            "source_dir" : {
+              "type" : "string"
+            }
+          },
+          "type" : "object"
+        },
+        "name" : "review_build",
+        "outputSchema" : {
+          "properties" : {
+            "findings" : {
+              "type" : "array"
+            },
+            "report" : {
+              "type" : "string"
+            }
+          },
+          "type" : "object"
+        },
+        "skillBackReference" : "builtin-java-build",
+        "writes" : false
+      }
+    ],
+    "category" : "CODE",
+    "configSchema" : { },
+    "description" : "Criteria for judging Maven updates, conflicts, POM hygiene and trivy vulnerabilities (with a reachability check). Source: decebals/claude-code-java (MIT) + MySuricates experience.",
+    "icon" : "📦",
+    "id" : "builtin-java-build",
+    "name" : "Java review: build & dependencies",
+    "prompt" : "# Java review: build & dependencies\n\nExpertise for judging measured candidates from Maven (versions and dependency plugin), POM analysis and\ntrivy. Source: skill `maven-dependency-audit` from decebals/claude-code-java (MIT), shortened and extended\nwith experience from MySuricates.\n\n## Basic stance\n- An available update is not a finding by itself. A finding means there is a reason to act: a known\n  vulnerability, an end of support, a conflict with runtime consequences or a build that is not reproducible.\n- Read `pom.xml` and, where needed, what you know from release notes, but do not invent CVE numbers: CVEs\n  come only from the trivy TREFFER lines.\n\n## Vulnerabilities (trivy)\n- The trivy severity mostly comes from NVD/GHSA. Vendors often rate differently: in 2026 Spring rated several\n  CVEs LOW that NVD listed as CRITICAL. The `trivy_advisory` line names the severity per source; name\n  deviations in the description.\n- **Check reachability:** the advisory describes a vulnerable function and conditions (e.g. \"XsltView with a\n  /** mapping\", \"SSE with view fragments\"). Grep for exactly these classes, annotations and settings in the\n  source directory and in `application*.yml`. Verdict: \"reachable\" (used), \"not reachable\" (search without\n  hits, name the terms) or \"unclear\" (the advisory names no concrete function).\n- Severity: the trivy severity if \"reachable\" or \"unclear\"; at most MEDIUM if \"not reachable\". It still stays a\n  finding as long as the dependency is in the build, because a later change can start using the function.\n- Scope `test` or `provided` lowers the severity further. If there is a fixed version within the same major,\n  the fix is simple; otherwise the major upgrade belongs in the fix.\n\n## Updates (`dependency_update`, `plugin_update`, `parent_update`)\n- **Patch/minor**: one collected LOW finding per file (`pom.xml`), not per artifact; the artifacts go into\n  the evidence.\n- **Major**: a finding only if the line in use no longer receives support or a trivy vulnerability is fixed\n  only in the new major. Spring Boot: the framework maintains each minor line with OSS support for about\n  13 months. If the project's line (FAKT `spring_boot_version`) is, to your knowledge, out of support or close\n  to it, that is a MEDIUM finding with a note that the date needs to be checked. Otherwise no finding, only\n  context.\n- Artifacts managed by the parent/BOM (Spring Boot starters, Jackson, Hibernate under Boot) follow the\n  parent: no finding of their own per artifact, but one for the parent.\n- Milestones and release candidates are already filtered out.\n\n## Conflicts (`dependency_conflict`)\n- \"omitted for conflict\" means: Maven picked one version while another one was requested. A finding only if\n  the picked version is **older** than a requested one (nearest-wins downgraded) or a major jump lies in\n  between. If Maven picks the newest, it is not a finding.\n\n## Reproducibility and hygiene\n- `snapshot_dependency`, `version_range` (LATEST/RELEASE/[a,b)): build not reproducible. MEDIUM.\n- `plugin_without_version`: the plugin version comes from the Maven defaults and changes with Maven. LOW.\n- `insecure_repository` (http://): dependencies over an unencrypted connection. HIGH.\n- `test_library_compile_scope`: test library in the production artifact. LOW–MEDIUM.\n\n## Severity\n| Severity | Criterion |\n|---|---|\n| CRITICAL | Exploitable vulnerability in a runtime dependency without a countermeasure |\n| HIGH | Vulnerability rated HIGH at runtime, insecure repository |\n| MEDIUM | Line without support, downgraded conflict, non-reproducible build |\n| LOW | Collected patch/minor updates, hygiene |",
+    "sortOrder" : 24,
+    "version" : "1.0.0"
+  },
+  {
+    "builtin" : true,
+    "capabilities" : [
+      {
+        "async" : false,
+        "description" : "Judge the candidates of the readability & design fact sheet in the Java source and report findings with ruleKey and severity",
+        "handlerClass" : null,
+        "inputSchema" : {
+          "properties" : {
+            "fact_sheet" : {
+              "type" : "string"
+            },
+            "source_dir" : {
+              "type" : "string"
+            }
+          },
+          "type" : "object"
+        },
+        "name" : "review_design",
+        "outputSchema" : {
+          "properties" : {
+            "findings" : {
+              "type" : "array"
+            },
+            "report" : {
+              "type" : "string"
+            }
+          },
+          "type" : "object"
+        },
+        "skillBackReference" : "builtin-java-design",
+        "writes" : false
+      }
+    ],
+    "category" : "CODE",
+    "configSchema" : { },
+    "description" : "Criteria for judging complexity, naming and design candidates at method level, with patterns as fixes. Source: decebals/claude-code-java (MIT) plus MySuricates experience.",
+    "icon" : "🧭",
+    "id" : "builtin-java-design",
+    "name" : "Java review: readability & design",
+    "prompt" : "# Java review: readability & design\n\nExpertise for judging measured candidates at method level (complexity, nesting, length, misleading names) and\ndesign hints (type switches, scattered case distinctions, refused overrides, self-built dependencies). Source: the\nskills `clean-code`, `solid-principles` and `design-patterns` from decebals/claude-code-java (MIT), shortened and\nextended with experience from MySuricates.\n\n## Basic stance\n- Ask for every candidate: **Can a person reading the code for the first time understand, in reasonable time, what\n  happens and why, and change it without overlooking anything?** A high metric alone is no finding.\n- Complexity that comes from the task (parser, state machine, validation with many cases, mapping tables) is often\n  “intended” if it is well structured. Complexity from mixed concerns or deep nesting is a finding.\n- Class-level topics (god class, coupling, cycles, layers) are checked by an architecture review. Report here only\n  what is visible within a method or at a case distinction.\n- The fix is **concrete**: which section becomes which method, which condition becomes a guard clause, which case\n  distinction moves where. “Refactor” without a target is no fix.\n\n## Method level\n- **Cognitive complexity / NPath** (`CognitiveComplexity` from 25, `NPathComplexity` from 1000): a finding if the\n  method does several things (recognisable by section comments, blocks separated by blank lines, changing levels of\n  abstraction) or if nesting obscures the flow. Fix: extract one method per section, return early instead of\n  `else`, name conditions (`boolean hasPendingApproval = …`).\n- **Deep nesting** (`AvoidDeeplyNestedIfStmts` from depth 4): almost always a finding, LOW; guard clauses.\n- **Long methods** (`NcssCount` from 80 statements): a finding if clearly separable steps can be recognised.\n- **Misleading names** (`LinguisticNaming`): `isX()`/`hasX()` that do not return a boolean, `getX()` that changes\n  something, `setX()` with a return value. A finding, because readers make wrong assumptions; MEDIUM if a caller\n  misuses the method because of it.\n- **Simplifiable** (`SimplifyBooleanReturns`, `CollapsibleIfStatements`): LOW, as one combined finding per file.\n\n## Design (SOLID, and patterns as fixes)\n- **Type switch** (`type_switch`): a `switch`/`if` chain over `getType()`, `status()` and the like. A finding if the\n  same distinction recurs elsewhere or new types are foreseeable (Open/Closed): every new case requires changes in\n  several places. Fix: put the behaviour on the type (enum method, polymorphism), a strategy per case, or a registry\n  that maps each type to its handler. A single, self-contained case distinction over a fixed enum is intended.\n- **Scattered switch** (`scattered_switch`): the same cases are evaluated separately in several files (Shotgun\n  Surgery). A finding, MEDIUM: a new case or a changed meaning has to be followed up everywhere, and a forgotten\n  place goes unnoticed. Fix: one place that knows the meaning (a method on the enum, a mapping class).\n- **Refused override** (`refused_override`): an implementation throws `UnsupportedOperationException`\n  (Liskov/Interface Segregation). A finding if callers use the interface generically; fix: split the interface.\n- **Self-built dependency** (`hidden_dependency`): a Spring component creates a service with `new` (Dependency\n  Inversion). A finding if this makes tests or replacement harder. Factories that deliberately build instances per\n  target (e.g. one HTTP client per kind of target) and plain value objects are intended.\n- **Patterns** are named only as a fix, with the concrete gain (strategy instead of a type switch, builder instead of\n  a long constructor, template method for identical sequences with different steps). A “missing pattern” without a\n  visible problem is no finding.\n\n## Severity\n| Severity | Criterion |\n|---|---|\n| MEDIUM | Readers or people changing the code will probably overlook something: scattered switch, misleading name that is misused, heavily nested method on a frequently changed path |\n| LOW | Readability suffers, but misuse is not likely |\n\nNo finding of this audit goes above MEDIUM: actual bugs are reported by the idioms & error handling audit.",
+    "sortOrder" : 25,
+    "version" : "1.0.0"
+  },
+  {
+    "builtin" : true,
+    "capabilities" : [
+      {
+        "async" : false,
+        "description" : "Judge the candidates of the code review of changes fact sheet in the Java source and report findings with ruleKey and severity",
+        "handlerClass" : null,
+        "inputSchema" : {
+          "properties" : {
+            "fact_sheet" : {
+              "type" : "string"
+            },
+            "source_dir" : {
+              "type" : "string"
+            }
+          },
+          "type" : "object"
+        },
+        "name" : "review_changes",
+        "outputSchema" : {
+          "properties" : {
+            "findings" : {
+              "type" : "array"
+            },
+            "report" : {
+              "type" : "string"
+            }
+          },
+          "type" : "object"
+        },
+        "skillBackReference" : "builtin-java-review",
+        "writes" : false
+      }
+    ],
+    "category" : "CODE",
+    "configSchema" : { },
+    "description" : "Criteria for reviewing a diff (the commits since the last run or a PR range). Source: decebals/claude-code-java (MIT) plus MySuricates experience.",
+    "icon" : "🔎",
+    "id" : "builtin-java-review",
+    "name" : "Java review: code review of changes",
+    "prompt" : "# Java review: code review of changes\n\nExpertise for reviewing a diff (the commits since the last run, or a range such as a pull request).\nSource: the skill `java-code-review` from decebals/claude-code-java (MIT), shortened and extended with experience\nfrom MySuricates and the other Java audits (concurrency, persistence, idioms, readability).\n\n## Procedure\n1. **Understand the intent:** read the commit subjects, then the diff. What is the change meant to achieve?\n2. **Check every changed location** (`changed_hunk`): read the location in the source with its surroundings, not only\n   the diff. For new files, read the whole file.\n3. **Candidates of the measurement** on changed lines (lost_cause, blocking_in_synchronized, repository_in_loop …):\n   judge them as in the respective audits.\n4. **Tests:** if logic changes without tests being added or changed (`changed_test_files`), that is a\n   finding `java.review.missing-test`. Check whether existing tests already cover the new logic (Grep for the\n   class name under `src/test`).\n\n## Checklist per location\n- **Correctness:** edge cases (null, empty, 0, maximum), inverted conditions, off-by-one, wrong order,\n  incomplete renaming (the old name is still in use elsewhere).\n- **Error handling:** swallowed exceptions, lost cause, a broad catch that also catches new errors,\n  resources without try-with-resources, `InterruptedException` without `interrupt()`.\n- **Concurrency:** new shared state, blocking under `synchronized` (Java < 24 with virtual threads:\n  pinning), `@Async`/`@Transactional` self-invocation, ThreadLocal without `remove` in `finally`.\n- **Persistence:** slow calls inside `@Transactional`, a read per loop iteration, `findAll` on growing\n  tables, lazy access outside the transaction, a writing query without a transaction.\n- **API contract:** entity exposed to the outside, `@RequestBody` without `@Valid`, changed response shape without\n  notice (breaks clients), wrong verb or wrong status code.\n- **Security:** input flowing into paths, commands, queries, logs; secrets in logs or `toString`; files holding\n  keys not created with 0600; new public endpoints without checks.\n- **Readability:** the name does not match the effect, new deep nesting, a copy instead of reusing\n  an existing helper method.\n- **Project rules:** whatever the README, CLAUDE.md or comments nearby state as a rule is the yardstick\n  (e.g. \"every new process spawn site must go through …\"). A violation is a finding with a reference to the rule.\n\n## What is not a finding\n- Style questions that a formatter or linter settles; taste in names where nothing is misunderstood.\n- Existing code the change does not touch: the audits of the whole code base check that. Exception: the change\n  relies on an existing bug or makes it worse.\n\n## Known findings of earlier reviews\nAn open review finding stays until the location is fixed, even if the file was not changed in the current range:\ncheck it in the source and carry it on, or leave it out once it is fixed.\n\n## Severity\n| Severity | Criterion |\n|---|---|\n| CRITICAL | Security hole or data loss caused by the change |\n| HIGH | Failure in normal operation likely, contract break for clients |\n| MEDIUM | Failure in edge cases, missing tests for new logic with branches |\n| LOW | Readability, small robustness gaps |",
+    "sortOrder" : 26,
+    "version" : "1.0.0"
   }
 ]

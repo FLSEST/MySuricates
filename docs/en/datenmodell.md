@@ -78,7 +78,7 @@ erDiagram
 | `created_at` | TEXT | | Creation time |
 | `updated_at` | TEXT | | Update time |
 
-19 built-in skills are created by `SkillSeeder` at startup (idempotent, updates on version bump). The definitions live as `src/main/resources/skills/builtin/<id>.json` + `<id>.md` (prompt). Built-in skills have stable IDs (e.g. `builtin-code-review`).
+26 built-in skills are created by `SkillSeeder` at startup (idempotent, updates on version bump). The definitions live as `src/main/resources/skills/builtin/<id>.json` + `<id>.md` (prompt). Built-in skills have stable IDs (e.g. `builtin-code-review`).
 
 ### `capabilities`
 

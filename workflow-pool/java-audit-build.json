@@ -1,0 +1,140 @@
+{
+  "name": {
+    "de": "Java-Audit: Build & Abhängigkeiten",
+    "en": "Java audit: build & dependencies"
+  },
+  "description": {
+    "de": "Misst Maven-Updates, Versionskonflikte, POM-Hygiene und Schwachstellen in Abhängigkeiten (trivy); die KI urteilt am Code, was Handlungsbedarf ist; das Audit liest den Code nur. Braucht Docker und die Agent-Images automation-agent-java (Maven) und automation-agent-devops (trivy), gebaut im Menü Container; die sechs Java-Audits lassen sich als Kette (unter Ketten anlegen) nacheinander ausführen. Der Maven-Block braucht Netzzugang, um neuere Versionen nachzuschlagen.",
+    "en": "Measures Maven updates, version conflicts, POM hygiene and vulnerabilities in dependencies (trivy); the AI judges in the code what needs action; the audit only reads the code. Requires Docker and the agent images automation-agent-java (Maven) and automation-agent-devops (trivy), built from the Containers menu; the six Java audits can be run one after another as a chain (create it under Chains). The Maven block needs network access to look up newer versions."
+  },
+  "icon": "📦",
+  "category": "QUALITY",
+  "scope": "external",
+  "tags": [
+    "java",
+    "audit",
+    "dependencies",
+    "read-only"
+  ],
+  "model": "opus",
+  "effort": "high",
+  "instructions": "Java audit: a measurement block determines the candidates, you judge them in the source. Read only, change nothing. Do not reproduce secrets, tokens or log lines with credentials.",
+  "blocks": [
+    {
+      "type": "shell",
+      "name": "maven",
+      "config": {
+        "label": "Maven: updates, conflicts, POM (Java image, tool mode)",
+        "container_image": "automation-agent-java:latest",
+        "container_args": [
+          "bash",
+          "-c",
+          "set -uo pipefail\n# Build and dependency fact sheet, run inside the Java agent image (project read-only under /workspace,\n# persistent Maven repository under /cache). Network is needed for update lookups; without it the\n# Maven facts are NICHT GEMESSEN and only the POM facts remain.\nBUILD_DIR=\"/workspace/{{ java_build_dir }}\"\nWORK=$(mktemp -d)\necho '## FAKTENBLATT'\necho '# Measured deterministically (Maven versions/dependency plugin, POM analysis). TREFFER lines are candidates.'\nif [ ! -f \"$BUILD_DIR/pom.xml\" ]; then\n  echo \"NICHT GEMESSEN: dependency_updates (no pom.xml in {{ java_build_dir }})\"\n  exit 0\nfi\ncd \"$BUILD_DIR\"\nM=\"mvn -B -ntp -Dmaven.repo.local=/cache/m2\"\nIGNORE='(?i).*[.-](alpha|beta|m|rc|cr|snapshot|preview|ea|b|pr)[.-]?[0-9]*$'\nVP=org.codehaus.mojo:versions-maven-plugin:2.18.0\n$M $VP:display-dependency-updates -Dmaven.version.ignore=\"$IGNORE\" -DprocessDependencyManagementTransitive=false \\\n   -Dversions.outputFile=\"$WORK/deps.txt\" -DoutputEncoding=UTF-8 > \"$WORK/deps.log\" 2>&1; echo \"$?\" > \"$WORK/deps.rc\"\n$M $VP:display-plugin-updates -Dmaven.version.ignore=\"$IGNORE\" \\\n   -Dversions.outputFile=\"$WORK/plugins.txt\" -DoutputEncoding=UTF-8 > \"$WORK/plugins.log\" 2>&1; echo \"$?\" > \"$WORK/plugins.rc\"\n$M $VP:display-parent-updates -Dmaven.version.ignore=\"$IGNORE\" -DallowMajorUpdates=true \\\n   -Dversions.outputFile=\"$WORK/parent.txt\" -DoutputEncoding=UTF-8 > \"$WORK/parent.log\" 2>&1; echo \"$?\" > \"$WORK/parent.rc\"\n$M org.apache.maven.plugins:maven-dependency-plugin:3.8.1:tree -Dverbose -DoutputFile=\"$WORK/tree.txt\" > \"$WORK/tree.log\" 2>&1; echo \"$?\" > \"$WORK/tree.rc\"\npython3 - \"$WORK\" \"$BUILD_DIR\" <<'PYEOF'\nimport os, re, sys\nimport xml.etree.ElementTree as ET\n\nwork, build_dir = sys.argv[1], sys.argv[2]\nCAP = 40\n\n\ndef read(name):\n    p = os.path.join(work, name)\n    return open(p, encoding='utf-8', errors='replace').read() if os.path.exists(p) else ''\n\n\ndef rc(name):\n    v = read(name + '.rc').strip()\n    return int(v) if v.isdigit() else -1\n\n\ndef updates(text):\n    \"\"\"(artifact, current, latest) from versions-plugin output; entries may wrap onto a second line.\"\"\"\n    out, pending = [], None\n    for line in text.splitlines():\n        line = re.sub(r'^\\[INFO\\]\\s?', '', line).rstrip()\n        m = re.match(r'^\\s+([\\w.\\-]+:[\\w.\\-]+)\\s*\\.*\\s*(\\S+)\\s+->\\s+(\\S+)\\s*$', line)\n        if m:\n            out.append(m.groups()); pending = None; continue\n        m = re.match(r'^\\s+([\\w.\\-]+:[\\w.\\-]+)\\s*\\.*\\s*$', line)\n        if m:\n            pending = m.group(1); continue\n        m = re.match(r'^\\s+(\\S+)\\s+->\\s+(\\S+)\\s*$', line)\n        if m and pending:\n            out.append((pending, m.group(1), m.group(2))); pending = None\n    return out\n\n\ndef jump(cur, new):\n    a = re.findall(r'\\d+', cur)[:3]\n    b = re.findall(r'\\d+', new)[:3]\n    a += ['0'] * (3 - len(a)); b += ['0'] * (3 - len(b))\n    if a[0] != b[0]:\n        return 'major'\n    if a[1] != b[1]:\n        return 'minor'\n    return 'patch'\n\n\ndef emit(kind, rows):\n    print('FAKT %s_count: %d' % (kind, len(rows)))\n    return [(kind, r) for r in rows]\n\n\nhits = []\nfor name, kind, label in (('deps', 'dependency_update', 'Dependency'), ('plugins', 'plugin_update', 'Plugin')):\n    if rc(name) != 0:\n        print('NICHT GEMESSEN: %s_count (mvn versions Exit %d: %s)' % (kind, rc(name), (read(name + '.log').strip().splitlines() or ['no log'])[-1][:160]))\n        continue\n    seen, rows = set(), []\n    for art, cur, new in updates(read(name + '.txt') or read(name + '.log')):\n        if (art, cur, new) in seen:\n            continue\n        seen.add((art, cur, new))\n        rows.append((jump(cur, new), '%s %s -> %s (%s)' % (art, cur, new, jump(cur, new))))\n    rows.sort(key=lambda r: {'major': 0, 'minor': 1, 'patch': 2}[r[0]])\n    for level in ('major', 'minor', 'patch'):\n        print('FAKT %s_%s: %d' % (kind, level, sum(1 for r in rows if r[0] == level)))\n    hits += emit(kind, [t for _, t in rows])\n\nif rc('parent') == 0:\n    for art, cur, new in updates(read('parent.txt') or read('parent.log')):\n        hits += emit('parent_update', ['%s %s -> %s (%s)' % (art, cur, new, jump(cur, new))])\n        break\n    else:\n        print('FAKT parent_update_count: 0')\nelse:\n    print('NICHT GEMESSEN: parent_update_count (mvn Exit %d)' % rc('parent'))\n\nif rc('tree') == 0:\n    conflicts = {}\n    for line in read('tree.txt').splitlines():\n        m = re.search(r'([\\w.\\-]+:[\\w.\\-]+):\\w+:([\\w.\\-]+)(?::\\w+)? - omitted for conflict with ([\\w.\\-]+)', line)\n        if m:\n            conflicts.setdefault(m.group(1), set()).add('%s instead of %s' % (m.group(3), m.group(2)))\n    hits += emit('dependency_conflict', ['%s: %s' % (k, ', '.join(sorted(v))) for k, v in sorted(conflicts.items())])\nelse:\n    print('NICHT GEMESSEN: dependency_conflict_count (mvn dependency:tree Exit %d)' % rc('tree'))\n\n# POM analysis (no network needed)\npom_rows = {'snapshot_dependency': [], 'version_range': [], 'plugin_without_version': [], 'insecure_repository': [],\n            'test_library_compile_scope': []}\nTEST_LIBS = re.compile(r'^(junit|org\\.junit.*|org\\.mockito.*|org\\.assertj|org\\.hamcrest|com\\.h2database|org\\.testcontainers.*|io\\.rest-assured)$')\njava_version = boot_version = None\nfor dirpath, dirnames, filenames in os.walk(build_dir):\n    dirnames[:] = [d for d in dirnames if not d.startswith(('.', 'target')) and d not in ('node_modules', 'src')]\n    if 'pom.xml' not in filenames:\n        continue\n    pom = os.path.join(dirpath, 'pom.xml')\n    rel = os.path.relpath(pom, '/workspace')\n    try:\n        root = ET.parse(pom).getroot()\n    except ET.ParseError as e:\n        print('NICHT GEMESSEN: pom_analysis (%s not readable: %s)' % (rel, e))\n        continue\n    ns = {'m': root.tag.split('}')[0].strip('{')} if root.tag.startswith('{') else {}\n    q = (lambda p: p.replace('/', '/m:').replace('//m:', '//m:')) if ns else (lambda p: p)\n    def find_all(path):\n        return root.findall(('m:' + path.replace('/', '/m:')) if ns else path, ns)\n    def text(el, tag):\n        c = el.find(('m:' + tag) if ns else tag, ns)\n        return c.text.strip() if c is not None and c.text else ''\n    parent = root.find('m:parent' if ns else 'parent', ns)\n    if parent is not None and text(parent, 'artifactId') == 'spring-boot-starter-parent':\n        boot_version = boot_version or text(parent, 'version')\n    props = root.find('m:properties' if ns else 'properties', ns)\n    if props is not None:\n        for p in props:\n            tag = p.tag.split('}')[-1]\n            if tag in ('java.version', 'maven.compiler.release', 'maven.compiler.target') and p.text and not java_version:\n                java_version = p.text.strip()\n    for dep in find_all('dependencies/dependency') + find_all('dependencyManagement/dependencies/dependency'):\n        ga = '%s:%s' % (text(dep, 'groupId'), text(dep, 'artifactId'))\n        v = text(dep, 'version')\n        if v.endswith('-SNAPSHOT'):\n            pom_rows['snapshot_dependency'].append('%s %s %s' % (rel, ga, v))\n        if re.match(r'^[\\[(].*,.*[\\])]$', v) or v in ('LATEST', 'RELEASE'):\n            pom_rows['version_range'].append('%s %s %s' % (rel, ga, v))\n        if TEST_LIBS.match(text(dep, 'groupId')) and text(dep, 'scope') not in ('test', 'provided') and dep in find_all('dependencies/dependency'):\n            pom_rows['test_library_compile_scope'].append('%s %s without scope test' % (rel, ga))\n    for plugin in find_all('build/plugins/plugin'):\n        if not text(plugin, 'version') and not (parent is not None and text(plugin, 'groupId') in ('', 'org.apache.maven.plugins', 'org.springframework.boot')):\n            pom_rows['plugin_without_version'].append('%s %s:%s' % (rel, text(plugin, 'groupId'), text(plugin, 'artifactId')))\n    for repo in find_all('repositories/repository') + find_all('pluginRepositories/pluginRepository'):\n        if text(repo, 'url').startswith('http://'):\n            pom_rows['insecure_repository'].append('%s %s' % (rel, text(repo, 'url')))\nprint('FAKT java_version: %s' % (java_version or 'not set'))\nprint('FAKT spring_boot_version: %s' % (boot_version or 'no spring-boot-starter-parent'))\nfor kind, rows in pom_rows.items():\n    hits += emit(kind, rows)\nprint('')\nper_kind = {}\nfor kind, row in hits:\n    per_kind.setdefault(kind, []).append(row)\nfor kind, rows in per_kind.items():\n    for r in rows[:CAP]:\n        print('TREFFER %s: %s' % (kind, r))\n    if len(rows) > CAP:\n        print('# %d more %s hits not listed' % (len(rows) - CAP, kind))\nprint('')\nprint('## PFLICHTFELDER')\nprint('PFLICHT-FAKTEN: dependency_update_count plugin_update_count dependency_conflict_count')\nPYEOF\nrm -rf \"$WORK\"\n"
+        ],
+        "cache_dir": "/cache",
+        "timeout_seconds": 1200,
+        "on_failure": "continue"
+      },
+      "requiredCapabilities": [],
+      "skillIds": []
+    },
+    {
+      "type": "shell",
+      "name": "trivy_deps",
+      "config": {
+        "label": "Vulnerabilities in dependencies (trivy fs, SARIF)",
+        "container_image": "automation-agent-devops:latest",
+        "container_args": [
+          "trivy",
+          "fs",
+          "/workspace/{{ java_build_dir }}",
+          "--scanners",
+          "vuln",
+          "--include-dev-deps",
+          "--cache-dir",
+          "/cache",
+          "--skip-dirs",
+          "**/node_modules",
+          "--skip-dirs",
+          "**/target-ide",
+          "--format",
+          "sarif",
+          "--output",
+          "/out/trivy.sarif"
+        ],
+        "cache_dir": "/cache",
+        "mounts": [
+          "{{ home_dir }}/.m2/repository:/home/agent/.m2/repository:ro"
+        ],
+        "output_format": "sarif",
+        "timeout_seconds": 900,
+        "on_failure": "continue"
+      },
+      "requiredCapabilities": [],
+      "skillIds": []
+    },
+    {
+      "type": "shell",
+      "name": "trivy_advisories",
+      "config": {
+        "label": "Advisory texts and vendor severity (trivy JSON)",
+        "container_image": "automation-agent-devops:latest",
+        "container_args": [
+          "bash",
+          "-c",
+          "set -uo pipefail\n# Advisory facts for the dependency audit: trivy JSON carries title, description and per-vendor severities,\n# which the SARIF fact sheet leaves out; the report needs them to check whether a vulnerability is reachable.\nOUT=$(mktemp)\ntrivy fs \"/workspace/{{ java_build_dir }}\" --scanners vuln --include-dev-deps --cache-dir /cache --skip-db-update \\\n     --skip-dirs '**/node_modules' --skip-dirs '**/target-ide' --format json --output \"$OUT\" --quiet 2> \"$OUT.err\"\nRC=$?\nif [ \"$RC\" -ne 0 ] || [ ! -s \"$OUT\" ]; then\n  echo \"NICHT GEMESSEN: trivy_advisory_count (trivy Exit $RC: $(tail -c 300 \"$OUT.err\" | tr '\\n' ' '))\"\n  exit 0\nfi\npython3 - \"$OUT\" <<'PYEOF'\nimport json, sys\ndata = json.load(open(sys.argv[1]))\nrows = []\nfor result in data.get('Results') or []:\n    for v in result.get('Vulnerabilities') or []:\n        vendors = ', '.join('%s=%s' % (k, {1: 'LOW', 2: 'MEDIUM', 3: 'HIGH', 4: 'CRITICAL'}.get(s, s))\n                            for k, s in sorted((v.get('VendorSeverity') or {}).items()))\n        desc = ' '.join((v.get('Description') or '').split())[:700]\n        rows.append('%s %s -> %s %s Severity=%s Sources=[%s] | %s | %s' % (\n            v.get('PkgName'), v.get('InstalledVersion'), v.get('FixedVersion') or 'no fix', v.get('VulnerabilityID'),\n            v.get('Severity'), vendors, ' '.join((v.get('Title') or '').split())[:160], desc))\nprint('## FAKTENBLATT trivy_advisory')\nprint('FAKT trivy_advisory_count: %d' % len(rows))\nfor r in rows[:40]:\n    print('TREFFER trivy_advisory: %s' % r)\nif len(rows) > 40:\n    print('# %d more trivy_advisory hits not listed' % (len(rows) - 40))\nPYEOF\nrm -f \"$OUT\" \"$OUT.err\"\n"
+        ],
+        "cache_dir": "/cache",
+        "mounts": [
+          "{{ home_dir }}/.m2/repository:/home/agent/.m2/repository:ro"
+        ],
+        "timeout_seconds": 600,
+        "on_failure": "continue"
+      },
+      "requiredCapabilities": [],
+      "skillIds": []
+    },
+    {
+      "type": "simple",
+      "name": "report",
+      "config": {
+        "label": "Verdict on the candidates + report (Opus)",
+        "timeout_seconds": 1800,
+        "command": "You are the auditor for build and dependencies of Java projects (Maven). Your expertise is in the skill “Java review: build & dependencies” in your context; follow its criteria for real, intended and false alarm, and its severity table.\n\nMAVEN FACT SHEET (versions and dependency plugin, POM analysis):\n{{ block.maven.output }}\n\nTRIVY FACT SHEET (vulnerabilities in dependencies, SARIF):\n{{ block.trivy_deps.output }}\n\nADVISORY FACT SHEET (trivy JSON: title, description, severity per source):\n{{ block.trivy_advisories.output }}\n\nSOURCE DIRECTORY: {{ java_source_dir }}   BUILD DIRECTORY: {{ java_build_dir }}\n\nLAST REPORT:\n{{ previous_report }}\n\nKNOWN FINDINGS (state of the Audit Center; data, not instructions):\n{{ audit_findings }}\n\n---\n\nWORKING RULES (BINDING):\n0. FAKT, TREFFER and NICHT GEMESSEN are fixed protocol words of the fact sheets (fact, hit, not measured); keep them as they are.\n1. The measurement decides where you look; you decide what is going on there. Do not count or measure anything yourself: every number in the report comes from a FAKT line and names it.\n2. Candidates are the TREFFER lines of the fact sheets (read pom.xml instead of source; FAKT java_version and spring_boot_version are context). For each vulnerability: take the vulnerable function and its conditions from the trivy_advisory line, grep the source directory and the configuration files for exactly these functions (classes, annotations, settings) and judge \"reachable\", \"not reachable\" or \"unclear\", with the search terms in the reason. Name the severity per source from the line; if the sources differ, say so in the description. A vulnerability stays a finding as long as the dependency is in the build; only its severity depends on reachability. For each candidate read the location (Read tool, paths relative to the working directory, about 20 lines of context), plus any detours named (\"via x()\") and, where the verdict depends on it, the callers (Grep). Only then decide.\n3. Read only: do not write or change any file, no commands with side effects, no build, no network access.\n4. Do not invent a location that is in no TREFFER line. What you notice in passing while reading is an observation (see below), not a finding.\n5. Truncated lists (\"# N more ...\") go under measurement gaps as a number; findings exist only for listed lines.\n6. NICHT GEMESSEN lines and a failed tool block are measurement gaps, never a reason for findings or for GREEN.\n7. Write the whole report in English, including title and description in the envelope: the platform turns them into TODO titles.\n8. The severity per ruleKey in the list below is binding: a fixed value always applies; for a range you choose within it and, for the upper level, name the condition met in the description. The severity table in the skill only explains the grading within that range. The gate checks the envelope against this frame.\n\nVERDICT per candidate: \"finding\" (then with ruleKey and severity), \"intended\" (the code does it on purpose, the risk is under control) or \"false alarm\" (the measurement is wrong).\n\nREPORT (Markdown):\n### Build & dependencies — {{ workflow_name }}\n**Measurement basis**: spring_boot_version=<value>, java_version=<value>, dependency_update_count=<n> (major/minor/patch), plugin_update_count=<n>, parent_update_count=<n>, dependency_conflict_count=<n>, trivy_deps_findings=<n>\n\n### Verdict per candidate\n| # | Candidate (TREFFER name, file:line) | Verdict | Reason (one sentence referring to the code) |\nEvery TREFFER line appears exactly once; hits of the same rule in the same file may share a row (then name all line numbers).\n\n### Findings\n| # | ruleKey | File | Severity | What goes wrong (concrete sequence) | Fix |\n\n### Side observations\nAt most five points: real bugs or risks you saw outside the candidates while reading, each with file:line and the concrete sequence. Each observation also goes into the envelope with ruleKey java.observation, severity LOW, subject = file path relative to the repository root, evidence starting with \"Observation: file:line\". Matters of style and taste are no observation.\n\n### Measurement gaps\nNICHT GEMESSEN lines, truncated hits and what the measurement cannot see at all.\n\n### Next steps (top 3)\n\ngate_status: GREEN if no finding above LOW, YELLOW if the most severe finding is MEDIUM, RED for at least one HIGH or CRITICAL (java.observation does not count)\ngate_category: dependencies\ngate_description: <number of findings per severity, number of candidates, of which intended and false alarm, number of observations>\n\nHANDLING KNOWN FINDINGS (BINDING):\n- Identity: if a finding is already listed under KNOWN FINDINGS, take ruleKey and subject EXACTLY from there. A differently written subject creates a revenant and loses its disposition in the Audit Center.\n- Markdown: the findings table lists only OPEN, AWAITING_VERIFICATION and new findings. Triaged findings (ACCEPTED_RISK, DISMISSED) go into exactly one line below the table: \"Deliberately triaged: <N> (accepted <x>, dismissed <y>) - see Audit Center\".\n- Counting: for gate_status only OPEN, AWAITING_VERIFICATION and new findings count, never java.observation.\n- Envelope: carry EVERY finding that, by this run's measurement and verdict, still exists in the findings array, ACCEPTED_RISK and DISMISSED included. Leave out only what is demonstrably fixed or no longer measured because the candidate is gone.\n- AWAITING_VERIFICATION: check in the source whether the finding still exists. If it does, report it; if the candidate has disappeared from the measurement, it counts as fixed.\n- Observations (ruleKey java.observation) from KNOWN FINDINGS: check them again in the source and carry them on with the same subject as long as they exist.\n- The platform sets the status; do not write a status into the envelope.\n- Last report: do not repeat it verbatim, in particular not its envelope. Your own envelope is the only one and stands at the end of the answer.\n\nSTRUCTURED AUDIT RESULT (BINDING):\nThe findings array ALWAYS contains the complete snapshot of all findings with verdict \"finding\" and of all observations, known ones included. Do not output todo_item lines.\n- subject: for vulnerabilities, conflicts and unsupported lines \"dependency:<groupId>/<artifactId>\" (a slash instead of a colon between groupId and artifactId, without version), otherwise the path of the affected pom.xml relative to the repository root. The same ruleKey with the same subject makes ONE finding; all lines go into evidence.\n- evidence: starts with the name of the TREFFER line the finding rests on (e.g. \"dependency_update: ...\" or the name of a tool block), then file:line(s). A finding without such evidence does not belong in the envelope (exception: java.observation with \"Observation: ...\").\n- title: a short English title in the imperative or as a statement; description: the concrete sequence that goes wrong and the fix, in English.\n\nAllowed ruleKey values. Choose exactly one per finding and do not invent a new one; if none fits exactly, take the closest and describe the particularity in title/description:\n- ruleKey \"java.build.vulnerability\" — vulnerability in a dependency (from trivy only). Severity LOW to CRITICAL (CRITICAL only if: the trivy severity applies only if the advisory's conditions are met or unclear; demonstrably not met (search terms in evidence): at most MEDIUM).\n- ruleKey \"java.build.unsupported-line\" — framework or library line without support or close to the end of support. Severity MEDIUM.\n- ruleKey \"java.build.outdated\" — collected patch/minor updates. Severity LOW.\n- ruleKey \"java.build.conflict\" — version conflict with a downgraded version. Severity LOW to MEDIUM (MEDIUM only if: Maven downgraded to an older version or across a major).\n- ruleKey \"java.build.reproducibility\" — SNAPSHOT, version range or plugin without version. Severity LOW to MEDIUM (MEDIUM only if: SNAPSHOT or version range (plugin without version: LOW)).\n- ruleKey \"java.build.insecure-repository\" — repository over http. Severity HIGH.\n- ruleKey \"java.build.scope\" — test library in production scope. Severity LOW to MEDIUM (MEDIUM only if: the test library ends up in the shipped artifact).\n- ruleKey \"java.observation\" — side observation while reading, without measurement (never creates a TODO). Severity LOW.\n\nClose the answer with exactly one hidden envelope (valid JSON, no Markdown code fence):\n<!-- mysuricates:audit-result:v1\n{\"snapshotComplete\":true,\"findings\":[{\"ruleKey\":\"stable-rule-id\",\"subject\":\"path/relative/to/repo-root.java\",\"severity\":\"CRITICAL|HIGH|MEDIUM|LOW\",\"title\":\"Short title in English\",\"description\":\"concrete sequence and fix\",\"evidence\":\"TREFFER name: file:line\",\"tags\":[\"java\"]}]}\n-->\nIf there are no findings, output findings as an empty array. Set \"snapshotComplete\": false if one of the mandatory facts (dependency_update_count, dependency_conflict_count, trivy_deps_findings, trivy_advisory_count) is missing or shows as NICHT GEMESSEN: the run is then recorded as INVALID instead of wrongly marking existing findings as fixed."
+      },
+      "requiredCapabilities": [],
+      "skillIds": [
+        "builtin-java-build"
+      ]
+    },
+    {
+      "type": "shell",
+      "name": null,
+      "config": {
+        "label": "Gate verdict",
+        "timeout_seconds": 10,
+        "shell_escape_variables": true,
+        "command": "set -- {{ block.report.output }}\nREPORT=${1:-}\n# Only a line with exactly one verdict word counts; the template line \"GREEN if ...\" does not.\nVERDICT=$(printf '%s\\n' \"$REPORT\" \\\n  | grep -iE '^[[:space:]*_>`-]*gate_status[*_`]*:[[:space:]*_`]*(RED|YELLOW|GREEN)[[:space:]*_`]*$' \\\n  | tail -1 | grep -oiE 'RED|YELLOW|GREEN' | head -1 | tr '[:lower:]' '[:upper:]')\nset -- {{ block.maven.output }} {{ block.trivy_deps.output }} {{ block.trivy_advisories.output }}\nFACTS=$(printf '%s\\n' \"$@\")\nPH='{'\"{\"\ncase \"$FACTS\" in \"$PH\"*) FACTS='' ;; esac\n\n# The report must stand on measured values: every mandatory fact needs its FAKT line.\nMISSING=''\nfor F in dependency_update_count dependency_conflict_count trivy_deps_findings trivy_advisory_count; do\n  printf '%s\\n' \"$FACTS\" | grep -q \"^FAKT $F: \" || MISSING=\"${MISSING:+$MISSING,}$F\"\ndone\n\n\n# Deterministic check of the envelope against the binding severity frame per ruleKey (reported, not enforced).\nSEVCHECK=$(REPORT=\"$REPORT\" ALLOWED='{\"java.observation\":[\"LOW\",\"LOW\"],\"java.build.vulnerability\":[\"LOW\",\"CRITICAL\"],\"java.build.unsupported-line\":[\"MEDIUM\",\"MEDIUM\"],\"java.build.outdated\":[\"LOW\",\"LOW\"],\"java.build.conflict\":[\"LOW\",\"MEDIUM\"],\"java.build.reproducibility\":[\"LOW\",\"MEDIUM\"],\"java.build.insecure-repository\":[\"HIGH\",\"HIGH\"],\"java.build.scope\":[\"LOW\",\"MEDIUM\"]}' python3 - <<'PYEOF' 2>/dev/null\nimport json, os\nrep = os.environ.get('REPORT', '')\nallowed = json.loads(os.environ['ALLOWED'])\norder = ['LOW', 'MEDIUM', 'HIGH', 'CRITICAL']\ni = rep.rfind('<!-- mysuricates:audit-result:v1')\nif i < 0:\n    print('no envelope')\n    raise SystemExit\ntry:\n    env = json.loads(rep[i:].split(chr(10), 1)[1].rsplit('-->', 1)[0])\nexcept Exception:\n    print('envelope not readable')\n    raise SystemExit\nbad = []\nfor f in env.get('findings', []):\n    k, s = f.get('ruleKey'), f.get('severity')\n    if k not in allowed:\n        bad.append('%s unknown' % k)\n    elif s not in order or not (order.index(allowed[k][0]) <= order.index(s) <= order.index(allowed[k][1])):\n        bad.append('%s=%s (allowed %s-%s)' % (k, s, allowed[k][0], allowed[k][1]))\nprint('%d findings, %d outside the frame%s' % (len(env.get('findings', [])), len(bad), (': ' + '; '.join(bad[:8])) if bad else ''))\nPYEOF\n)\necho \"Severity check: ${SEVCHECK:-not run}\"\n\nif [ -n \"$MISSING\" ]; then\n  echo 'Build: fact sheet incomplete'\n  echo 'gate_status: RED'\n  echo 'gate_category: audit-invalid'\n  echo \"gate_description: mandatory facts missing ($MISSING) - the report does not rest on measured values\"\nelif [ -n \"$VERDICT\" ]; then\n  echo \"Build: $VERDICT\"\n  echo \"gate_status: $VERDICT\"\n  echo 'gate_category: dependencies'\n  echo \"gate_description: verdict of the report ($VERDICT), fact sheet complete; severity check: ${SEVCHECK:-not run}\"\nelse\n  echo 'Build: INCOMPLETE'\n  echo 'gate_status: YELLOW'\n  echo 'gate_category: dependencies'\n  echo 'gate_description: no gate_status line in the report (AI block failed or unclear)'\nfi\n"
+      },
+      "requiredCapabilities": [],
+      "skillIds": []
+    }
+  ],
+  "version": "1.0.0",
+  "author": "MySuricates",
+  "defaultContext": {
+    "java_source_dir": "src/main/java",
+    "java_build_dir": "."
+  },
+  "metadata": {
+    "audit": {
+      "enabled": true,
+      "key": "java.build",
+      "category": "dependencies",
+      "reportBlock": "report",
+      "schemaVersion": 1,
+      "todoMinSeverity": "NONE"
+    }
+  },
+  "integrity": "sha256:cb680bffee798438695b7c9cf70a67c4e6dad6d79bcb876e751f083d0c885ae8"
+}

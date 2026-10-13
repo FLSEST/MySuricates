@@ -1,0 +1,37 @@
+{
+  "id" : "builtin-java-persistence",
+  "sortOrder" : 22,
+  "version" : "1.0.0",
+  "name" : "Java review: persistence & transactions",
+  "icon" : "🗄️",
+  "description" : "Criteria for judging JPA/Spring Data candidates (transactions, N+1, entities). Source: decebals/claude-code-java (MIT) plus MySuricates experience.",
+  "category" : "CODE",
+  "capabilities" : [
+    {
+      "name" : "review_persistence",
+      "description" : "Judge the candidates of the persistence & transactions fact sheet in the Java source and report findings with ruleKey and severity",
+      "inputSchema" : {
+        "properties" : {
+          "fact_sheet" : {
+            "type" : "string"
+          },
+          "source_dir" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "outputSchema" : {
+        "properties" : {
+          "findings" : {
+            "type" : "array"
+          },
+          "report" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      }
+    }
+  ]
+}

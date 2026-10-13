@@ -140,7 +140,7 @@ File-related rules (`subject = path`) and rules with several permitted values
 "DB-Größe" and the FACT name, and every run created a new finding). Version 6 of the clean-up run
 merges these findings, and those that only stood apart under class name and path, triage included.
 `AuditRuleKeyCatalogTest` keeps catalogue and prompt in step and checks that a prompt's envelope
-example names only a catalogued `ruleKey` (or the placeholder `stabile-regel-id`).
+example names only a catalogued `ruleKey` (or the placeholder `stabile-regel-id`, `stable-rule-id` in the English Java audits).
 
 ### Evidence check: `evidence` must name a measurement of this run
 

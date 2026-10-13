@@ -35,6 +35,34 @@
     "version" : "1.0.0",
     "hash" : "sha256:27f85311ff90e4cb8c22d751f6528c0cbfc2553f7304331a0041fc8279aedcc0"
   },
+  "builtin-java-build" : {
+    "version" : "1.0.0",
+    "hash" : "sha256:786509f7bd8b5cbc03e84abd6932f399953da6b38d4999c53aeb3bf69bdd399f"
+  },
+  "builtin-java-concurrency" : {
+    "version" : "1.0.0",
+    "hash" : "sha256:b2e9c2e910e813cd38fdaacb2c00b2a2a36982c78e02b390739e9e6ac0be02f9"
+  },
+  "builtin-java-design" : {
+    "version" : "1.0.0",
+    "hash" : "sha256:1bec525116f3661edbd7994fc857615d82e7d56105b0334511ad5e061290db41"
+  },
+  "builtin-java-idioms" : {
+    "version" : "1.0.0",
+    "hash" : "sha256:d6c5dc31c452dfc9fc63a83a3ccd4189d44253abccaf16a11f81623607b45877"
+  },
+  "builtin-java-persistence" : {
+    "version" : "1.0.0",
+    "hash" : "sha256:eabf618daef201c34dbfb146dd897383403fcc8fe8682b48af0ab0fdd60f032f"
+  },
+  "builtin-java-rest-api" : {
+    "version" : "1.0.0",
+    "hash" : "sha256:9c587c228201452b267b008a54bd30dd75a25da4c371ccd60839f52573c08afd"
+  },
+  "builtin-java-review" : {
+    "version" : "1.0.0",
+    "hash" : "sha256:c5fe27c019ff3070ce7deeeab7f5c6779f8de4266bdb7581d941e2fe073b07f8"
+  },
   "builtin-marketing-copywriter" : {
     "version" : "1.0.0",
     "hash" : "sha256:8b635d178f18abdbe3537bb52bc1419ed18c660841701f2b1d7c4214c5d7dca0"

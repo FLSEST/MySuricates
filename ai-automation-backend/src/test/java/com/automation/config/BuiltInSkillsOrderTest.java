@@ -43,7 +43,15 @@ class BuiltInSkillsOrderTest {
                 "builtin-risk-assessor",
                 "builtin-spec-architect",
                 "builtin-feature-implementer",
-                "builtin-marketing-copywriter"
+                "builtin-marketing-copywriter",
+                // Java audits in the workflow pool (TODO 51357b6c)
+                "builtin-java-concurrency",
+                "builtin-java-idioms",
+                "builtin-java-persistence",
+                "builtin-java-rest-api",
+                "builtin-java-build",
+                "builtin-java-design",
+                "builtin-java-review"
         );
     }
 

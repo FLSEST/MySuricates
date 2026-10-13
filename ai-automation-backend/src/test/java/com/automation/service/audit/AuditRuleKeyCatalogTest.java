@@ -23,6 +23,9 @@ import static org.assertj.core.api.Assertions.assertThat;
  */
 class AuditRuleKeyCatalogTest {
 
+    /** The envelope example's ruleKey placeholder, German and English prompts. */
+    private static final Set<String> SCHEMA_PLACEHOLDERS = Set.of("stabile-regel-id", "stable-rule-id");
+
     private static final String COVERAGE = "mysuricates.test-coverage";
     private static final String PUBLIC_READINESS = "project.public-readiness";
 
@@ -225,7 +228,8 @@ class AuditRuleKeyCatalogTest {
     /**
      * Gate (802f740a): the envelope example at the end of a prompt also names no ruleKey outside the
      * catalog. If the model adopted it, the ingestion would discard the whole report. Besides that only
-     * the schema placeholder {@code stabile-regel-id} is allowed, which no catalog knows.
+     * the schema placeholder is allowed, which no catalog knows: {@code stabile-regel-id} in the German prompts,
+     * {@code stable-rule-id} in the English ones (java.* audits, TODO 51357b6c).
      */
     @Test
     void envelopeExamplesUseACataloguedRuleKeyOrThePlaceholder() throws IOException {
@@ -244,7 +248,7 @@ class AuditRuleKeyCatalogTest {
                         while (key.find()) {
                             examples++;
                             String value = key.group(1);
-                            if (!"stabile-regel-id".equals(value) && catalog.isChecked(auditKey)
+                            if (!SCHEMA_PLACEHOLDERS.contains(value) && catalog.isChecked(auditKey)
                                     && !catalog.allowedKeys(auditKey).contains(value)) {
                                 violations.add(variant.label() + " (" + auditKey + "): Envelope-Beispiel nennt ruleKey '"
                                         + value + "', der nicht im Katalog steht");

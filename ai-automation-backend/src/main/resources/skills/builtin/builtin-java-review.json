@@ -1,0 +1,37 @@
+{
+  "id" : "builtin-java-review",
+  "sortOrder" : 26,
+  "version" : "1.0.0",
+  "name" : "Java review: code review of changes",
+  "icon" : "🔎",
+  "description" : "Criteria for reviewing a diff (the commits since the last run or a PR range). Source: decebals/claude-code-java (MIT) plus MySuricates experience.",
+  "category" : "CODE",
+  "capabilities" : [
+    {
+      "name" : "review_changes",
+      "description" : "Judge the candidates of the code review of changes fact sheet in the Java source and report findings with ruleKey and severity",
+      "inputSchema" : {
+        "properties" : {
+          "fact_sheet" : {
+            "type" : "string"
+          },
+          "source_dir" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
+      "outputSchema" : {
+        "properties" : {
+          "findings" : {
+            "type" : "array"
+          },
+          "report" : {
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      }
+    }
+  ]
+}

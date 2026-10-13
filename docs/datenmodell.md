@@ -78,7 +78,7 @@ erDiagram
 | `created_at` | TEXT | | Erstellzeitpunkt |
 | `updated_at` | TEXT | | Aktualisierungszeitpunkt |
 
-19 eingebaute Skills werden durch `SkillSeeder` beim Start angelegt (idempotent, Update bei Version-Bump). Die Definitionen liegen als `src/main/resources/skills/builtin/<id>.json` + `<id>.md` (Prompt). Built-in Skills haben stabile IDs (z.B. `builtin-code-review`).
+26 eingebaute Skills werden durch `SkillSeeder` beim Start angelegt (idempotent, Update bei Version-Bump). Die Definitionen liegen als `src/main/resources/skills/builtin/<id>.json` + `<id>.md` (Prompt). Built-in Skills haben stabile IDs (z.B. `builtin-code-review`).
 
 ### `capabilities`
 

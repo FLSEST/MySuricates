@@ -140,7 +140,7 @@ unter „Kennzahl-Befunde“ nennt – im Performance-Audit `perf.db.size` → `
 führt diese Befunde und die, die nur unter Klassenname bzw. Pfad getrennt standen, samt Einordnung
 zusammen.
 `AuditRuleKeyCatalogTest` hält Katalog und Prompt gleich und prüft, dass auch das Envelope-Beispiel
-eines Prompts nur einen katalogisierten `ruleKey` (oder den Platzhalter `stabile-regel-id`) nennt.
+eines Prompts nur einen katalogisierten `ruleKey` (oder den Platzhalter `stabile-regel-id`, in den englischen Java-Audits `stable-rule-id`) nennt.
 
 ### Belegprüfung: `evidence` muss eine Messung dieses Laufs nennen
 

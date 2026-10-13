@@ -28,7 +28,12 @@ they are here as worked examples of the mechanism, not as tools for your codebas
 `external` entries (`saas-*`) drive a SaaS factory with its own `factory` CLI, which is not part
 of this repository; `saas-feature-loop` runs the installed `saas-feature-implement` once per
 feature (a `foreach` with `workflow_id`), so install both and pass the id of the second as
-`feature_workflow_id`. The pool
+`feature_workflow_id`. The Java audits (`java-audit-*`, `java-review-changes`) work on any Java
+project: a measurement (PMD, Maven, trivy or a script) picks the candidates and the AI judges them
+in the source, with a built-in skill per audit (`builtin-java-*`); set `java_source_dir` and
+`java_build_dir` for your layout. The ones using PMD, Maven or trivy are `external` (Docker plus
+the agent images from the Containers menu). The pool has no chains: to run the six audits one
+after another, create a chain from the installed copies under Chains. The pool
 browser shows the scope as a badge; from the shell:
 
 ```bash
@@ -58,5 +63,7 @@ entries are maintained — is in
 **Deutsch:** Jede Datei hier ist ein Angebot, kein Plattformbestandteil — sie wird erst durch
 bewusstes Installieren zu einem Workflow, und zwar als eigenständige Kopie. Das Feld `scope`
 sagt, ob ein Eintrag in einem fremden Projekt überhaupt etwas tut (`portable`) oder an den
-Aufbau dieses Repositories gebunden ist (`repo`). Regelwerk und Begründung:
+Aufbau dieses Repositories gebunden ist (`repo`). Die Java-Audits (`java-audit-*`,
+`java-review-changes`) sind englisch und passen zu jedem Java-Projekt; nacheinander laufen sie über
+eine Kette, die man aus den installierten Kopien selbst anlegt. Regelwerk und Begründung:
 [docs/workflow-pool-kuratierung.md](../docs/workflow-pool-kuratierung.md).
