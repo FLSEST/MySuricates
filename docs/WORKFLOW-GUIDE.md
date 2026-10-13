@@ -1323,7 +1323,7 @@ Wenn der Provider nicht verbunden ist oder die API fehlschlägt, wird der Block 
 
 Was in den öffentlichen Workflow-Pool gehört, wie er sich von den eingebauten Templates abgrenzt und welche Kriterien das Hygiene-Gate durchsetzt, steht in [workflow-pool-kuratierung.md](workflow-pool-kuratierung.md).
 
-Alle eingebauten Templates mit ihrem primären Pattern. Die SaaS-Factory-Workflows (`saas-*`) liegen im Pool (Scope `external`), weil sie ein Werkzeug außerhalb des Repositories brauchen:
+Alle eingebauten Templates mit ihrem primären Pattern:
 
 | Template | Pattern | Kategorie |
 |---|---|---|

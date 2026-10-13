@@ -24,11 +24,7 @@ Every definition carries a `scope` field with one of three values:
 | `external` | needs a tool that is neither in this repository nor in your project; the description names it | runs once you have that tool |
 
 All three are legitimate. The `repo` entries are the self-audits this project runs on itself —
-they are here as worked examples of the mechanism, not as tools for your codebase. The
-`external` entries (`saas-*`) drive a SaaS factory with its own `factory` CLI, which is not part
-of this repository; `saas-feature-loop` runs the installed `saas-feature-implement` once per
-feature (a `foreach` with `workflow_id`), so install both and pass the id of the second as
-`feature_workflow_id`. The Java audits (`java-audit-*`, `java-review-changes`) work on any Java
+they are here as worked examples of the mechanism, not as tools for your codebase. The Java audits (`java-audit-*`, `java-review-changes`) work on any Java
 project: a measurement (PMD, Maven, trivy or a script) picks the candidates and the AI judges them
 in the source, with a built-in skill per audit (`builtin-java-*`); set `java_source_dir` and
 `java_build_dir` for your layout. The ones using PMD, Maven or trivy are `external` (Docker plus

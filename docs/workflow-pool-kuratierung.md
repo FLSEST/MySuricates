@@ -46,14 +46,12 @@ Jeder Eintrag trägt ein Pflichtfeld `scope` mit genau einem von drei Werten:
 |---|---|---|
 | `repo` | greift auf die Struktur **dieses** Repositories zu | nennt `ai-automation-backend`, `ai-automation-frontend`, `mvnw`, `scripts/` oder `workflow-pool/` |
 | `portable` | über `project_path` (o. ä. Kontextvariablen) parametrisiert | läuft in jedem Projekt, das der Installierende auswählt |
-| `external` | braucht ein Werkzeug außerhalb dieses Repositories und des gewählten Projekts | die Beschreibung nennt die Voraussetzung, etwa die SaaS-Factory (`saas-factory/` mit der CLI `tools/factory`) |
+| `external` | braucht ein Werkzeug außerhalb dieses Repositories und des gewählten Projekts | die Beschreibung nennt die Voraussetzung, etwa Docker und die Agent-Images der Java-Audits (`java-audit-*`) |
 
-Der `saas-feature-loop`-Eintrag lässt die SaaS-Factory über eine ganze Feature-Liste laufen: Ein
-`foreach` mit `workflow_id` startet je Feature den installierten `saas-feature-implement` als
-eigenen Lauf. Weil der Pool keine Instanz-UUIDs enthalten darf, kommt dessen ID zur Laufzeit als
-Kontextvariable `feature_workflow_id` – beide Einträge installieren und die ID des zweiten
-mitgeben. Zwischen dem 2026-09-30 und a5c9fbbf war der Eintrag aus dem Pool genommen, weil `foreach`
-das noch nicht konnte.
+Die Einträge der SaaS-Factory (`saas-*`) sind seit 2026-10-13 nicht mehr im Pool: Gegen den heutigen
+Plattformstand liefen sie nicht durch (TODOs per REST, Schlüssel aus der Datenbank, entfernte
+Kettenvorlage). Sie kommen mit der überarbeiteten Factory zurück, die dann im Repository liegt
+(TODO fba15213).
 
 Alle drei sind legitim, aber sie sind verschieden nützlich: wer einen `repo`-Eintrag in sein
 eigenes Projekt installiert, bekommt einen Workflow, der ins Leere läuft, und ein
