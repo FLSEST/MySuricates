@@ -2425,6 +2425,7 @@ export const en = {
     socketRestart: 'To use them, restart the instance with the socket mounted.',
     socketSwitchLabel: 'Switch',
     dockerTryout: 'The tryout mounts nothing from the host, no Docker socket either. So no image can be checked, and shell blocks with container_image fail: the projects live on a Docker volume that a container block cannot mount. For container blocks, set MySuricates up directly on the machine (scripts/setup.sh) or use scripts/instance.sh with MYSURICATES_DOCKER_SOCKET=1.',
+    dockerCliOnly: 'Docker is reachable through the docker CLI (a docker context), so shell blocks with container_image run. The image check, though, talks to the Docker API directly and does not follow the docker context, so the build state of the images stays unknown. For it, point DOCKER_HOST at the same daemon (for rootless Docker e.g. unix:///run/user/1000/docker.sock), then restart the instance.',
     staleSummary: '{count} shipped image(s) do not match this version. Rebuild them on the host:',
     rebuildAll: 'Rebuild all agent images',
     rebuild: 'Rebuild this image',

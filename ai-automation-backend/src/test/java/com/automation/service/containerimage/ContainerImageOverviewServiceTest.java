@@ -98,6 +98,19 @@ class ContainerImageOverviewServiceTest {
     }
 
     @Test
+    void dockerReachedOnlyThroughTheCliIsNotConnectedAndNotInspected() {
+        when(docker.status()).thenReturn(new DockerAccess.Status(DockerExpectation.State.UP, false, null, null,
+                false, true));
+
+        Overview overview = service.overview();
+
+        assertThat(overview.docker()).isEqualTo("CLI_ONLY");
+        assertThat(overview.images()).extracting(ImageView::status).containsOnly(Status.UNKNOWN);
+        assertThat(overview.images()).extracting(ImageView::builtAt).containsOnlyNulls();
+        verify(inspector, never()).inspect(anyString());
+    }
+
+    @Test
     void anInstanceInAContainerNamesItsSocketSwitch() {
         when(docker.status()).thenReturn(new DockerAccess.Status(DockerExpectation.State.NOT_CONFIGURED, true,
                 "TEST_DOCKER_SOCKET", "/home/user/.config/mysuricates/staging.env"));

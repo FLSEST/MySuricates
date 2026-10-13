@@ -256,7 +256,7 @@ Source: `ContainerImageController` – Container images workflows can run in —
 
 Notes:
 
-- `GET /api/v1/container-images` — Status per image: CURRENT/OUTDATED compare the label `org.mysuricates.dockerfile-sha256` with the catalog, UNLABELED means built without `scripts/build-agent-images.sh`, MISSING not present, UNKNOWN not checkable (Docker unreachable or a placeholder reference). Read-only; rebuilding stays a command on the host.
+- `GET /api/v1/container-images` — Status per image: CURRENT/OUTDATED compare the label `org.mysuricates.dockerfile-sha256` with the catalog, UNLABELED means built without `scripts/build-agent-images.sh`, MISSING not present, UNKNOWN not checkable (Docker unreachable or a placeholder reference). `docker` is CONNECTED, UNAVAILABLE, NOT_CONFIGURED or CLI_ONLY: only the docker CLI reaches the daemon (a docker context), so container blocks run, but the images stay UNKNOWN because the check uses the Docker API. Read-only; rebuilding stays a command on the host.
 
 ## /api/v1/conversions
 

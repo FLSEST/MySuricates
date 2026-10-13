@@ -170,6 +170,25 @@ describe('Containers', () => {
     expect(screen.queryByText(/secure default/)).not.toBeInTheDocument();
   });
 
+  it('says that only the docker CLI reaches Docker and what the image check needs', async () => {
+    server.use(http.get('/api/v1/container-images', () => HttpResponse.json({
+      ...overview,
+      docker: 'CLI_ONLY',
+      images: overview.images.map((image) => ({ ...image, status: 'UNKNOWN', builtAt: null })),
+    })));
+
+    renderWithProviders(<Containers />);
+
+    const note = await screen.findByText(/Docker is reachable through the docker CLI/);
+    expect(note).toHaveTextContent('so shell blocks with container_image run');
+    expect(note).toHaveTextContent('DOCKER_HOST');
+    expect(note).toHaveTextContent('unix:///run/user/1000/docker.sock');
+    expect(note).toHaveTextContent('restart the instance');
+    expect(screen.queryByText(/connected/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Docker is not set up on this machine/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/does not respond/)).not.toBeInTheDocument();
+  });
+
   it('uses the German purpose and labels in German', async () => {
     useI18nStore.setState({ locale: 'de' });
     server.use(http.get('/api/v1/container-images', () => HttpResponse.json(overview)));

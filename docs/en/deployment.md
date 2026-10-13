@@ -179,7 +179,10 @@ daemon:
 
 Reachable means: the instance's ping answers or, if it does not, `docker version` through the docker CLI
 that container blocks start with. So a `docker context` (rootless Docker, Docker Desktop for Linux, Colima)
-without `DOCKER_HOST` counts too (`DockerCliProbe`, answer kept for 30 s).
+without `DOCKER_HOST` counts too (`DockerCliProbe`, answer kept for 30 s). The Containers page shows this
+case as `CLI_ONLY` and leaves the build state of the images open, because the image check talks to the
+Docker API directly and follows no `docker context` – for it, point `DOCKER_HOST` at the same daemon (rootless e.g.
+`unix:///run/user/1000/docker.sock`) and restart the instance.
 
 In the container instances the project folders are mounted under the same path as on the machine; with
 the socket, container blocks therefore work there as they do on the machine. The tryout lacks exactly

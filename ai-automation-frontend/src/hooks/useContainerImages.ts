@@ -35,7 +35,11 @@ export interface ContainerImageView {
 }
 
 export interface ContainerImagesOverview {
-  docker: 'CONNECTED' | 'UNAVAILABLE' | 'NOT_CONFIGURED';
+  /**
+   * CLI_ONLY: only the docker CLI reaches the daemon (a docker context). Container blocks run, but the
+   * images are not inspected, because that goes through the Docker API (java.review 574d1178).
+   */
+  docker: 'CONNECTED' | 'CLI_ONLY' | 'UNAVAILABLE' | 'NOT_CONFIGURED';
   allowlistActive: boolean;
   images: ContainerImageView[];
   /** The instance itself runs in a container; without the socket it cannot start containers. */

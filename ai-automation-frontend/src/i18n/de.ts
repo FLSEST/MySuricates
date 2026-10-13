@@ -2422,6 +2422,7 @@ export const de: TranslationKeys = {
     socketRestart: 'Dafür die Instanz mit eingebundenem Socket neu starten.',
     socketSwitchLabel: 'Schalter',
     dockerTryout: 'Das Tryout bindet nichts vom Rechner ein, auch keinen Docker-Socket. Deshalb lässt sich kein Image prüfen, und Shell-Blöcke mit container_image scheitern: Die Projekte liegen auf einem Docker-Volume, das ein Container-Block nicht einbinden kann. Für Container-Blöcke MySuricates direkt auf dem Rechner einrichten (scripts/setup.sh) oder scripts/instance.sh mit MYSURICATES_DOCKER_SOCKET=1 nutzen.',
+    dockerCliOnly: 'Docker ist über die docker-CLI erreichbar (ein docker context), Shell-Blöcke mit container_image laufen also. Die Image-Prüfung spricht aber die Docker-API direkt an und folgt dem docker context nicht, deshalb bleibt der Baustand der Images unbekannt. Dafür DOCKER_HOST auf denselben Daemon setzen (bei rootless Docker z. B. unix:///run/user/1000/docker.sock), dann die Instanz neu starten.',
     staleSummary: '{count} mitgelieferte(s) Image(s) passen nicht zu dieser Version. Auf dem Host neu bauen:',
     rebuildAll: 'Alle Agent-Images neu bauen',
     rebuild: 'Dieses Image neu bauen',

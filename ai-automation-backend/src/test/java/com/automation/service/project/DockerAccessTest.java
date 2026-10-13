@@ -17,6 +17,12 @@ class DockerAccessTest {
         return new DockerAccess(expectation, env::get, () -> marker);
     }
 
+    private static DockerExpectation mockProbe(DockerExpectation.State state) {
+        DockerExpectation expectation = mock(DockerExpectation.class);
+        when(expectation.probe()).thenReturn(state);
+        return expectation;
+    }
+
     @Test
     @DisplayName("a failed ping is not the last word: a docker CLI that reaches a daemon (docker context) counts")
     void cliReachesDockerThroughAContext() {
@@ -28,6 +34,38 @@ class DockerAccessTest {
 
         assertThat(status.reachable()).isTrue();
         assertThat(status.hint()).isEmpty();
+    }
+
+    @Test
+    @DisplayName("a daemon only the docker CLI reaches stays reachable for container blocks but is marked CLI-only")
+    void cliOnlyIsReachableAndSaysSo() {
+        DockerAccess.Status status = new DockerAccess(mockProbe(DockerExpectation.State.NOT_CONFIGURED),
+                Map.<String, String>of()::get, () -> false, () -> true).status();
+
+        assertThat(status.reachable()).isTrue();
+        assertThat(status.state()).isEqualTo(DockerExpectation.State.UP);
+        assertThat(status.cliOnly()).isTrue();
+        assertThat(status.hintEn()).isEmpty();
+    }
+
+    @Test
+    @DisplayName("an answering ping is not CLI-only")
+    void pingUpIsNotCliOnly() {
+        DockerAccess.Status status = new DockerAccess(mockProbe(DockerExpectation.State.UP),
+                Map.<String, String>of()::get, () -> false, () -> true).status();
+
+        assertThat(status.reachable()).isTrue();
+        assertThat(status.cliOnly()).isFalse();
+    }
+
+    @Test
+    @DisplayName("neither ping nor CLI answers: unreachable, and not CLI-only")
+    void nothingAnswersIsNotCliOnly() {
+        DockerAccess.Status status = new DockerAccess(mockProbe(DockerExpectation.State.DOWN),
+                Map.<String, String>of()::get, () -> false, () -> false).status();
+
+        assertThat(status.reachable()).isFalse();
+        assertThat(status.cliOnly()).isFalse();
     }
 
     @Test

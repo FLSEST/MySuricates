@@ -116,7 +116,14 @@ function StateNotes({ overview }: { overview: ContainerImagesOverview }) {
   const stale = overview.images.filter((image) => image.shipped && NEEDS_BUILD.includes(image.status));
   return (
     <div className="space-y-3">
-      {overview.docker !== 'CONNECTED' && <DockerMissing overview={overview} />}
+      {overview.docker === 'CLI_ONLY' ? (
+        // Container blocks run through the CLI; only the image check (Docker API) cannot reach the daemon.
+        <p className="rounded-lg border border-info/30 bg-info-subtle px-4 py-3 text-sm text-info break-words">
+          {t.containers.dockerCliOnly}
+        </p>
+      ) : (
+        overview.docker !== 'CONNECTED' && <DockerMissing overview={overview} />
+      )}
       {stale.length > 0 && (
         <div className="rounded-lg border border-warning/30 bg-warning-subtle px-4 py-3 space-y-2">
           <p className="text-sm text-warning">

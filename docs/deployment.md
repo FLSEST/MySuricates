@@ -180,6 +180,9 @@ Docker-Daemon erreicht:
 Erreichbar heißt: Der Ping der Instanz antwortet, oder – wenn nicht – `docker version` über die
 docker-CLI, mit der Container-Blöcke ja starten. So zählt auch ein `docker context` (rootless Docker,
 Docker Desktop für Linux, Colima) ohne `DOCKER_HOST` (`DockerCliProbe`, Antwort 30 s gemerkt).
+Die Seite Container zeigt diesen Fall eigens als `CLI_ONLY` an und lässt den Baustand der Images offen,
+weil die Image-Prüfung die Docker-API direkt anspricht und keinem `docker context` folgt – dafür `DOCKER_HOST` auf
+denselben Daemon setzen (rootless etwa `unix:///run/user/1000/docker.sock`) und die Instanz neu starten.
 
 Die Projektordner sind in den Container-Instanzen unter demselben Pfad eingebunden wie auf dem
 Rechner; mit Socket funktionieren Container-Blöcke dort also wie auf dem Rechner. Im Tryout fehlt genau

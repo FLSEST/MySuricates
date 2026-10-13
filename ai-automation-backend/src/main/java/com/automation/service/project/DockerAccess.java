@@ -27,6 +27,8 @@ import java.util.function.UnaryOperator;
  *
  * <p>The ping only knows {@code docker.host}; when it fails, the docker CLI is asked as well
  * ({@link DockerCliProbe}): container blocks start through it, and it also follows a {@code docker context}.
+ * Such a status is reachable but {@link Status#cliOnly() CLI-only}: whatever talks to Docker through
+ * docker-java (the image check of the container page) still cannot reach that daemon (java.review 574d1178).
  *
  * <p>The texts end up in step outputs, analyzer findings and the container page; they name switches and
  * a config file path, never a secret.
@@ -40,12 +42,19 @@ public class DockerAccess {
      * @param socketSwitch name of the switch that mounts the socket ({@code TEST_DOCKER_SOCKET}), or null
      * @param switchSource where that switch is changed (a file, or how the starter is called), or null
      * @param tryout       the instance is the tryout image, where a socket would not help
+     * @param cliOnly      {@code state} is UP only because the docker CLI answered, the ping (Docker API) did not;
+     *                     {@link #reachable()} stays true, since container blocks start through the CLI
      */
     public record Status(DockerExpectation.State state, boolean inContainer, String socketSwitch, String switchSource,
-                         boolean tryout) {
+                         boolean tryout, boolean cliOnly) {
 
         public Status(DockerExpectation.State state, boolean inContainer, String socketSwitch, String switchSource) {
             this(state, inContainer, socketSwitch, switchSource, false);
+        }
+
+        public Status(DockerExpectation.State state, boolean inContainer, String socketSwitch, String switchSource,
+                      boolean tryout) {
+            this(state, inContainer, socketSwitch, switchSource, tryout, false);
         }
 
         public boolean reachable() {
@@ -139,12 +148,15 @@ public class DockerAccess {
         boolean hasSwitch = inContainer && !tryout;
         String prefix = hasSwitch ? blankToNull(env.apply("MYSURICATES_SWITCH_PREFIX")) : null;
         DockerExpectation.State state = docker.probe();
+        boolean cliOnly = false;
         if (state != DockerExpectation.State.UP && cliReachable.getAsBoolean()) {
+            // Reachable for container blocks (they start through the CLI), but not for docker-java callers.
             state = DockerExpectation.State.UP;
+            cliOnly = true;
         }
         return new Status(state, inContainer,
                 prefix == null ? null : prefix + "DOCKER_SOCKET",
-                hasSwitch ? blankToNull(env.apply("MYSURICATES_SWITCH_SOURCE")) : null, tryout);
+                hasSwitch ? blankToNull(env.apply("MYSURICATES_SWITCH_SOURCE")) : null, tryout, cliOnly);
     }
 
     private static String blankToNull(String value) {

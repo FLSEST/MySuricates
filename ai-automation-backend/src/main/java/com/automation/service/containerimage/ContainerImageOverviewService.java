@@ -43,7 +43,10 @@ public class ContainerImageOverviewService {
         MISSING,
         /** Present; a foreign image has no catalog entry to compare with. */
         PRESENT,
-        /** Not checkable: Docker unreachable, the reference is a placeholder, or the inspection failed. */
+        /**
+         * Not checkable: Docker unreachable or reachable only through the docker CLI, the reference is a
+         * placeholder, or the inspection failed.
+         */
         UNKNOWN
     }
 
@@ -52,7 +55,9 @@ public class ContainerImageOverviewService {
                             String buildCommand, List<WorkflowUse> workflows, List<String> projectTypes) {}
 
     /**
-     * {@code docker}: CONNECTED, UNAVAILABLE or NOT_CONFIGURED, as in the system health. {@code inContainer},
+     * {@code docker}: CONNECTED, UNAVAILABLE or NOT_CONFIGURED, as in the system health, or CLI_ONLY: only the
+     * docker CLI reaches the daemon (a docker context), so container blocks run but the images cannot be
+     * inspected, because that goes through the Docker API (java.review 574d1178). {@code inContainer},
      * {@code socketSwitch} and {@code switchSource} let the page say why Docker is missing in an instance that
      * itself runs in a container and which switch mounts the socket (TODO 0ad8853b); both strings may be null.
      * {@code tryout}: the tryout image, which has no switch because a socket would not help there (TODO 29d6a133).
@@ -61,6 +66,7 @@ public class ContainerImageOverviewService {
                            String socketSwitch, String switchSource, boolean tryout) {}
 
     static final String BUILD_SCRIPT = "scripts/build-agent-images.sh";
+    static final String CLI_ONLY = "CLI_ONLY";
 
     private final AgentImageCatalog catalog;
     private final ContainerImageInspector inspector;
@@ -71,12 +77,13 @@ public class ContainerImageOverviewService {
     public Overview overview() {
         Map<String, List<WorkflowUse>> uses = ContainerImageUsage.scan(workflowService.findAll());
         DockerAccess.Status access = dockerAccess.status();
-        boolean dockerUp = access.reachable();
-        String docker = dockerState(access.state());
+        // The inspector uses docker-java, which cannot reach a daemon only the CLI finds: every call would fail.
+        boolean inspectable = access.reachable() && !access.cliOnly();
+        String docker = access.cliOnly() ? CLI_ONLY : dockerState(access.state());
 
         List<ImageView> images = new ArrayList<>();
         for (AgentImage image : catalog.images()) {
-            State state = state(image.image(), dockerUp, facts -> labelStatus(facts, image));
+            State state = state(image.image(), inspectable, facts -> labelStatus(facts, image));
             images.add(new ImageView(image.image(), true, image.purpose(), image.base(), image.tools(),
                     state.status(), state.builtAt(), allowlist.isAllowed(image.image()),
                     BUILD_SCRIPT + " " + image.service(), uses.getOrDefault(image.image(), List.of()),
@@ -84,7 +91,7 @@ public class ContainerImageOverviewService {
         }
         uses.forEach((reference, workflows) -> {
             if (catalog.find(reference).isPresent()) return;
-            State state = state(reference, dockerUp, facts -> Status.PRESENT);
+            State state = state(reference, inspectable, facts -> Status.PRESENT);
             images.add(new ImageView(reference, false, Map.of(), null, List.of(), state.status(), state.builtAt(),
                     allowlist.isAllowed(reference), null, workflows, List.of()));
         });
@@ -95,8 +102,8 @@ public class ContainerImageOverviewService {
     private record State(Status status, String builtAt) {}
 
     /** One Docker round trip per image; {@code present} decides the status of an image that exists. */
-    private State state(String reference, boolean dockerUp, Function<ImageFacts, Status> present) {
-        if (!dockerUp || isPlaceholder(reference)) return new State(Status.UNKNOWN, null);
+    private State state(String reference, boolean inspectable, Function<ImageFacts, Status> present) {
+        if (!inspectable || isPlaceholder(reference)) return new State(Status.UNKNOWN, null);
         try {
             return inspector.inspect(reference)
                     .map(facts -> new State(present.apply(facts), facts.created()))
