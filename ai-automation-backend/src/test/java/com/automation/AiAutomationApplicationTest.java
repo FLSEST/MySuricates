@@ -1,5 +1,7 @@
 package com.automation;
 
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.MockedStatic;
 import org.springframework.boot.SpringApplication;
@@ -24,6 +26,24 @@ class AiAutomationApplicationTest {
 
     @Autowired
     private ApplicationContext applicationContext;
+
+    private String headlessBefore;
+
+    // Two tests below set java.awt.headless=false; left behind, it made AWT tests later in the
+    // same fork try the (missing) X server of the CI runner (TODO 9592e2df)
+    @BeforeEach
+    void rememberHeadless() {
+        headlessBefore = System.getProperty("java.awt.headless");
+    }
+
+    @AfterEach
+    void restoreHeadless() {
+        if (headlessBefore == null) {
+            System.clearProperty("java.awt.headless");
+        } else {
+            System.setProperty("java.awt.headless", headlessBefore);
+        }
+    }
 
     @Test
     void should_loadSpringContext_when_applicationStarts() {

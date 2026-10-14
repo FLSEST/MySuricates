@@ -384,9 +384,16 @@
                         Passed as a system property, NOT via argLine: the argLine above wins over
                         any -DargLine, and systemPropertyVariables composes cleanly with it.
                         Guarded by ExternalConfigIsolationTest.
+
+                        java.awt.headless=true for the same reason: without it AWT decides from
+                        DISPLAY. GitHub runners set DISPLAY=:0.0 without an X server, so a test
+                        drawing a BufferedImage (TrayIconRendererTest) only passed when an earlier
+                        @SpringBootTest in the same fork had set headless=true - red on the runner
+                        image of 2026-10-12 (TODO 9592e2df).
                     -->
                     <systemPropertyVariables>
                         <spring.config.location>optional:classpath:/,optional:classpath:/config/</spring.config.location>
+                        <java.awt.headless>true</java.awt.headless>
                     </systemPropertyVariables>
                 </configuration>
             </plugin>
