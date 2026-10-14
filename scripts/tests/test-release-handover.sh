@@ -8,7 +8,7 @@
 # Checked: exclusion list, content replaced (ignored build caches stay), commit with
 # noreply author, annotated tag, notes file, abort on gate finding (default rule, private
 # term list, docs gate) with full reset, abort without change, preconditions,
-# and that nothing is ever pushed.
+# and that nothing is ever pushed. At the end: release-ci-check.sh against a fake gh.
 #
 # Run: bash scripts/tests/test-release-handover.sh   (exit 0 = all checks ok)
 set -uo pipefail
@@ -273,5 +273,47 @@ check "Uebergabe und Verwerfen laufen durch"               '[ "$RC20" -eq 0 ] &&
 check "Branch wieder ungeboren, kein Tag"                  '! git -C "$TMP/pub2" rev-parse -q --verify HEAD >/dev/null && [ -z "$(git -C "$TMP/pub2" tag)" ]'
 check "keine Datei mehr im Klon (auch keine ignorierte)"    '[ -z "$(cd "$TMP/pub2" && find . -path ./.git -prune -o -type f -print)" ]'
 check "nichts gepusht"                                     'no_push && [ -z "$(git -C "$TMP/empty.git" for-each-ref)" ]'
+
+# --- release-ci-check.sh: CI gate before first cut and handover (fake gh) ----------------------
+echo; echo "== release-ci-check.sh"
+CI="$TMP/ci"
+git init -q -b main "$CI"
+git -C "$CI" -c user.email="$NOREPLY" -c user.name=Tester commit -q --allow-empty -m "Release v1.0.0"
+git -C "$CI" tag v1.0.0
+git -C "$CI" remote add origin git@github.com:owner/repo_archive.git
+cat > "$TMP/fake-gh" <<'GH'
+#!/usr/bin/env bash
+echo "$*" >> "$FAKE_GH_LOG"
+[ -n "${FAKE_GH_FAIL:-}" ] && { echo "HTTP 401: Bad credentials"; exit 1; }
+case " $* " in
+  *" --commit "*) printf '%s' "$FAKE_TAG_RUNS" ;;
+  *" --branch "*) printf '%s' "$FAKE_MAIN_RUNS" ;;
+esac
+GH
+chmod +x "$TMP/fake-gh"
+GREEN='[{"databaseId":2,"status":"completed","conclusion":"success"},{"databaseId":1,"status":"completed","conclusion":"failure"}]'
+RED='[{"databaseId":3,"status":"completed","conclusion":"failure"}]'
+RUNNING='[{"databaseId":4,"status":"in_progress","conclusion":""}]'
+cicheck() { GH="$TMP/fake-gh" FAKE_GH_LOG="$TMP/gh.log" bash "$REPO/scripts/release-ci-check.sh" --repo "$CI" --tag v1.0.0; }
+: > "$TMP/gh.log"
+OUTC1="$(FAKE_TAG_RUNS="$GREEN" FAKE_MAIN_RUNS="$GREEN" cicheck)"; RCC1=$?
+check "CI: Tag und main gruen (neuester Lauf zaehlt) -> exit 0" '[ "$RCC1" -eq 0 ] && [ "$(grep -c " grün (Lauf 2)" <<< "$OUTC1")" = 2 ]'
+check "CI: fragt das GitHub-Repo von origin, Tag-Commit und main" 'grep -q -- "-R owner/repo_archive .*--commit $(git -C "$CI" rev-parse v1.0.0)" "$TMP/gh.log" && grep -q -- "--branch main --event push" "$TMP/gh.log"'
+OUTC2="$(FAKE_TAG_RUNS="$GREEN" FAKE_MAIN_RUNS="$RED" cicheck)"; RCC2=$?
+check "CI: Tag gruen, main rot -> Abbruch (der Fall v0.7.8)" '[ "$RCC2" -eq 1 ] && grep -q "auf main in owner/repo_archive ist failure (Lauf 3)" <<< "$OUTC2"'
+OUTC3="$(FAKE_TAG_RUNS="$RUNNING" FAKE_MAIN_RUNS="$GREEN" cicheck)"; RCC3=$?
+check "CI: Lauf des Tags noch offen -> Abbruch"             '[ "$RCC3" -eq 1 ] && grep -q "läuft noch (Lauf 4)" <<< "$OUTC3"'
+OUTC4="$(FAKE_TAG_RUNS='[]' FAKE_MAIN_RUNS="$GREEN" cicheck)"; RCC4=$?
+check "CI: kein Lauf fuer den Tag -> Abbruch"               '[ "$RCC4" -eq 1 ] && grep -q "kein Lauf von ci.yml für v1.0.0" <<< "$OUTC4"'
+OUTC5="$(FAKE_GH_FAIL=1 cicheck)"; RCC5=$?
+check "CI: gh scheitert -> Abbruch mit Grund"               '[ "$RCC5" -eq 1 ] && grep -q "nicht lesbar: HTTP 401" <<< "$OUTC5"'
+git -C "$CI" remote set-url origin https://github.com/owner/repo.git
+OUTC6="$(FAKE_TAG_RUNS="$GREEN" FAKE_MAIN_RUNS="$GREEN" cicheck)"; RCC6=$?
+check "CI: https-origin wird erkannt"                       '[ "$RCC6" -eq 0 ] && grep -q "in owner/repo grün" <<< "$OUTC6"'
+git -C "$CI" remote set-url origin /srv/git/repo.git
+OUTC7="$(cicheck)"; RCC7=$?
+check "CI: origin ohne GitHub -> Abbruch"                   '[ "$RCC7" -eq 1 ] && grep -q "kein GitHub-Repo" <<< "$OUTC7"'
+OUTC8="$(GH="$TMP/fake-gh" FAKE_GH_LOG="$TMP/gh.log" bash "$REPO/scripts/release-ci-check.sh" --repo "$CI" --tag v9.9.9)"; RCC8=$?
+check "CI: unbekanntes Tag -> Abbruch"                      '[ "$RCC8" -eq 1 ] && grep -q "Tag v9.9.9 fehlt" <<< "$OUTC8"'
 
 echo; echo "passed=$PASS failed=$FAIL"; [ "$FAIL" -eq 0 ]

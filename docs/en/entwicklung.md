@@ -901,6 +901,12 @@ be played through beforehand. `live` takes the working repo (`archive_repo`) and
 and that the target (`public_remote`) is empty. The paths per mode are in
 `scripts/lib/release-paths.sh`.
 
+In live mode, the first cut and the handover check CI in the archive first (`scripts/release-ci-check.sh`,
+via `gh`): the run of the tag commit and the newest push run on `main` must be green; a running,
+missing or red run stops them. So start only after `main` and the tag are pushed to the archive and CI
+has finished. With v0.7.8 the tag run was green and the `main` run right after it red (a test depended
+on the order) – the tag alone would have let it through.
+
 The first cut takes `main` up to the release tag: the tag must lie on `main`, but not necessarily at its tip.
 `release.sh` commits the next `-SNAPSHOT` version after the tag; that commit stays in the archive and
 goes out with the next handover (`rewrite.sh --tag` resets the work clone to the tag, the tree

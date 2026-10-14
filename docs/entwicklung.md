@@ -916,6 +916,12 @@ Klon (`public_clone`); der Erstschnitt verlangt dort, dass `origin` schon auf `M
 zeigt und das Ziel (`public_remote`) leer ist. Die Pfade je Modus stehen in
 `scripts/lib/release-paths.sh`.
 
+Live prüfen Erstschnitt und Übergabe vorher die CI im Archiv (`scripts/release-ci-check.sh`, per `gh`):
+Der Lauf des Tag-Commits und der neueste Push-Lauf auf `main` müssen grün sein, ein laufender, fehlender
+oder roter Lauf hält an. Erst nach dem Push von `main` samt Tag ins Archiv starten und die CI abwarten.
+Bei v0.7.8 war der Tag-Lauf grün und der `main`-Lauf direkt danach rot (ein Test hing an der
+Reihenfolge) – mit dem Tag allein wäre das durchgerutscht.
+
 Der Erstschnitt nimmt `main` bis zum Release-Tag: Das Tag muss auf `main` liegen, aber nicht
 an der Spitze. `release.sh` legt nach dem Tag den Commit mit der nächsten `-SNAPSHOT`-Version an; der bleibt
 im Archiv und kommt mit der nächsten Übergabe hinaus (`rewrite.sh --tag` setzt den Arbeitsklon auf das
