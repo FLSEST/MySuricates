@@ -897,7 +897,7 @@ The context value `mode` decides: `probe` (default) replaces both GitHub repos w
 under `~/.local/state/mysuricates/release-probe` — a clone of the working repo (`work/`, `main` starts
 at the cut commit) with `archive.git` as `origin`, and an empty `public.git`. That way the whole way can
 be played through beforehand. `live` takes the working repo (`archive_repo`) and the public clone
-(`public_clone`); there the first cut requires that `origin` already points to `MySuricates-archive`
+(`public_clone`); there the first cut requires that `origin` already points to `MySuricates_archive`
 and that the target (`public_remote`) is empty. The paths per mode are in
 `scripts/lib/release-paths.sh`.
 

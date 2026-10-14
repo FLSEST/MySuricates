@@ -912,7 +912,7 @@ Der Kontext `mode` entscheidet: `probe` (Standard) ersetzt beide GitHub-Repos du
 unter `~/.local/state/mysuricates/release-probe` — einen Klon des Arbeits-Repos (`work/`, `main`
 beginnt beim Schnitt-Commit) mit `archive.git` als `origin` und ein leeres `public.git`. So lässt sich
 der ganze Weg vorher durchspielen. `live` nimmt das Arbeits-Repo (`archive_repo`) und den öffentlichen
-Klon (`public_clone`); der Erstschnitt verlangt dort, dass `origin` schon auf `MySuricates-archive`
+Klon (`public_clone`); der Erstschnitt verlangt dort, dass `origin` schon auf `MySuricates_archive`
 zeigt und das Ziel (`public_remote`) leer ist. Die Pfade je Modus stehen in
 `scripts/lib/release-paths.sh`.
 

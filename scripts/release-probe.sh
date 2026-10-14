@@ -6,7 +6,7 @@
 # Layout of the probe directory (default ~/.local/state/mysuricates/release-probe):
 #   work/          clone of the working repo - stands in for the archive working copy; main starts
 #                  at the cut commit, the later commits wait under refs/probe/future
-#   archive.git/   bare repo, origin of work/ - stands in for GitHub MySuricates-archive
+#   archive.git/   bare repo, origin of work/ - stands in for GitHub MySuricates_archive
 #   public.git/    bare repo, empty after reset - stands in for the new public GitHub repo
 #   public/        clone of public.git, created after the first cut - the handover target
 #   events.jsonl   event log of the probe (scripts/release-overview.py)
