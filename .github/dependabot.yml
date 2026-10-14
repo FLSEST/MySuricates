@@ -1,7 +1,8 @@
-# Version updates for GitHub Actions (monthly, grouped) and security updates for
-# npm/Maven. Version PRs for npm/Maven are deliberately handled by the pool workflow
-# "npm-dependency-update" or by hand (workflow first) - so open-pull-requests-limit: 0 applies
-# here, which only switches off the version updates. Security PRs have
+# Security updates only. Version PRs are switched off for every ecosystem
+# (open-pull-requests-limit: 0): npm/Maven go through the pool workflow
+# "npm-dependency-update" or by hand (workflow first), GitHub Actions by hand. The public
+# repo only receives release commits through the handover, so a version PR there could never
+# be merged (2026-10-14: the first push opened one at once). Security PRs have
 # their own internal limit and keep running independently of it, as soon as they are switched on
 # in the repo settings (Code security -> Dependabot alerts + Dependabot security updates) -
 # that is not a setting in this file.
@@ -11,6 +12,7 @@ updates:
     directory: /
     schedule:
       interval: monthly
+    open-pull-requests-limit: 0
     groups:
       actions:
         patterns: ["*"]
